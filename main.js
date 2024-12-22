@@ -40,6 +40,8 @@ class QubitGrid {
         // Event listeners
         window.addEventListener('resize', () => this.onWindowResize());
         window.addEventListener('mousemove', (event) => this.onMouseMove(event));
+        window.addEventListener('mouseleave', this.onMouseLeave.bind(this));
+
         
         // Create grid
         this.createGrid(5, 5); // 5x5 grid
@@ -48,7 +50,7 @@ class QubitGrid {
         this.animate();
         
         // Start random state changes
-        setInterval(() => this.randomStateChange(), 1000);
+        setInterval(() => this.randomStateChange(), 500);
     }
 
     setupLights() {
@@ -90,56 +92,226 @@ class QubitGrid {
             }
         }
     }
+
+
+    createArrow(direction, color) {
+        const arrowGroup = new THREE.Group();
     
-    createQubit(id, x, y) {
-        const geometry = new THREE.SphereGeometry(0.4, 32, 32);
-        const material = new THREE.MeshPhongMaterial({
-            color: this.getStateColor('0'),
-            specular: 0x444444,
-            shininess: 30,
-            emissive: 0x0,
-            emissiveIntensity: 0.2
-        });
+        // Create the shaft
+        const shaftGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.35);
+        const shaftMaterial = new THREE.MeshBasicMaterial({ color: color });
+        const shaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
+        shaft.position.y = 0.175; // Half of the shaft length
         
-        const sphere = new THREE.Mesh(geometry, material);
-        sphere.position.set(x, y, 0);
-        sphere.userData = { id, state: '0' };
-        
-        // Add subtle glow effect
-        const glowGeometry = new THREE.SphereGeometry(0.45, 32, 32);
-        const glowMaterial = new THREE.MeshPhongMaterial({
-            color: this.getStateColor('0'),
-            transparent: true,
-            opacity: 0.2,
-            side: THREE.BackSide
-        });
-        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-        sphere.add(glow);
-        
-        this.scene.add(sphere);
-        this.qubits.set(id, sphere);
-        return sphere;
+        // Create the arrow head (cone)
+        const headGeometry = new THREE.ConeGeometry(0.05, 0.1);
+        const headMaterial = new THREE.MeshBasicMaterial({ color: color });
+        const head = new THREE.Mesh(headGeometry, headMaterial);
+        head.position.y = 0.35; // Position at the end of the shaft
+    
+        arrowGroup.add(shaft);
+        arrowGroup.add(head);
+    
+        // Orient the arrow in the specified direction
+        arrowGroup.lookAt(direction.multiplyScalar(0.4));
+    
+        return arrowGroup;
     }
 
+    createQubit(id, x, y) {
+        // Create a group to hold all components of the Bloch sphere
+        const blochSphere = new THREE.Group();
+        blochSphere.position.set(x, y, 0);
+        blochSphere.userData = { id, state: '0' };
     
-    getStateColor(state) {
-        const colors = {
-            '0': 0x00ff00,        // Green
-            '1': 0xff0000,        // Red
-            '+': 0x0000ff,        // Blue
-            '-': 0xff00ff,        // Purple
-            'superposition': 0xffff00  // Yellow
-        };
-        return colors[state] || 0x00ff00;
+        // Main sphere (transparent)
+        const sphereGeometry = new THREE.SphereGeometry(0.4, 32, 32);
+        const sphereMaterial = new THREE.MeshPhongMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide
+        });
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+        blochSphere.add(sphere);
+    
+        // Axes
+        const axisLength = 0.5;
+        const axisGeometry = new THREE.CylinderGeometry(0.01, 0.01, axisLength * 2);
+        
+        // Z-axis (vertical)
+        const zAxis = new THREE.Mesh(
+            axisGeometry,
+            new THREE.MeshBasicMaterial({ color: 0x888888 })
+        );
+        blochSphere.add(zAxis);
+    
+        // X-axis (horizontal)
+        const xAxis = new THREE.Mesh(
+            axisGeometry,
+            new THREE.MeshBasicMaterial({ color: 0x888888 })
+        );
+        xAxis.rotation.z = Math.PI / 2;
+        blochSphere.add(xAxis);
+    
+        // Y-axis
+        const yAxis = new THREE.Mesh(
+            axisGeometry,
+            new THREE.MeshBasicMaterial({ color: 0x888888 })
+        );
+        yAxis.rotation.x = Math.PI / 2;
+        blochSphere.add(yAxis);
+    
+        // Equatorial circle
+        const equatorGeometry = new THREE.TorusGeometry(0.4, 0.005, 16, 100);
+        const equatorMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
+        const equator = new THREE.Mesh(equatorGeometry, equatorMaterial);
+        equator.rotation.x = Math.PI / 2;
+        blochSphere.add(equator);
+    
+        // Meridian circle
+        const meridianGeometry = new THREE.TorusGeometry(0.4, 0.005, 16, 100);
+        const meridianMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
+        const meridian = new THREE.Mesh(meridianGeometry, meridianMaterial);
+        blochSphere.add(meridian);
+        
+        // Then replace the ArrowHelper creation with:
+        const stateVector = this.createArrow(
+            new THREE.Vector3(1, 0, 0),
+            this.getStateColor('0')
+        );
+        blochSphere.add(stateVector);
+        
+    
+        this.scene.add(blochSphere);
+        this.qubits.set(id, blochSphere);
+        return blochSphere;
     }
     
+    // Modify getStateColor to represent quantum states
+    getStateColor(state) {
+        const colors = {
+            '0': 0xffffff,    // White for |0⟩
+            '1': 0xff0000,    // Red for |1⟩
+            '+': 0x00ff00,    // Green for |+⟩
+            '-': 0x0000ff,    // Blue for |-⟩
+            'superposition': 0xff00ff  // Purple for other superpositions
+        };
+        return colors[state] || 0xffff00;
+    }
+
     updateQubitState(id, newState) {
         const qubit = this.qubits.get(id);
         if (qubit) {
-            qubit.material.color.setHex(this.getStateColor(newState));
+            const stateVector = qubit.children.find(child => child instanceof THREE.Group);
+            if (stateVector) {
+                // Get current and target colors
+                const currentColor = stateVector.children[0].material.color;
+                const targetColor = new THREE.Color(this.getStateColor(newState));
+    
+                // Animate color change
+                gsap.to(currentColor, {
+                    r: targetColor.r,
+                    g: targetColor.g,
+                    b: targetColor.b,
+                    duration: 0.5,
+                    onUpdate: () => {
+                        // Update all parts of the arrow with the interpolated color
+                        stateVector.children.forEach(part => {
+                            part.material.color.copy(currentColor);
+                        });
+                    }
+                });
+            }
+            
             qubit.userData.state = newState;
+            this.animateStateVector(qubit, newState);
         }
     }
+    
+    animateStateVector(qubit, state) {
+        const stateVector = qubit.children.find(child => child instanceof THREE.Group);
+        if (!stateVector) return;
+    
+        // Get target direction based on state
+        let targetDirection = new THREE.Vector3();
+        switch(state) {
+            case '0':
+                targetDirection.set(0, 1, 0);
+                break;
+            case '1':
+                targetDirection.set(0, -1, 0);
+                break;
+            case '+':
+                targetDirection.set(1, 0, 0);
+                break;
+            case '-':
+                targetDirection.set(-1, 0, 0);
+                break;
+            default:
+                targetDirection.set(0, 1, 0);
+        }
+        targetDirection.normalize().multiplyScalar(0.4);
+    
+        // Store current rotation
+        const currentRotation = stateVector.rotation.clone();
+        
+        // Create a temporary vector to calculate target rotation
+        const tempVector = new THREE.Vector3();
+        stateVector.lookAt(targetDirection);
+        stateVector.rotateX(Math.PI / 2);
+        const targetRotation = stateVector.rotation.clone();
+        
+        // Reset to original rotation
+        stateVector.rotation.copy(currentRotation);
+    
+        // Animate rotation
+        gsap.to(stateVector.rotation, {
+            x: targetRotation.x,
+            y: targetRotation.y,
+            z: targetRotation.z,
+            duration: 0.5,
+            ease: "power2.inOut"
+        });
+    }
+    
+    
+    updateStateVector(qubit, state) {
+        const stateVector = qubit.children.find(child => child instanceof THREE.Group);
+        if (!stateVector) return;
+    
+        // Reset rotation
+        stateVector.rotation.set(0, 0, 0);
+    
+        let direction = new THREE.Vector3();
+        switch(state) {
+            case '0':
+                direction.set(0, 1, 0); // Up
+                break;
+            case '1':
+                direction.set(0, -1, 0); // Down
+                break;
+            case '+':
+                direction.set(1, 0, 0); // Right
+                break;
+            case '-':
+                direction.set(-1, 0, 0); // Left
+                break;
+            default:
+                direction.set(0, 1, 0); // Default to up
+        }
+    
+        // Normalize and scale the direction
+        direction.normalize().multiplyScalar(0.4);
+        
+        // Make the arrow point in the new direction
+        stateVector.lookAt(direction);
+        
+        // Rotate 90 degrees on X to correct the arrow orientation
+        stateVector.rotateX(Math.PI / 2);
+    }
+    
+    
     
     randomStateChange() {
         const randomId = Math.floor(Math.random() * this.qubits.size);
@@ -152,19 +324,36 @@ class QubitGrid {
         this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         
         this.raycaster.setFromCamera(this.mouse, this.camera);
-        const intersects = this.raycaster.intersectObjects(this.scene.children);
+        const intersects = this.raycaster.intersectObjects(this.scene.children, true); // Add true for recursive check
         
-        // Reset info for all qubits
-        document.getElementById('info').textContent = 'Hover over qubits to see their state';
+        const tooltip = document.getElementById('qubit-tooltip');
         
         if (intersects.length > 0) {
-            const qubit = intersects[0].object;
-            if (qubit.userData.state) {
-                document.getElementById('info').textContent = 
-                    `Qubit ${qubit.userData.id}: State |${qubit.userData.state}⟩`;
+            // Find the parent group (Bloch sphere) of the intersected object
+            let qubit = intersects[0].object;
+            while (qubit.parent && !qubit.userData.id) {
+                qubit = qubit.parent;
             }
+    
+            if (qubit.userData.state) {
+                tooltip.style.display = 'block';
+                tooltip.style.left = event.clientX + 10 + 'px';
+                tooltip.style.top = event.clientY + 10 + 'px';
+                tooltip.textContent = `Qubit ${qubit.userData.id}: State |${qubit.userData.state}⟩`;
+            } else {
+                tooltip.style.display = 'none';
+            }
+        } else {
+            tooltip.style.display = 'none';
         }
     }
+    
+
+    onMouseLeave() {
+        const tooltip = document.getElementById('qubit-tooltip');
+        tooltip.style.display = 'none';
+    }    
+    
     
     onWindowResize() {
         this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -175,16 +364,17 @@ class QubitGrid {
     animate() {
         requestAnimationFrame(() => this.animate());
         
-        // Update controls
         this.controls.update();
-        
-        // Update light rig to match camera position
         this.lightRig.quaternion.copy(this.camera.quaternion);
-        
-        // Render
         this.renderer.render(this.scene, this.camera);
     }
 }
 
-// Create the visualization
 const grid = new QubitGrid();
+
+const timeline = document.getElementById('timeline');
+timeline.addEventListener('input', function(e) {
+    const timeValue = e.target.value;
+    // Here you'll later add the logic to update the visualization
+    // based on the timeline value
+});
