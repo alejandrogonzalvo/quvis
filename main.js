@@ -49,10 +49,43 @@ class QubitGrid {
         // Start animation
         this.animate();
         
-        // Start random state changes
-        setInterval(() => this.randomStateChange(), 500);
+        window.addEventListener('keydown', (event) => {
+            if (event.code === 'Space') {
+                this.generateNewSlice();
+            }
+        });
+
+        // Add timeline-related properties
+        this.timelineSlices = []; // Array to store state snapshots
+        this.currentSlice = 0;
+        
+        // Initialize first slice with initial states
+        this.saveCurrentState();
     }
 
+    // Save current state of all qubits
+    saveCurrentState() {
+        const stateSlice = new Map();
+        this.qubits.forEach((qubit, id) => {
+            stateSlice.set(id, qubit.userData.state);
+        });
+        this.timelineSlices.push(stateSlice);
+        
+        // Update timeline max value
+        const timeline = document.getElementById('timeline');
+        timeline.max = this.timelineSlices.length - 1;
+        timeline.value = this.timelineSlices.length - 1;
+    }
+
+    // Load state from a specific slice
+    loadStateFromSlice(sliceIndex) {
+        const stateSlice = this.timelineSlices[sliceIndex];
+        if (!stateSlice) return;
+
+        stateSlice.forEach((state, id) => {
+            this.updateQubitState(id, state);
+        });
+    }
     setupLights() {
         // Static ambient light
         const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
@@ -226,6 +259,10 @@ class QubitGrid {
             
             qubit.userData.state = newState;
             this.animateStateVector(qubit, newState);
+
+            if (!this.isLoadingFromTimeline) {
+                this.saveCurrentState();
+            }
         }
     }
     
@@ -233,47 +270,39 @@ class QubitGrid {
         const stateVector = qubit.children.find(child => child instanceof THREE.Group);
         if (!stateVector) return;
     
-        // Get target direction based on state
-        let targetDirection = new THREE.Vector3();
-        switch(state) {
-            case '0':
-                targetDirection.set(0, 1, 0);
-                break;
-            case '1':
-                targetDirection.set(0, -1, 0);
-                break;
-            case '+':
-                targetDirection.set(1, 0, 0);
-                break;
-            case '-':
-                targetDirection.set(-1, 0, 0);
-                break;
-            default:
-                targetDirection.set(0, 1, 0);
-        }
-        targetDirection.normalize().multiplyScalar(0.4);
-    
         // Store current rotation
         const currentRotation = stateVector.rotation.clone();
         
-        // Create a temporary vector to calculate target rotation
-        const tempVector = new THREE.Vector3();
-        stateVector.lookAt(targetDirection);
-        stateVector.rotateX(Math.PI / 2);
-        const targetRotation = stateVector.rotation.clone();
-        
-        // Reset to original rotation
-        stateVector.rotation.copy(currentRotation);
+        // Calculate target rotation based on state
+        let targetRotation = new THREE.Euler();
+        switch(state) {
+            case '0':
+                targetRotation.set(0, 0, 0); // Point up
+                break;
+            case '1':
+                targetRotation.set(Math.PI, 0, 0); // Point down
+                break;
+            case '+':
+                targetRotation.set(Math.PI/2, 0, -Math.PI/2); // Point right
+                break;
+            case '-':
+                targetRotation.set(Math.PI/2, 0, Math.PI/2); // Point left
+                break;
+            default:
+                targetRotation.set(0, 0, 0);
+        }
     
         // Animate rotation
         gsap.to(stateVector.rotation, {
             x: targetRotation.x,
             y: targetRotation.y,
             z: targetRotation.z,
-            duration: 0.5,
-            ease: "power2.inOut"
+            duration: 1,
+            ease: "power1.inOut"
         });
     }
+    
+    
     
     
     updateStateVector(qubit, state) {
@@ -311,12 +340,16 @@ class QubitGrid {
         stateVector.rotateX(Math.PI / 2);
     }
     
-    
-    
-    randomStateChange() {
-        const randomId = Math.floor(Math.random() * this.qubits.size);
-        const randomState = this.states[Math.floor(Math.random() * this.states.length)];
-        this.updateQubitState(randomId, randomState);
+    generateNewSlice() {
+        // Change state of 10 random qubits
+        for (let i = 0; i < 10; i++) {
+            const randomId = Math.floor(Math.random() * this.qubits.size);
+            const randomState = this.states[Math.floor(Math.random() * this.states.length)];
+            this.updateQubitState(randomId, randomState);
+        }
+        
+        // Save the new state as a slice
+        this.saveCurrentState();
     }
     
     onMouseMove(event) {
@@ -374,7 +407,8 @@ const grid = new QubitGrid();
 
 const timeline = document.getElementById('timeline');
 timeline.addEventListener('input', function(e) {
-    const timeValue = e.target.value;
-    // Here you'll later add the logic to update the visualization
-    // based on the timeline value
+    const timeValue = parseInt(e.target.value);
+    grid.isLoadingFromTimeline = true;
+    grid.loadStateFromSlice(timeValue);
+    grid.isLoadingFromTimeline = false;
 });
