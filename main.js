@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
+import { npzLoader } from './npzLoader.js';
 class QubitGrid {
     constructor() {
         // Scene setup
@@ -59,11 +59,52 @@ class QubitGrid {
         this.timelineSlices = []; // Array to store state snapshots
         this.currentSlice = 0;
         
-        // Initialize first slice with initial states
+        // Add timeline markers container
+        this.timelineMarkers = document.createElement('div');
+        this.timelineMarkers.style.position = 'fixed';
+        this.timelineMarkers.style.bottom = '50px';
+        this.timelineMarkers.style.width = '80%';
+        this.timelineMarkers.style.left = '10%';
+        this.timelineMarkers.style.height = '20px';
+        document.body.appendChild(this.timelineMarkers);
+
+        // this.loadNPZData('approx_states.npz').then(() => {
+        //     this.saveCurrentState();
+        // });
+
         this.saveCurrentState();
     }
 
-    // Save current state of all qubits
+    async loadNPZData(url) {
+        const loader = new npzLoader();
+        const data = await loader.load(url);
+        
+        // Process each time step exactly like Spacebar generates new slices
+        const numSteps = Object.values(data)[0].length;
+        
+        for (let step = 0; step < numSteps; step++) {
+            // Update all qubits for this step
+            Object.entries(data).forEach(([qubitKey, steps]) => {
+                const qubitId = parseInt(qubitKey);
+                const [x, y, z] = steps[step];
+                const state = this.xyzToState([x, y, z]);
+                this.updateQubitState(qubitId, state);
+            });
+            
+            // Save as new slice exactly like generateNewSlice
+            this.saveCurrentState();
+        }
+    }
+
+    xyzToState([x, y, z]) {
+        const THRESHOLD = 0.9;
+        if (z > THRESHOLD) return '0';
+        if (z < -THRESHOLD) return '1';
+        if (x > THRESHOLD) return '+';
+        if (x < -THRESHOLD) return '-';
+        return 'superposition';
+    }
+
     saveCurrentState() {
         const stateSlice = new Map();
         this.qubits.forEach((qubit, id) => {
@@ -71,13 +112,31 @@ class QubitGrid {
         });
         this.timelineSlices.push(stateSlice);
         
-        // Update timeline max value
+        
         const timeline = document.getElementById('timeline');
         timeline.max = this.timelineSlices.length - 1;
-        timeline.value = this.timelineSlices.length - 1;
+        timeline.step = "1"; // Enforce integer steps
+
+        this.updateTimelineMarkers();
     }
 
-    // Load state from a specific slice
+    updateTimelineMarkers() {
+        // Clear existing markers
+        this.timelineMarkers.innerHTML = '';
+        
+        // Create new markers
+        this.timelineSlices.forEach((_, index) => {
+            const marker = document.createElement('div');
+            marker.style.position = 'absolute';
+            marker.style.left = `${(index / (this.timelineSlices.length - 1)) * 100}%`;
+            marker.style.width = '2px';
+            marker.style.height = '20px';
+            marker.style.backgroundColor = '#fff';
+            marker.style.transform = 'translateX(-1px)';
+            this.timelineMarkers.appendChild(marker);
+        });
+    }
+
     loadStateFromSlice(sliceIndex) {
         const stateSlice = this.timelineSlices[sliceIndex];
         if (!stateSlice) return;
@@ -86,6 +145,7 @@ class QubitGrid {
             this.updateQubitState(id, state);
         });
     }
+
     setupLights() {
         // Static ambient light
         const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
@@ -259,10 +319,6 @@ class QubitGrid {
             
             qubit.userData.state = newState;
             this.animateStateVector(qubit, newState);
-
-            if (!this.isLoadingFromTimeline) {
-                this.saveCurrentState();
-            }
         }
     }
     
@@ -270,9 +326,6 @@ class QubitGrid {
         const stateVector = qubit.children.find(child => child instanceof THREE.Group);
         if (!stateVector) return;
     
-        // Store current rotation
-        const currentRotation = stateVector.rotation.clone();
-        
         // Calculate target rotation based on state
         let targetRotation = new THREE.Euler();
         switch(state) {
@@ -348,10 +401,13 @@ class QubitGrid {
             this.updateQubitState(randomId, randomState);
         }
         
-        // Save the new state as a slice
         this.saveCurrentState();
+        this.currentSlice = this.timelineSlices.length - 1; // Update current to last slice
+        
+        const timeline = document.getElementById('timeline');
+        timeline.value = this.currentSlice; // Move slider to end
     }
-    
+
     onMouseMove(event) {
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -407,8 +463,7 @@ const grid = new QubitGrid();
 
 const timeline = document.getElementById('timeline');
 timeline.addEventListener('input', function(e) {
-    const timeValue = parseInt(e.target.value);
-    grid.isLoadingFromTimeline = true;
+    const timeValue = Math.round(parseInt(e.target.value)); // Snap to nearest integer
+    e.target.value = timeValue; // Update slider position
     grid.loadStateFromSlice(timeValue);
-    grid.isLoadingFromTimeline = false;
 });
