@@ -1,4 +1,9 @@
+## Setup
+```
+npm install
+```
+
 ## Start Application
 ```
-python3 -m http.server
+npx vite
 ```
