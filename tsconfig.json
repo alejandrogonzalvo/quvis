@@ -5,7 +5,7 @@
     "moduleResolution": "nodenext",
     "skipLibCheck": true,
     "outDir": "./dist", // Specify the output folder for compiled JavaScript
-    "allowJs": true
+    "allowJs": true,
   },
   "include": ["./src/**/*.ts"] // Specify the path to your TypeScript files
 }
