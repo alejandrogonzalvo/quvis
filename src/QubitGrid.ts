@@ -1,8 +1,23 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { npzLoader } from './npzLoader.js';
+import { gsap } from "gsap";
 
 export class QubitGrid {
+    scene: THREE.Scene;
+    camera: THREE.PerspectiveCamera;
+    cameraRig: THREE.Group<THREE.Object3DEventMap>;
+    renderer: THREE.WebGLRenderer;
+    controls: OrbitControls;
+    states: string[];
+    qubits: Map<any, any>;
+    raycaster: THREE.Raycaster;
+    mouse: THREE.Vector2;
+    timelineSlices: any[];
+    currentSlice: number;
+    timelineMarkers: HTMLDivElement;
+    lightRig: THREE.Group<THREE.Object3DEventMap>;
+
     constructor() {
         // Scene setup
         this.scene = new THREE.Scene();
@@ -114,9 +129,9 @@ export class QubitGrid {
         this.timelineSlices.push(stateSlice);
         
         
-        const timeline = document.getElementById('timeline');
-        timeline.max = this.timelineSlices.length - 1;
-        timeline.step = "1"; // Enforce integer steps
+        const timeline = document.getElementById('timeline') as HTMLInputElement;
+        timeline.max = String(this.timelineSlices.length - 1);
+        timeline.step = "1";
 
         this.updateTimelineMarkers();
     }
@@ -405,8 +420,8 @@ export class QubitGrid {
         this.saveCurrentState();
         this.currentSlice = this.timelineSlices.length - 1; // Update current to last slice
         
-        const timeline = document.getElementById('timeline');
-        timeline.value = this.currentSlice; // Move slider to end
+        const timeline = document.getElementById('timeline') as HTMLInputElement;
+        timeline.value = String(this.currentSlice); // Move slider to end
     }
 
     onMouseMove(event) {
