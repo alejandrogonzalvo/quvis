@@ -9,7 +9,11 @@
     "three": "^0.158.0"
   },
   "devDependencies": {
+    "@types/node": "^22.13.10",
     "@types/three": "^0.170.0",
-    "typescript": "^5.6.3"
+    "@types/webpack": "^5.28.5",
+    "typescript": "^5.8.2",
+    "undici-types": "^7.5.0",
+    "webpack": "^5.98.0"
   }
 }
