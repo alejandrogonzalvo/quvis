@@ -1,0 +1,41 @@
+body { 
+    margin: 0; 
+}
+
+.tooltip {
+    position: fixed;
+    display: none;
+    color: white;
+    font-family: Arial;
+    background: rgba(0,0,0,0.7);
+    padding: 8px;
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+#timeline {
+    -webkit-appearance: none;
+    height: 10px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.2);
+    outline: none;
+}
+
+#timeline::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
+}
+
+#timeline::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
+}
