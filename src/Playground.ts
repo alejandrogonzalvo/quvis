@@ -10,10 +10,13 @@ export class Playground {
     controls: OrbitControls;
     lightRig: THREE.Group<THREE.Object3DEventMap>;
     grid: QubitGrid;
+    mouse: THREE.Vector2;
+    raycaster: THREE.Raycaster;
 
     constructor() {
         // Scene setup
         this.scene = new THREE.Scene();
+        this.mouse = new THREE.Vector2();
         this.scene.background = new THREE.Color(0x121212);        
         
         // Camera setup
@@ -37,18 +40,22 @@ export class Playground {
         
         // Setup lights
         this.setupLights();
-        
+
+        // Raycaster for hover detection
+        this.raycaster = new THREE.Raycaster();
+
         // Event listeners
         window.addEventListener('resize', () => this.onWindowResize());
         window.addEventListener('mousemove', (event) => this.onMouseMove(event));
         window.addEventListener('mouseleave', this.onMouseLeave.bind(this));
-
+        
         // Create Qubit Grid
-        this.grid = new QubitGrid();
+        this.grid = new QubitGrid(this.scene, this.mouse);
 
         // Start animation
         this.animate();
     }
+
     setupLights() {
         // Static ambient light
         const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
@@ -80,6 +87,40 @@ export class Playground {
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
+
+    onMouseMove(event) {
+        this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const intersects = this.raycaster.intersectObjects(this.scene.children, true); // Add true for recursive check
+        
+        const tooltip = document.getElementById('qubit-tooltip');
+        
+        if (intersects.length > 0) {
+            // Find the parent group (Bloch sphere) of the intersected object
+            let qubit = intersects[0].object;
+            while (qubit.parent && !qubit.userData.id) {
+                qubit = qubit.parent;
+            }
+    
+            if (qubit.userData.state) {
+                tooltip.style.display = 'block';
+                tooltip.style.left = event.clientX + 10 + 'px';
+                tooltip.style.top = event.clientY + 10 + 'px';
+                tooltip.textContent = `Qubit ${qubit.userData.id}: State |${qubit.userData.state}⟩`;
+            } else {
+                tooltip.style.display = 'none';
+            }
+        } else {
+            tooltip.style.display = 'none';
+        }
+    }
+
+    onMouseLeave() {
+        const tooltip = document.getElementById('qubit-tooltip');
+        tooltip.style.display = 'none';
+    }   
 
     animate() {
         requestAnimationFrame(() => this.animate());

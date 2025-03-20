@@ -1,24 +1,25 @@
 import * as THREE from 'three';
 import { npzLoader } from './npzLoader.js';
-import { gsap } from "gsap";
+import { Timeline } from './Timeline.js';
+import { Qubit } from './Qubit.js';
+import { State, States } from './State.js';
 
 export class QubitGrid {
+    scene: THREE.Scene
     states: string[];
-    qubits: Map<any, any>;
-    timelineSlices: any[];
-    currentSlice: number;
-    timelineMarkers: HTMLDivElement;
+    slices: Array<Map<number, Qubit>>;
+    qubits: Map<number, Qubit>;
     mouse: THREE.Vector2;
-    raycaster: THREE.Raycaster;
+    timeline: Timeline;
 
-
-
-    constructor() {
-        this.mouse = new THREE.Vector2();
-        
-        // Qubit management
+    constructor(scene: THREE.Scene, mouse: THREE.Vector2) {
+        this.mouse = mouse;
+        this.scene = scene;
+        this.slices = [];
         this.qubits = new Map();
-        this.states = ['0', '1', '+', '-', 'superposition'];
+        this.timeline = new Timeline(
+            (sliceIndex) => this.loadStateFromSlice(sliceIndex)
+        );
         
         // Create grid
         this.createGrid(5, 5); // 5x5 grid     
@@ -28,22 +29,6 @@ export class QubitGrid {
                 this.generateNewSlice();
             }
         });
-
-        // Add timeline-related properties
-        this.timelineSlices = []; // Array to store state snapshots
-        this.currentSlice = 0;
-
-        // Raycaster for hover detection
-        this.raycaster = new THREE.Raycaster();
-
-        // Add timeline markers container
-        this.timelineMarkers = document.createElement('div');
-        this.timelineMarkers.style.position = 'fixed';
-        this.timelineMarkers.style.bottom = '50px';
-        this.timelineMarkers.style.width = '80%';
-        this.timelineMarkers.style.left = '10%';
-        this.timelineMarkers.style.height = '20px';
-        document.body.appendChild(this.timelineMarkers);
 
         // this.loadNPZData('approx_states.npz').then(() => {
         //     this.saveCurrentState();
@@ -65,7 +50,7 @@ export class QubitGrid {
                 const qubitId = parseInt(qubitKey);
                 const [x, y, z] = steps[step];
                 const state = this.xyzToState([x, y, z]);
-                this.updateQubitState(qubitId, state);
+                this.updateQubitState(this.qubits[qubitKey]);
             });
             
             // Save as new slice exactly like generateNewSlice
@@ -75,51 +60,25 @@ export class QubitGrid {
 
     xyzToState([x, y, z]) {
         const THRESHOLD = 0.9;
-        if (z > THRESHOLD) return '0';
-        if (z < -THRESHOLD) return '1';
-        if (x > THRESHOLD) return '+';
-        if (x < -THRESHOLD) return '-';
-        return 'superposition';
+        if (z > THRESHOLD) return State.ZERO;
+        if (z < -THRESHOLD) return State.ONE;
+        if (x > THRESHOLD) return State.PLUS;
+        if (x < -THRESHOLD) return State.MINUS;
+        return State.SUPERPOSITION;
     }
 
     saveCurrentState() {
-        const stateSlice = new Map();
-        this.qubits.forEach((qubit, id) => {
-            stateSlice.set(id, qubit.userData.state);
-        });
-        this.timelineSlices.push(stateSlice);
-        
-        
-        const timeline = document.getElementById('timeline') as HTMLInputElement;
-        timeline.max = String(this.timelineSlices.length - 1);
-        timeline.step = "1";
-
-        this.updateTimelineMarkers();
-    }
-
-    updateTimelineMarkers() {
-        // Clear existing markers
-        this.timelineMarkers.innerHTML = '';
-        
-        // Create new markers
-        this.timelineSlices.forEach((_, index) => {
-            const marker = document.createElement('div');
-            marker.style.position = 'absolute';
-            marker.style.left = `${(index / (this.timelineSlices.length - 1)) * 100}%`;
-            marker.style.width = '2px';
-            marker.style.height = '20px';
-            marker.style.backgroundColor = '#fff';
-            marker.style.transform = 'translateX(-1px)';
-            this.timelineMarkers.appendChild(marker);
-        });
+        this.slices.push(this.qubits);        
+        this.timeline.addSlice();
     }
 
     loadStateFromSlice(sliceIndex) {
-        const stateSlice = this.timelineSlices[sliceIndex];
-        if (!stateSlice) return;
+        const stateSlice = this.slices[sliceIndex];
+        this.timeline.setSlice(sliceIndex);
 
-        stateSlice.forEach((state, id) => {
-            this.updateQubitState(id, state);
+        this.qubits = stateSlice;
+        this.qubits.forEach(qubit => {
+            qubit.animate();
         });
     }
 
@@ -137,260 +96,23 @@ export class QubitGrid {
         }
     }
 
-
-    createArrow(direction, color) {
-        const arrowGroup = new THREE.Group();
-    
-        // Create the shaft
-        const shaftGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.35);
-        const shaftMaterial = new THREE.MeshBasicMaterial({ color: color });
-        const shaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
-        shaft.position.y = 0.175; // Half of the shaft length
-        
-        // Create the arrow head (cone)
-        const headGeometry = new THREE.ConeGeometry(0.05, 0.1);
-        const headMaterial = new THREE.MeshBasicMaterial({ color: color });
-        const head = new THREE.Mesh(headGeometry, headMaterial);
-        head.position.y = 0.35; // Position at the end of the shaft
-    
-        arrowGroup.add(shaft);
-        arrowGroup.add(head);
-    
-        // Orient the arrow in the specified direction
-        arrowGroup.lookAt(direction.multiplyScalar(0.4));
-    
-        return arrowGroup;
-    }
-
     createQubit(id, x, y) {
-        // Create a group to hold all components of the Bloch sphere
-        const blochSphere = new THREE.Group();
-        blochSphere.position.set(x, y, 0);
-        blochSphere.userData = { id, state: '0' };
-    
-        // Main sphere (transparent)
-        const sphereGeometry = new THREE.SphereGeometry(0.4, 32, 32);
-        const sphereMaterial = new THREE.MeshPhongMaterial({
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.3,
-            side: THREE.DoubleSide
-        });
-        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-        blochSphere.add(sphere);
-    
-        // Axes
-        const axisLength = 0.5;
-        const axisGeometry = new THREE.CylinderGeometry(0.01, 0.01, axisLength * 2);
-        
-        // Z-axis (vertical)
-        const zAxis = new THREE.Mesh(
-            axisGeometry,
-            new THREE.MeshBasicMaterial({ color: 0x888888 })
-        );
-        blochSphere.add(zAxis);
-    
-        // X-axis (horizontal)
-        const xAxis = new THREE.Mesh(
-            axisGeometry,
-            new THREE.MeshBasicMaterial({ color: 0x888888 })
-        );
-        xAxis.rotation.z = Math.PI / 2;
-        blochSphere.add(xAxis);
-    
-        // Y-axis
-        const yAxis = new THREE.Mesh(
-            axisGeometry,
-            new THREE.MeshBasicMaterial({ color: 0x888888 })
-        );
-        yAxis.rotation.x = Math.PI / 2;
-        blochSphere.add(yAxis);
-    
-        // Equatorial circle
-        const equatorGeometry = new THREE.TorusGeometry(0.4, 0.005, 16, 100);
-        const equatorMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
-        const equator = new THREE.Mesh(equatorGeometry, equatorMaterial);
-        equator.rotation.x = Math.PI / 2;
-        blochSphere.add(equator);
-    
-        // Meridian circle
-        const meridianGeometry = new THREE.TorusGeometry(0.4, 0.005, 16, 100);
-        const meridianMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
-        const meridian = new THREE.Mesh(meridianGeometry, meridianMaterial);
-        blochSphere.add(meridian);
-        
-        // Then replace the ArrowHelper creation with:
-        const stateVector = this.createArrow(
-            new THREE.Vector3(1, 0, 0),
-            this.getStateColor('0')
-        );
-        blochSphere.add(stateVector);
-        
-    
-        this.scene.add(blochSphere);
-        this.qubits.set(id, blochSphere);
-        return blochSphere;
-    }
-    
-    // Modify getStateColor to represent quantum states
-    getStateColor(state) {
-        const colors = {
-            '0': 0xffffff,    // White for |0⟩
-            '1': 0xff0000,    // Red for |1⟩
-            '+': 0x00ff00,    // Green for |+⟩
-            '-': 0x0000ff,    // Blue for |-⟩
-            'superposition': 0xff00ff  // Purple for other superpositions
-        };
-        return colors[state] || 0xffff00;
-    }
-
-    updateQubitState(id, newState) {
-        const qubit = this.qubits.get(id);
-        if (qubit) {
-            const stateVector = qubit.children.find(child => child instanceof THREE.Group);
-            if (stateVector) {
-                // Get current and target colors
-                const currentColor = stateVector.children[0].material.color;
-                const targetColor = new THREE.Color(this.getStateColor(newState));
-    
-                // Animate color change
-                gsap.to(currentColor, {
-                    r: targetColor.r,
-                    g: targetColor.g,
-                    b: targetColor.b,
-                    duration: 0.5,
-                    onUpdate: () => {
-                        // Update all parts of the arrow with the interpolated color
-                        stateVector.children.forEach(part => {
-                            part.material.color.copy(currentColor);
-                        });
-                    }
-                });
-            }
-            
-            qubit.userData.state = newState;
-            this.animateStateVector(qubit, newState);
-        }
-    }
-    
-    animateStateVector(qubit, state) {
-        const stateVector = qubit.children.find(child => child instanceof THREE.Group);
-        if (!stateVector) return;
-    
-        // Calculate target rotation based on state
-        let targetRotation = new THREE.Euler();
-        switch(state) {
-            case '0':
-                targetRotation.set(0, 0, 0); // Point up
-                break;
-            case '1':
-                targetRotation.set(Math.PI, 0, 0); // Point down
-                break;
-            case '+':
-                targetRotation.set(Math.PI/2, 0, -Math.PI/2); // Point right
-                break;
-            case '-':
-                targetRotation.set(Math.PI/2, 0, Math.PI/2); // Point left
-                break;
-            default:
-                targetRotation.set(0, 0, 0);
-        }
-    
-        // Animate rotation
-        gsap.to(stateVector.rotation, {
-            x: targetRotation.x,
-            y: targetRotation.y,
-            z: targetRotation.z,
-            duration: 1,
-            ease: "power1.inOut"
-        });
-    }
-    
-    
-    
-    
-    updateStateVector(qubit, state) {
-        const stateVector = qubit.children.find(child => child instanceof THREE.Group);
-        if (!stateVector) return;
-    
-        // Reset rotation
-        stateVector.rotation.set(0, 0, 0);
-    
-        let direction = new THREE.Vector3();
-        switch(state) {
-            case '0':
-                direction.set(0, 1, 0); // Up
-                break;
-            case '1':
-                direction.set(0, -1, 0); // Down
-                break;
-            case '+':
-                direction.set(1, 0, 0); // Right
-                break;
-            case '-':
-                direction.set(-1, 0, 0); // Left
-                break;
-            default:
-                direction.set(0, 1, 0); // Default to up
-        }
-    
-        // Normalize and scale the direction
-        direction.normalize().multiplyScalar(0.4);
-        
-        // Make the arrow point in the new direction
-        stateVector.lookAt(direction);
-        
-        // Rotate 90 degrees on X to correct the arrow orientation
-        stateVector.rotateX(Math.PI / 2);
+        const qubit = new Qubit(x, y, id);
+        this.scene.add(qubit.blochSphere.blochSphere);
+        this.qubits.set(id, qubit);
     }
     
     generateNewSlice() {
+        this.loadStateFromSlice(this.slices.length-1);
+
         // Change state of 10 random qubits
         for (let i = 0; i < 10; i++) {
-            const randomId = Math.floor(Math.random() * this.qubits.size);
-            const randomState = this.states[Math.floor(Math.random() * this.states.length)];
-            this.updateQubitState(randomId, randomState);
+            const randomID: number = Math.floor(Math.random() * this.qubits.size)
+            const randomQubit: Qubit = this.qubits.get(randomID);
+            const randomState: State = States[Math.floor(Math.random() * States.length)];
+            randomQubit.state = randomState;
         }
         
         this.saveCurrentState();
-        this.currentSlice = this.timelineSlices.length - 1; // Update current to last slice
-        
-        const timeline = document.getElementById('timeline') as HTMLInputElement;
-        timeline.value = String(this.currentSlice); // Move slider to end
-    }
-
-    onMouseMove(event) {
-        this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        
-        this.raycaster.setFromCamera(this.mouse, this.camera);
-        const intersects = this.raycaster.intersectObjects(this.scene.children, true); // Add true for recursive check
-        
-        const tooltip = document.getElementById('qubit-tooltip');
-        
-        if (intersects.length > 0) {
-            // Find the parent group (Bloch sphere) of the intersected object
-            let qubit = intersects[0].object;
-            while (qubit.parent && !qubit.userData.id) {
-                qubit = qubit.parent;
-            }
-    
-            if (qubit.userData.state) {
-                tooltip.style.display = 'block';
-                tooltip.style.left = event.clientX + 10 + 'px';
-                tooltip.style.top = event.clientY + 10 + 'px';
-                tooltip.textContent = `Qubit ${qubit.userData.id}: State |${qubit.userData.state}⟩`;
-            } else {
-                tooltip.style.display = 'none';
-            }
-        } else {
-            tooltip.style.display = 'none';
-        }
-    }
-    
-
-    onMouseLeave() {
-        const tooltip = document.getElementById('qubit-tooltip');
-        tooltip.style.display = 'none';
-    }    
+    } 
 }
