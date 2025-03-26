@@ -1,12 +1,12 @@
 // Heatmap.ts
-import * as THREE from 'three';
-import { Qubit } from './Qubit.js';
+import * as THREE from "three";
+import { Qubit } from "./Qubit.js";
 
 export class Heatmap {
     camera: THREE.PerspectiveCamera;
     mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
     material: THREE.ShaderMaterial;
-    points: { position: THREE.Vector3, intensity: number }[] = [];
+    points: { position: THREE.Vector3; intensity: number }[] = [];
     qubit_number: number;
 
     constructor(camera: THREE.PerspectiveCamera, qubit_number: number) {
@@ -20,7 +20,7 @@ export class Heatmap {
                 color1: { value: new THREE.Color(0xff0000) },
                 color2: { value: new THREE.Color(0x000000) },
                 worldToLocal: { value: new THREE.Matrix4() },
-                aspect: { value: window.innerWidth / window.innerHeight }
+                aspect: { value: window.innerWidth / window.innerHeight },
             },
             vertexShader: `
                 varying vec2 vUv;
@@ -48,7 +48,7 @@ export class Heatmap {
                 }
             `,
             transparent: true,
-            blending: THREE.AdditiveBlending
+            blending: THREE.AdditiveBlending,
         });
 
         this.mesh = new THREE.Mesh(geometry, this.material);
@@ -59,22 +59,22 @@ export class Heatmap {
         const pointData = new Float32Array(this.qubit_number * 3);
         let index = 0;
 
-        qubits.forEach(qubit => {
+        qubits.forEach((qubit) => {
             const worldPos = new THREE.Vector3();
             qubit.blochSphere.blochSphere.getWorldPosition(worldPos);
             const temp = worldPos.clone().project(this.camera);
             const uvX = (temp.x + 1) / 2;
             const uvY = (temp.y + 1) / 2;
-            
+
             // Highlight only changed qubits
             const intensity = changedIds.has(qubit.id) ? 1.0 : 0.0;
-            
+
             pointData[index++] = uvX;
             pointData[index++] = uvY;
             pointData[index++] = intensity;
         });
 
-        while(index < this.qubit_number * 3) {
+        while (index < this.qubit_number * 3) {
             pointData[index++] = 0;
         }
 

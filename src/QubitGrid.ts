@@ -1,14 +1,14 @@
-import * as THREE from 'three';
-import { npzLoader } from './npzLoader.js';
-import { Timeline } from './Timeline.js';
-import { Qubit } from './Qubit.js';
-import { State, States } from './State.js';
-import { Heatmap } from './Heatmap.js';
-import { Slice } from './Slice.js';
-import { BlochSphere } from './BlochSphere.js';
+import * as THREE from "three";
+import { npzLoader } from "./npzLoader.js";
+import { Timeline } from "./Timeline.js";
+import { Qubit } from "./Qubit.js";
+import { State, States } from "./State.js";
+import { Heatmap } from "./Heatmap.js";
+import { Slice } from "./Slice.js";
+import { BlochSphere } from "./BlochSphere.js";
 
 export class QubitGrid {
-    scene: THREE.Scene
+    scene: THREE.Scene;
     states: string[];
     slices: Array<Slice>;
     mouse: THREE.Vector2;
@@ -26,21 +26,26 @@ export class QubitGrid {
         this.onCurrentSliceChange();
     }
 
-    constructor(scene: THREE.Scene, mouse: THREE.Vector2, camera: THREE.PerspectiveCamera, qubit_number: number) {
+    constructor(
+        scene: THREE.Scene,
+        mouse: THREE.Vector2,
+        camera: THREE.PerspectiveCamera,
+        qubit_number: number,
+    ) {
         this.mouse = mouse;
         this.scene = scene;
         this.slices = [];
-        this.heatmap = new Heatmap(camera, qubit_number*qubit_number);
+        this.heatmap = new Heatmap(camera, qubit_number * qubit_number);
         this.current_slice = new Slice();
-        this.timeline = new Timeline(
-            (sliceIndex) => this.loadStateFromSlice(sliceIndex)
+        this.timeline = new Timeline((sliceIndex) =>
+            this.loadStateFromSlice(sliceIndex),
         );
         scene.add(this.heatmap.mesh);
-        
-        this.createGrid(qubit_number, qubit_number);   
 
-        window.addEventListener('keydown', (event) => {
-            if (event.code === 'Space') {
+        this.createGrid(qubit_number, qubit_number);
+
+        window.addEventListener("keydown", (event) => {
+            if (event.code === "Space") {
                 this.generateNewSlice();
             }
         });
@@ -55,10 +60,10 @@ export class QubitGrid {
     // async loadNPZData(url) {
     //     const loader = new npzLoader();
     //     const data = await loader.load(url);
-        
+
     //     // Process each time step exactly like Spacebar generates new slices
     //     const numSteps = Object.values(data)[0].length;
-        
+
     //     for (let step = 0; step < numSteps; step++) {
     //         // Update all qubits for this step
     //         Object.entries(data).forEach(([qubitKey, steps]) => {
@@ -67,7 +72,7 @@ export class QubitGrid {
     //             const state = this.xyzToState([x, y, z]);
     //             this.updateQubitState(this.qubits[qubitKey]);
     //         });
-            
+
     //         // Save as new slice exactly like generateNewSlice
     //         this.saveCurrentState();
     //     }
@@ -78,7 +83,10 @@ export class QubitGrid {
             qubit.animate();
         });
 
-        this.heatmap.updatePoints(this.current_slice.qubits, this.current_slice.interacting_qubits);
+        this.heatmap.updatePoints(
+            this.current_slice.qubits,
+            this.current_slice.interacting_qubits,
+        );
     }
     xyzToState([x, y, z]) {
         const THRESHOLD = 0.9;
@@ -89,23 +97,22 @@ export class QubitGrid {
         return State.SUPERPOSITION;
     }
 
-    saveCurrentState() : void {
+    saveCurrentState(): void {
         this.slices.push(this.current_slice);
         this.timeline.addSlice();
     }
 
-    loadStateFromSlice(sliceIndex: number) : void {
-        this.current_slice =  this.slices[sliceIndex];
+    loadStateFromSlice(sliceIndex: number): void {
+        this.current_slice = this.slices[sliceIndex];
     }
-
 
     createGrid(rows, cols) {
         const spacing = 2;
-        const offsetX = (cols - 1) * spacing / 2;
-        const offsetY = (rows - 1) * spacing / 2;
-        
-        for(let i = 0; i < rows; i++) {
-            for(let j = 0; j < cols; j++) {
+        const offsetX = ((cols - 1) * spacing) / 2;
+        const offsetY = ((rows - 1) * spacing) / 2;
+
+        for (let i = 0; i < rows; i++) {
+            for (let j = 0; j < cols; j++) {
                 const x = j * spacing - offsetX;
                 const y = i * spacing - offsetY;
                 this.createQubit(i * cols + j, x, y);
@@ -118,22 +125,27 @@ export class QubitGrid {
         this.scene.add(qubit.blochSphere.blochSphere);
         this.current_slice.qubits.set(id, qubit);
     }
-    
+
     generateNewSlice() {
         // Load previous state into CURRENT qubits
         this.loadStateFromSlice(this.slices.length - 1);
-        
-        this.current_slice = this.current_slice.clone()
+
+        this.current_slice = this.current_slice.clone();
         // Modify current qubits
         const currentIDs = Array.from(this.current_slice.qubits.keys());
         for (let i = 0; i < 50; i++) {
-            const randomID = currentIDs[Math.floor(Math.random() * currentIDs.length)];
+            const randomID =
+                currentIDs[Math.floor(Math.random() * currentIDs.length)];
             this.current_slice.interacting_qubits.add(randomID);
             const randomQubit = this.current_slice.qubits.get(randomID)!;
-            randomQubit.state = States[Math.floor(Math.random() * States.length)];
+            randomQubit.state =
+                States[Math.floor(Math.random() * States.length)];
         }
-        
+
         this.saveCurrentState();
-        this.heatmap.updatePoints(this.current_slice.qubits, this.current_slice.interacting_qubits);
+        this.heatmap.updatePoints(
+            this.current_slice.qubits,
+            this.current_slice.interacting_qubits,
+        );
     }
 }

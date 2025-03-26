@@ -1,6 +1,6 @@
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { QubitGrid } from './QubitGrid.js';
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { QubitGrid } from "./QubitGrid.js";
 
 export class Playground {
     scene: THREE.Scene;
@@ -17,10 +17,15 @@ export class Playground {
         // Scene setup
         this.scene = new THREE.Scene();
         this.mouse = new THREE.Vector2();
-        this.scene.background = new THREE.Color(0x121212);        
-        
+        this.scene.background = new THREE.Color(0x121212);
+
         // Camera setup
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        this.camera = new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000,
+        );
         this.camera.position.set(0, 0, 20);
 
         // Create a camera rig
@@ -32,12 +37,15 @@ export class Playground {
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(this.renderer.domElement);
-        
+
         // Controls - now targeting the camera rig
-        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+        this.controls = new OrbitControls(
+            this.camera,
+            this.renderer.domElement,
+        );
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
-        
+
         // Setup lights
         this.setupLights();
 
@@ -45,17 +53,19 @@ export class Playground {
         this.raycaster = new THREE.Raycaster();
 
         // Event listeners
-        window.addEventListener('resize', () => this.onWindowResize());
-        window.addEventListener('mousemove', (event) => this.onMouseMove(event));
-        window.addEventListener('mouseleave', this.onMouseLeave.bind(this));
-        
+        window.addEventListener("resize", () => this.onWindowResize());
+        window.addEventListener("mousemove", (event) =>
+            this.onMouseMove(event),
+        );
+        window.addEventListener("mouseleave", this.onMouseLeave.bind(this));
+
         // Create Qubit Grid
         this.grid = new QubitGrid(this.scene, this.mouse, this.camera, 20);
 
-        this.grid.heatmap.material.uniforms.aspect.value = 
-        window.innerWidth / window.innerHeight;
-        window.addEventListener('resize', () => {
-            this.grid.heatmap.material.uniforms.aspect.value = 
+        this.grid.heatmap.material.uniforms.aspect.value =
+            window.innerWidth / window.innerHeight;
+        window.addEventListener("resize", () => {
+            this.grid.heatmap.material.uniforms.aspect.value =
                 window.innerWidth / window.innerHeight;
         });
         // Start animation
@@ -69,7 +79,7 @@ export class Playground {
 
         // Create a light rig that follows the camera
         this.lightRig = new THREE.Group();
-        
+
         // Main light
         const mainLight = new THREE.DirectionalLight(0xffffff, 1);
         mainLight.position.set(5, 5, 5);
@@ -97,40 +107,43 @@ export class Playground {
     onMouseMove(event) {
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        
+
         this.raycaster.setFromCamera(this.mouse, this.camera);
-        const intersects = this.raycaster.intersectObjects(this.scene.children, true); // Add true for recursive check
-        
-        const tooltip = document.getElementById('qubit-tooltip');
-        
+        const intersects = this.raycaster.intersectObjects(
+            this.scene.children,
+            true,
+        ); // Add true for recursive check
+
+        const tooltip = document.getElementById("qubit-tooltip");
+
         if (intersects.length > 0) {
             // Find the parent group (Bloch sphere) of the intersected object
             let qubit = intersects[0].object;
             while (qubit.parent && !qubit.userData.id) {
                 qubit = qubit.parent;
             }
-    
+
             if (qubit.userData.state) {
-                tooltip.style.display = 'block';
-                tooltip.style.left = event.clientX + 10 + 'px';
-                tooltip.style.top = event.clientY + 10 + 'px';
+                tooltip.style.display = "block";
+                tooltip.style.left = event.clientX + 10 + "px";
+                tooltip.style.top = event.clientY + 10 + "px";
                 tooltip.textContent = `Qubit ${qubit.userData.id}: State |${qubit.userData.state}⟩`;
             } else {
-                tooltip.style.display = 'none';
+                tooltip.style.display = "none";
             }
         } else {
-            tooltip.style.display = 'none';
+            tooltip.style.display = "none";
         }
     }
 
     onMouseLeave() {
-        const tooltip = document.getElementById('qubit-tooltip');
-        tooltip.style.display = 'none';
-    }   
+        const tooltip = document.getElementById("qubit-tooltip");
+        tooltip.style.display = "none";
+    }
 
     animate() {
         requestAnimationFrame(() => this.animate());
-        
+
         this.grid.heatmap.mesh.renderOrder = -1;
 
         this.controls.update();

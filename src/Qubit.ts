@@ -1,13 +1,17 @@
-import * as THREE from 'three';
-import { BlochSphere } from './BlochSphere.js';
-import { State } from './State.js';
+import * as THREE from "three";
+import { BlochSphere } from "./BlochSphere.js";
+import { State } from "./State.js";
 
 export class Qubit {
     id: number;
     private _state: State;
     blochSphere: BlochSphere;
 
-    constructor(id: number = 0, initialState: State = State.ZERO, blockSphere: BlochSphere) {
+    constructor(
+        id: number = 0,
+        initialState: State = State.ZERO,
+        blockSphere: BlochSphere,
+    ) {
         this.id = id;
         this._state = initialState;
         this.blochSphere = blockSphere;
