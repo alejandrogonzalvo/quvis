@@ -4,13 +4,13 @@ import { State } from './State.js';
 
 export class Qubit {
     id: number;
-    private _state: State;  // Private backing field
+    private _state: State;
     blochSphere: BlochSphere;
 
-    constructor(x: number, y: number, id: number = 0, initialState: State = State.ZERO) {
+    constructor(id: number = 0, initialState: State = State.ZERO, blockSphere: BlochSphere) {
         this.id = id;
         this._state = initialState;
-        this.blochSphere = new BlochSphere(x, y);
+        this.blochSphere = blockSphere;
         this.state = this._state;
     }
 

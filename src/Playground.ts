@@ -50,8 +50,14 @@ export class Playground {
         window.addEventListener('mouseleave', this.onMouseLeave.bind(this));
         
         // Create Qubit Grid
-        this.grid = new QubitGrid(this.scene, this.mouse);
+        this.grid = new QubitGrid(this.scene, this.mouse, this.camera, 20);
 
+        this.grid.heatmap.material.uniforms.aspect.value = 
+        window.innerWidth / window.innerHeight;
+        window.addEventListener('resize', () => {
+            this.grid.heatmap.material.uniforms.aspect.value = 
+                window.innerWidth / window.innerHeight;
+        });
         // Start animation
         this.animate();
     }
@@ -125,6 +131,8 @@ export class Playground {
     animate() {
         requestAnimationFrame(() => this.animate());
         
+        this.grid.heatmap.mesh.renderOrder = -1;
+
         this.controls.update();
         this.lightRig.quaternion.copy(this.camera.quaternion);
         this.renderer.render(this.scene, this.camera);

@@ -26,7 +26,7 @@ export class Timeline {
         
         this.handleInput = (e: Event) => {
             const target = e.currentTarget as HTMLInputElement;
-            const timeValue = Math.round(parseInt(target.value)+1);
+            const timeValue = Math.round(parseInt(target.value));
             target.value = String(timeValue);
             this.currentSlice = timeValue;
             this.onSliceChange(timeValue);
