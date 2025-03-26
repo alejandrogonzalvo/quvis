@@ -3,82 +3,107 @@ import * as THREE from "three";
 import { Qubit } from "./Qubit.js";
 
 export class Heatmap {
-    camera: THREE.PerspectiveCamera;
-    mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+    mesh: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
     material: THREE.ShaderMaterial;
-    points: { position: THREE.Vector3; intensity: number }[] = [];
-    qubit_number: number;
+    positions: Float32Array;
+    intensities: Float32Array;
+    qubitPositions: THREE.Vector3[] = [];
+    camera: THREE.PerspectiveCamera;
 
     constructor(camera: THREE.PerspectiveCamera, qubit_number: number) {
         this.camera = camera;
-        this.qubit_number = qubit_number;
-        const geometry = new THREE.PlaneGeometry(qubit_number, qubit_number);
+        const geometry = new THREE.BufferGeometry();
+        this.positions = new Float32Array(qubit_number * 3);
+        this.intensities = new Float32Array(qubit_number);
+
+        geometry.setAttribute(
+            "position",
+            new THREE.BufferAttribute(this.positions, 3),
+        );
+        geometry.setAttribute(
+            "intensity",
+            new THREE.BufferAttribute(this.intensities, 1),
+        );
+
         this.material = new THREE.ShaderMaterial({
             uniforms: {
-                points: { value: new Float32Array(qubit_number * 3) },
-                radius: { value: 0.05 },
+                aspect: { value: window.innerWidth / window.innerHeight },
+                radius: { value: 1.0 },
+                baseSize: { value: 50.0 },
                 color1: { value: new THREE.Color(0xff0000) },
                 color2: { value: new THREE.Color(0x000000) },
-                worldToLocal: { value: new THREE.Matrix4() },
-                aspect: { value: window.innerWidth / window.innerHeight },
+                cameraPosition: { value: new THREE.Vector3() },
+                scaleFactor: { value: 1.0 },
             },
             vertexShader: `
-                varying vec2 vUv;
-                uniform mat4 worldToLocal;
+                uniform float scaleFactor;
+                uniform float baseSize;
+                attribute float intensity;
+                varying vec3 vPosition;
+                varying float vIntensity;
+                
                 void main() {
-                    vUv = uv;
+                    vPosition = position;
+                    vIntensity = intensity;
+                    gl_PointSize = baseSize * scaleFactor; // Combined base size with zoom scaling
                     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
                 }
             `,
             fragmentShader: `
-                uniform vec3 points[${this.qubit_number}];
-                uniform float radius;
                 uniform vec3 color1;
                 uniform vec3 color2;
-                varying vec2 vUv;
-
+                uniform float radius;
+                varying vec3 vPosition;
+                varying float vIntensity;
+                
                 void main() {
-                    float intensity = 0.0;
-                    for (int i = 0; i < ${this.qubit_number}; i++) {
-                        vec2 pointPos = points[i].xy;
-                        float dist = distance(vUv, pointPos);
-                        intensity += points[i].z * max(0.0, 1.0 - dist / radius);
-                    }
-                    gl_FragColor = vec4(mix(color2, color1, intensity), 0.8);
+                    vec2 coord = gl_PointCoord * 2.0 - vec2(1.0);
+                    float distance = length(coord);
+                    float alpha = smoothstep(radius, radius * 0.5, distance) * vIntensity;
+                    vec3 color = mix(color2, color1, vIntensity);
+                    gl_FragColor = vec4(color, alpha);
                 }
             `,
             transparent: true,
             blending: THREE.AdditiveBlending,
+            depthTest: false,
         });
 
-        this.mesh = new THREE.Mesh(geometry, this.material);
-        this.mesh.position.set(0, 0, -1); // Position behind qubits
+        this.mesh = new THREE.Points(geometry, this.material);
     }
 
     updatePoints(qubits: Map<number, Qubit>, changedIds: Set<number>) {
-        const pointData = new Float32Array(this.qubit_number * 3);
-        let index = 0;
+        let posIndex = 0;
+        let intIndex = 0;
 
-        qubits.forEach((qubit) => {
-            const worldPos = new THREE.Vector3();
-            qubit.blochSphere.blochSphere.getWorldPosition(worldPos);
-            const temp = worldPos.clone().project(this.camera);
-            const uvX = (temp.x + 1) / 2;
-            const uvY = (temp.y + 1) / 2;
+        // Update camera-dependent uniforms
+        this.material.uniforms.cameraPosition.value.copy(this.camera.position);
+        this.material.uniforms.scaleFactor.value = this.camera.zoom;
+        this.material.uniformsNeedUpdate = true;
+        qubits.forEach((qubit, id) => {
+            // Get world position once during initialization
+            if (!this.qubitPositions[id]) {
+                const pos = new THREE.Vector3();
+                qubit.blochSphere.blochSphere.getWorldPosition(pos);
+                this.qubitPositions[id] = pos;
+            }
 
-            // Highlight only changed qubits
-            const intensity = changedIds.has(qubit.id) ? 1.0 : 0.0;
+            // Update positions array
+            const pos = this.qubitPositions[id];
+            this.positions[posIndex++] = pos.x;
+            this.positions[posIndex++] = pos.y;
+            this.positions[posIndex++] = pos.z;
 
-            pointData[index++] = uvX;
-            pointData[index++] = uvY;
-            pointData[index++] = intensity;
+            // Update intensities
+            this.intensities[intIndex++] = changedIds.has(id) ? 1.0 : 0.0;
         });
 
-        while (index < this.qubit_number * 3) {
-            pointData[index++] = 0;
-        }
+        const positionAttr = this.mesh.geometry.attributes
+            .position as THREE.BufferAttribute;
+        positionAttr.needsUpdate = true;
 
-        this.material.uniforms.points.value = pointData;
-        this.material.uniformsNeedUpdate = true;
+        const intensityAttr = this.mesh.geometry.attributes
+            .intensity as THREE.BufferAttribute;
+        intensityAttr.needsUpdate = true;
     }
 }
