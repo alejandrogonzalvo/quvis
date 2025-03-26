@@ -71,7 +71,6 @@ export class npzLoader {
         if (magic !== "\x93NUMPY") throw new Error("Invalid NPY magic string");
 
         const major = data[6];
-        const minor = data[7];
         if (major !== 1 && major !== 2)
             throw new Error("Unsupported NPY version");
 
@@ -102,8 +101,8 @@ export class npzLoader {
         const dtype = header.descr.match(/[|<>]?(u?)(int|float)(\d+)/);
         if (!dtype) throw new Error("Unsupported data type");
 
+        // eslint-disable-next-line  @typescript-eslint/no-unused-vars
         const [_, unsigned, type, bits] = dtype;
-        const littleEndian = header.descr[0] === "<";
         const constructor = this.getTypedArrayConstructor(
             type,
             parseInt(bits) / 8,

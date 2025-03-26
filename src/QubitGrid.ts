@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { npzLoader } from "./npzLoader.js";
 import { Timeline } from "./Timeline.js";
 import { Qubit } from "./Qubit.js";
 import { State, States } from "./State.js";
@@ -79,7 +78,7 @@ export class QubitGrid {
     // }
 
     private onCurrentSliceChange() {
-        this.current_slice.qubits.forEach((qubit, id) => {
+        this.current_slice.qubits.forEach((qubit) => {
             qubit.animate();
         });
 
@@ -88,6 +87,8 @@ export class QubitGrid {
             this.current_slice.interacting_qubits,
         );
     }
+
+    // eslint-disable-next-line  @typescript-eslint/no-unused-vars
     xyzToState([x, y, z]) {
         const THRESHOLD = 0.9;
         if (z > THRESHOLD) return State.ZERO;

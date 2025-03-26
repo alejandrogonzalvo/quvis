@@ -68,8 +68,6 @@ export class Playground {
             this.grid.heatmap.material.uniforms.aspect.value =
                 window.innerWidth / window.innerHeight;
         });
-        // Start animation
-        this.animate();
     }
 
     setupLights() {

@@ -1,0 +1,3 @@
+npx eslint src
+npx prettier --write src
+git add src

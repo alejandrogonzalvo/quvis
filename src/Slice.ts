@@ -13,7 +13,7 @@ export class Slice {
     }
 
     clone(): Slice {
-        let cloned_qubits = new Map<number, Qubit>();
+        const cloned_qubits = new Map<number, Qubit>();
         this.qubits.forEach((qubit, id) => {
             cloned_qubits.set(
                 id,

@@ -1,4 +1,3 @@
-import * as THREE from "three";
 import { BlochSphere } from "./BlochSphere.js";
 import { State } from "./State.js";
 

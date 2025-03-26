@@ -104,7 +104,7 @@ export class BlochSphere {
         );
 
         // Calculate target rotation based on state
-        let targetRotation = new THREE.Euler();
+        const targetRotation = new THREE.Euler();
         switch (State[state]) {
             case State.ZERO:
                 targetRotation.set(0, 0, 0); // Point up
