@@ -31,7 +31,7 @@ export class Heatmap {
                 radius: { value: 1.0 },
                 baseSize: { value: 50.0 },
                 color1: { value: new THREE.Color(0xff0000) },
-                color2: { value: new THREE.Color(0x000000) },
+                color2: { value: new THREE.Color(0x00ff00) },
                 cameraPosition: { value: new THREE.Vector3() },
                 scaleFactor: { value: 1.0 },
             },
@@ -50,20 +50,25 @@ export class Heatmap {
                 }
             `,
             fragmentShader: `
-                uniform vec3 color1;
-                uniform vec3 color2;
-                uniform float radius;
-                varying vec3 vPosition;
-                varying float vIntensity;
+            uniform vec3 color1;
+            uniform vec3 color2;
+            uniform float radius;
+            varying vec3 vPosition;
+            varying float vIntensity;
+            
+            void main() {
+                vec2 coord = gl_PointCoord * 2.0 - vec2(1.0);
+                float distance = length(coord);
                 
-                void main() {
-                    vec2 coord = gl_PointCoord * 2.0 - vec2(1.0);
-                    float distance = length(coord);
-                    float alpha = smoothstep(radius, radius * 0.5, distance) * vIntensity;
-                    vec3 color = mix(color2, color1, vIntensity);
-                    gl_FragColor = vec4(color, alpha);
-                }
-            `,
+                // Calculate alpha separately from intensity
+                float alpha = smoothstep(radius, radius * 0.1, distance);
+                
+                // Use intensity for color mixing only
+                vec3 color = mix(color2, color1, vIntensity);
+                
+                gl_FragColor = vec4(color, alpha);
+            }
+        `,
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthTest: false,

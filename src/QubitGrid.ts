@@ -134,7 +134,7 @@ export class QubitGrid {
         this.current_slice = this.current_slice.clone();
         // Modify current qubits
         const currentIDs = Array.from(this.current_slice.qubits.keys());
-        for (let i = 0; i < 50; i++) {
+        for (let i = 0; i < 100; i++) {
             const randomID =
                 currentIDs[Math.floor(Math.random() * currentIDs.length)];
             this.current_slice.interacting_qubits.add(randomID);
