@@ -22,7 +22,8 @@ export class QubitGrid {
 
     set current_slice(value: Slice) {
         this._current_slice = value;
-        this.onCurrentSliceChange();
+        console.log(value)
+        this.onCurrentSliceChange(value.timeStep);
     }
 
     constructor(
@@ -35,7 +36,7 @@ export class QubitGrid {
         this.scene = scene;
         this.slices = [];
         this.heatmap = new Heatmap(camera, qubit_number * qubit_number);
-        this.current_slice = new Slice();
+        this._current_slice = new Slice();
         this.timeline = new Timeline((sliceIndex) =>
             this.loadStateFromSlice(sliceIndex),
         );
@@ -77,14 +78,22 @@ export class QubitGrid {
     //     }
     // }
 
-    private onCurrentSliceChange() {
+    private onCurrentSliceChange(sliceIndex: number) {
         this.current_slice.qubits.forEach((qubit) => {
             qubit.animate();
         });
 
+        console.log("Slice index: " + sliceIndex);
+        const iterations = Math.min(3, sliceIndex);
+        const sliceschangeIDs = new Array<Set<number>>();
+        for (let index = iterations; index >= 0; index--) {
+           const changeIDs = this.slices[index].interacting_qubits;
+           sliceschangeIDs.push(changeIDs);
+        }
+
         this.heatmap.updatePoints(
             this.current_slice.qubits,
-            this.current_slice.interacting_qubits,
+            sliceschangeIDs,
         );
     }
 
@@ -143,10 +152,8 @@ export class QubitGrid {
                 States[Math.floor(Math.random() * States.length)];
         }
 
+
+        this.current_slice = this.current_slice;
         this.saveCurrentState();
-        this.heatmap.updatePoints(
-            this.current_slice.qubits,
-            this.current_slice.interacting_qubits,
-        );
     }
 }
