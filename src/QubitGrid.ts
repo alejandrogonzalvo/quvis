@@ -24,7 +24,9 @@ export class QubitGrid {
     set current_slice(value: Slice) {
         this._current_slice = value;
         console.log(value);
-        this.onCurrentSliceChange(value.timeStep);
+        if (this._current_slice && this._current_slice.qubits.size > 0) {
+            this.onCurrentSliceChange(value.timeStep);
+        }
     }
 
     constructor(
@@ -57,11 +59,9 @@ export class QubitGrid {
             }
         });
 
-        // this.loadNPZData('approx_states.npz').then(() => {
-        //     this.saveCurrentState();
-        // });
-
         this.saveCurrentState();
+
+        this.loadStateFromSlice(0);
     }
 
     // async loadNPZData(url) {
