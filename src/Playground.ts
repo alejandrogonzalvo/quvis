@@ -60,7 +60,7 @@ export class Playground {
         window.addEventListener("mouseleave", this.onMouseLeave.bind(this));
 
         // Create Qubit Grid
-        this.grid = new QubitGrid(this.scene, this.mouse, this.camera, 20);
+        this.grid = new QubitGrid(this.scene, this.mouse, this.camera, 20, 5);
 
         this.grid.heatmap.material.uniforms.aspect.value =
             window.innerWidth / window.innerHeight;

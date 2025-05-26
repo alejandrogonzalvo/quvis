@@ -8,9 +8,15 @@ export class Heatmap {
     intensities: Float32Array;
     qubitPositions: THREE.Vector3[] = [];
     camera: THREE.PerspectiveCamera;
+    maxSlices: number;
 
-    constructor(camera: THREE.PerspectiveCamera, qubit_number: number) {
+    constructor(
+        camera: THREE.PerspectiveCamera,
+        qubit_number: number,
+        maxSlices: number,
+    ) {
         this.camera = camera;
+        this.maxSlices = maxSlices;
         const geometry = new THREE.BufferGeometry();
         this.positions = new Float32Array(qubit_number * 3);
         this.intensities = new Float32Array(qubit_number);
@@ -76,15 +82,18 @@ export class Heatmap {
         this.mesh = new THREE.Points(geometry, this.material);
     }
 
-    updatePoints(qubits: Map<number, Qubit>, changedIdSlices: Array<Set<number>>) {
+    updatePoints(
+        qubits: Map<number, Qubit>,
+        changedIdSlices: Array<Set<number>>,
+    ) {
         let posIndex = 0;
         let intIndex = 0;
-    
+
         // Update camera-dependent uniforms
         this.material.uniforms.cameraPosition.value.copy(this.camera.position);
         this.material.uniforms.scaleFactor.value = this.camera.zoom;
         this.material.uniformsNeedUpdate = true;
-    
+
         qubits.forEach((qubit, id) => {
             // Get world position once during initialization
             if (!this.qubitPositions[id]) {
@@ -92,33 +101,33 @@ export class Heatmap {
                 qubit.blochSphere.blochSphere.getWorldPosition(pos);
                 this.qubitPositions[id] = pos;
             }
-    
+
             // Update positions array
             const pos = this.qubitPositions[id];
             this.positions[posIndex++] = pos.x;
             this.positions[posIndex++] = pos.y;
             this.positions[posIndex++] = pos.z;
-    
+
             // Calculate cumulative intensity with exponential decay
             let intensity = 0;
             const decayFactor = 0.7; // Controls how quickly intensity decreases
-            const maxSlices = 3; // Consider last 3 interactions
-            
-            changedIdSlices.slice(0, maxSlices).forEach((slice, index) => {
+
+            changedIdSlices.slice(0, this.maxSlices).forEach((slice, index) => {
                 if (slice.has(id)) {
                     intensity += 0.5 * Math.pow(decayFactor, index);
                 }
             });
-            
+
             this.intensities[intIndex++] = Math.min(intensity, 1.0);
         });
-    
+
         // Update buffer attributes
-        const positionAttr = this.mesh.geometry.attributes.position as THREE.BufferAttribute;
+        const positionAttr = this.mesh.geometry.attributes
+            .position as THREE.BufferAttribute;
         positionAttr.needsUpdate = true;
-    
-        const intensityAttr = this.mesh.geometry.attributes.intensity as THREE.BufferAttribute;
+
+        const intensityAttr = this.mesh.geometry.attributes
+            .intensity as THREE.BufferAttribute;
         intensityAttr.needsUpdate = true;
     }
-    
 }

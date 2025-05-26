@@ -1,4 +1,3 @@
-import { time } from "console";
 import { Qubit } from "./Qubit.js";
 
 export class Slice {
@@ -24,6 +23,6 @@ export class Slice {
                 new Qubit(id, qubit.state, qubit.blochSphere),
             );
         });
-        return new Slice(this.timeStep+1, cloned_qubits, new Set<number>());
+        return new Slice(this.timeStep + 1, cloned_qubits, new Set<number>());
     }
 }
