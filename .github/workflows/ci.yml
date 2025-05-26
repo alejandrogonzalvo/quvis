@@ -2,19 +2,48 @@ name: CI & Deploy
 
 on:
   push:
-    branches: [ main ] # Or your default branch
+    branches: [ main ] # Changed from master to main
   pull_request:
-    branches: [ main ] # Or your default branch
+    branches: [ main ] # Changed from master to main
 
 jobs:
-  build_and_deploy: # Renamed job for clarity
+  release: # Release job now runs first on main
     runs-on: ubuntu-latest
-    permissions: # Added permissions for GitHub Pages
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Semantic Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # NPM_TOKEN: ${{ secrets.NPM_TOKEN }} # Uncomment if publishing to npm
+        run: npx semantic-release
+
+  build_and_deploy:
+    needs: release # Deploy job now depends on a successful release
+    runs-on: ubuntu-latest
+    permissions:
       contents: read
       pages: write
       id-token: write
 
-    environment: # Added environment for GitHub Pages
+    environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
@@ -35,7 +64,7 @@ jobs:
       run: npx tsc
 
     - name: Build Vite application
-      run: npx vite build # Output will be in 'dist' by default
+      run: npx vite build
 
     - name: Setup Pages
       uses: actions/configure-pages@v4
@@ -43,8 +72,8 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v3
       with:
-        path: './dist' # Vite builds to the 'dist' folder by default
+        path: './dist'
 
     - name: Deploy to GitHub Pages
       id: deployment
-      uses: actions/deploy-pages@v4 
+      uses: actions/deploy-pages@v4
