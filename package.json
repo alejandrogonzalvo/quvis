@@ -1,8 +1,10 @@
 {
-  "name": "quvis-web",
+  "name": "quvis",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
     "start": "http-server",
     "prepare": "husky"
   },

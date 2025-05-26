@@ -1,36 +1,78 @@
-## Setup
+# Quvis: Quantum Circuit Visualization Tool
 
-```
+Quvis is a visualization tool designed to display and analyze quantum circuits at various levels of abstraction, from logical interaction graphs to compiled circuits on physical quantum hardware. It aims to provide insights into circuit structure, qubit utilization, and various performance metrics.
+
+## Project Overview
+
+This tool helps visualize and understand the complexities of quantum algorithms and their execution on quantum processors. It focuses on three main graph representations:
+
+1.  **Interaction Graph**: A high-level view of a quantum circuit, where virtual qubits are nodes and their interactions (gates) are edges. This represents the logical structure of the algorithm.
+2.  **Compiled Interaction Graph**: A modified version of the interaction graph that accounts for the physical qubit layout and connectivity constraints of a specific quantum device. This involves adding operations like SWAP gates to enable interactions between non-adjacent qubits.
+3.  **Connectivity Graph (Coupling Map)**: Represents the physical architecture of a quantum processor, showing physical qubits as nodes and the possible two-qubit gate connections (couplers) as edges.
+
+The tool is designed to decompose the interaction and compiled interaction graphs into timeslices, facilitating detailed visualization and metric analysis. It aims to be scalable for circuits involving up to 10,000 qubits.
+
+Key metrics that can be assessed (for selected timeslices) include:
+
+*   **Burstiness**: Identifying active versus idle qubits.
+*   **Routing vs. Computing Operations**: Distinguishing between gates from the original circuit and those added for qubit routing.
+*   **Qubit Coherence**: Analyzing fidelity loss due to gate execution.
+*   **Routing Heatmaps**: Visualizing routing overhead and patterns.
+
+## Setup and Installation
+
+To set up the project locally, ensure you have Node.js installed (v20.x or higher recommended, use `nvm` if possible) and then run:
+
+```bash
 npm install
-npm install -g typescript
-tsc
 ```
 
-## Start Application
+## Running the Application
 
+To start the development server:
+
+```bash
+npm run dev
 ```
+
+This will start the Vite development server. You can typically access the application in your browser at `http://localhost:5173` (or a similar address shown in your terminal).
+
+Alternatively, you can run Vite directly:
+```bash
 npx vite
 ```
 
-## Log
+## Building for Production
 
-Visualization tool specifications:
+To create a production build:
 
-We are working with three graph levels, from virtual qubits to physical devices:
+```bash
+npm run build
+```
+This command compiles the TypeScript code and bundles the application using Vite. The output will be in the `dist` directory.
 
-1. For a given quantum operator (i.e. quantum algorithm) after being decomposed in single & two qubit gates, we can construct a graph with virtual qubits as nodes, and interactions in the circuit as edges connecting nodes. This high-level logical graph is known as the "interaction graph" of the circuit. https://link.springer.com/article/10.1007/s42484-023-00124-1
-2. The third graph is known as the "connectivity graph" or "coupling map" of a quantum processor, with physical qubits from the quantum device as nodes, and couplers (i.e. two-qubit gate feasibility) as edges connecting nodes. https://arxiv.org/abs/2007.15671
-3. This graph can be defined as "a modified version of the interaction graph satisfying the connectivity graph". Basically, we go from virtual qubits to physical qubits (as in the id of the qubits in the graph) adding new interactions in the circuit (i.e. SWAP gates) to route the qubits that need to interact (given by the interaction graph) into neighbouring positions (given by the connectivity graph). We refer to this graph as the "compiled interaction graph". https://arxiv.org/abs/1809.02573
+Alternatively, you can run Vite build directly:
+```bash
+npx vite build
+```
 
-The visualization tool should be able to display the three levels of graphs described above, and to assess several metrics.
-The first (interaction) and second (compiled interaction) graphs can be decomposed into timeslices, which will ease the visualization and metric analysis of the tool.
+## Release Process
 
-Tentative list of metrics to be displayed (for a selected set of consecutive slices):
+This project uses `semantic-release` for automated version management and package publishing. Releases are triggered automatically on pushes to the `main` branch.
 
-- Burstiness (which qubits are being operated and which are idling)
-- Routing vs Computing operations (i.e. the gate we are operating comes from the quantum circuit? or from the routing process?)
-- Qubit coherence (loss of fidelity due to the execution of gates)
-- Routing heatmaps?
-- ... many more to be defined (and probably some that I am forgetting)
+*   Commits to the `main` branch that follow the [Conventional Commits specification](https://www.conventionalcommits.org/) will trigger a new release.
+*   The GitHub Actions workflow (defined in `.github/workflows/ci.yml`) handles the release process, including:
+    *   Determining the next version number based on commit messages.
+    *   Generating release notes.
+    *   Creating a GitHub release and tag.
+*   Successful releases on the `main` branch will automatically trigger a deployment to GitHub Pages.
 
-The visualization tool should be scalable to allow for qubit-scales of the order of 10.000 qubits.
+Prereleases are generated for commits to the `staging` branch.
+
+## Contributing
+
+(Details to be added here - e.g., contribution guidelines, code of conduct, how to submit pull requests)
+
+## License
+
+(Details to be added here - e.g., MIT, Apache 2.0)
