@@ -34,9 +34,7 @@ export class Heatmap {
             uniforms: {
                 aspect: { value: window.innerWidth / window.innerHeight },
                 radius: { value: 1.0 },
-                baseSize: { value: 50.0 },
-                color1: { value: new THREE.Color(0xff0000) },
-                color2: { value: new THREE.Color(0x00ff00) },
+                baseSize: { value: 2800.0 },
                 cameraPosition: { value: new THREE.Vector3() },
                 scaleFactor: { value: 1.0 },
             },
@@ -50,13 +48,13 @@ export class Heatmap {
                 void main() {
                     vPosition = position;
                     vIntensity = intensity;
-                    gl_PointSize = baseSize * scaleFactor; // Combined base size with zoom scaling
                     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    float w = gl_Position.w;
+                    if (w <= 0.0) w = 0.00001;
+                    gl_PointSize = (baseSize * scaleFactor) / w;
                 }
             `,
             fragmentShader: `
-            uniform vec3 color1;
-            uniform vec3 color2;
             uniform float radius;
             varying vec3 vPosition;
             varying float vIntensity;
@@ -65,13 +63,18 @@ export class Heatmap {
                 vec2 coord = gl_PointCoord * 2.0 - vec2(1.0);
                 float distance = length(coord);
                 
-                // Calculate alpha separately from intensity
                 float alpha = smoothstep(radius, radius * 0.1, distance);
                 
-                // Use intensity for color mixing only
-                vec3 color = mix(color2, color1, vIntensity);
+                vec3 colorValue;
+                if (vIntensity <= 0.5) {
+                    // Transition from Green (0,1,0) at intensity 0 to Yellow (1,1,0) at intensity 0.5
+                    colorValue = vec3(vIntensity * 2.0, 1.0, 0.0);
+                } else {
+                    // Transition from Yellow (1,1,0) at intensity 0.5 to Red (1,0,0) at intensity 1.0
+                    colorValue = vec3(1.0, 1.0 - (vIntensity - 0.5) * 2.0, 0.0);
+                }
                 
-                gl_FragColor = vec4(color, alpha);
+                gl_FragColor = vec4(colorValue, alpha);
             }
         `,
             transparent: true,

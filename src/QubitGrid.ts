@@ -32,7 +32,7 @@ export class QubitGrid {
         mouse: THREE.Vector2,
         camera: THREE.PerspectiveCamera,
         qubit_number: number,
-        initialMaxSlicesForHeatmap: number = 3,
+        initialMaxSlicesForHeatmap: number = 10,
     ) {
         this.mouse = mouse;
         this.scene = scene;
