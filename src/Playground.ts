@@ -68,6 +68,20 @@ export class Playground {
             this.grid.heatmap.material.uniforms.aspect.value =
                 window.innerWidth / window.innerHeight;
         });
+
+        // Add instruction text
+        const instructionText = document.createElement("div");
+        instructionText.textContent = "Press Space to generate new slices.";
+        instructionText.style.position = "absolute";
+        instructionText.style.top = "20px";
+        instructionText.style.left = "20px";
+        instructionText.style.color = "white";
+        instructionText.style.fontFamily = "Arial, sans-serif";
+        instructionText.style.fontSize = "16px";
+        instructionText.style.backgroundColor = "rgba(0,0,0,0.5)";
+        instructionText.style.padding = "5px 10px";
+        instructionText.style.borderRadius = "5px";
+        document.body.appendChild(instructionText);
     }
 
     setupLights() {
