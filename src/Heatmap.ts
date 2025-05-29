@@ -111,17 +111,22 @@ export class Heatmap {
             this.positions[posIndex++] = pos.y;
             this.positions[posIndex++] = pos.z;
 
-            // Calculate cumulative intensity with exponential decay
-            let intensity = 0;
-            const decayFactor = 0.7; // Controls how quickly intensity decreases
+            // Calculate cumulative intensity based on interaction count
+            let interactionCount = 0;
+            const slicesToConsider = changedIdSlices.slice(0, this.maxSlices);
 
-            changedIdSlices.slice(0, this.maxSlices).forEach((slice, index) => {
+            slicesToConsider.forEach((slice) => {
                 if (slice.has(id)) {
-                    intensity += 0.5 * Math.pow(decayFactor, index);
+                    interactionCount++;
                 }
             });
 
-            this.intensities[intIndex++] = Math.min(intensity, 1.0);
+            let intensity = 0;
+            if (slicesToConsider.length > 0) {
+                intensity = interactionCount / slicesToConsider.length;
+            }
+
+            this.intensities[intIndex++] = intensity; // Already clamped between 0 and 1 by calculation
         });
 
         // Update buffer attributes
