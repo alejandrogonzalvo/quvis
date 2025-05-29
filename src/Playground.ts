@@ -15,14 +15,15 @@ export class Playground {
     heatmapSlicesSlider: HTMLInputElement;
     heatmapSlicesValueDisplay: HTMLSpanElement;
     maxHeatmapSlices: number;
+    legendRedValue: HTMLSpanElement;
+    legendYellowValue: HTMLSpanElement;
+    legendGreenValue: HTMLSpanElement;
 
     constructor() {
-        // Scene setup
         this.scene = new THREE.Scene();
         this.mouse = new THREE.Vector2();
         this.scene.background = new THREE.Color(0x121212);
 
-        // Heatmap slices slider initialization (moved earlier)
         this.heatmapSlicesSlider = document.getElementById(
             "heatmap-slices",
         ) as HTMLInputElement;
@@ -31,12 +32,21 @@ export class Playground {
         ) as HTMLSpanElement;
         this.maxHeatmapSlices = parseInt(this.heatmapSlicesSlider.value);
         if (this.heatmapSlicesValueDisplay) {
-            // Ensure the display element exists
             this.heatmapSlicesValueDisplay.textContent =
                 this.heatmapSlicesSlider.value;
         }
 
-        // Camera setup
+        this.legendRedValue = document.getElementById(
+            "legend-red-value",
+        ) as HTMLSpanElement;
+        this.legendYellowValue = document.getElementById(
+            "legend-yellow-value",
+        ) as HTMLSpanElement;
+        this.legendGreenValue = document.getElementById(
+            "legend-green-value",
+        ) as HTMLSpanElement;
+        this.updateLegend();
+
         this.camera = new THREE.PerspectiveCamera(
             75,
             window.innerWidth / window.innerHeight,
@@ -45,17 +55,14 @@ export class Playground {
         );
         this.camera.position.set(0, 0, 20);
 
-        // Create a camera rig
         this.cameraRig = new THREE.Group();
         this.cameraRig.add(this.camera);
         this.scene.add(this.cameraRig);
 
-        // Renderer setup
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(this.renderer.domElement);
 
-        // Controls - now targeting the camera rig
         this.controls = new OrbitControls(
             this.camera,
             this.renderer.domElement,
@@ -63,20 +70,16 @@ export class Playground {
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
 
-        // Setup lights
         this.setupLights();
 
-        // Raycaster for hover detection
         this.raycaster = new THREE.Raycaster();
 
-        // Event listeners
         window.addEventListener("resize", () => this.onWindowResize());
         window.addEventListener("mousemove", (event) =>
             this.onMouseMove(event),
         );
         window.addEventListener("mouseleave", this.onMouseLeave.bind(this));
 
-        // Create Qubit Grid
         this.grid = new QubitGrid(
             this.scene,
             this.mouse,
@@ -92,22 +95,17 @@ export class Playground {
                 window.innerWidth / window.innerHeight;
         });
 
-        // Heatmap slices slider event listener (this part should remain, the declaration above is for initial value)
-        // this.heatmapSlicesSlider = document.getElementById("heatmap-slices") as HTMLInputElement; // Already initialized
-        // this.heatmapSlicesValueDisplay = document.getElementById("heatmap-slices-value") as HTMLSpanElement; // Already initialized
-        // this.maxHeatmapSlices = parseInt(this.heatmapSlicesSlider.value); // Already initialized
-
         this.heatmapSlicesSlider.addEventListener("input", (event) => {
             const target = event.currentTarget as HTMLInputElement;
             this.maxHeatmapSlices = parseInt(target.value);
             this.heatmapSlicesValueDisplay.textContent = target.value;
+            this.updateLegend();
 
             if (this.grid) {
                 this.grid.maxSlicesForHeatmap = this.maxHeatmapSlices;
                 if (this.grid.heatmap) {
-                    this.grid.heatmap.maxSlices = this.maxHeatmapSlices; // Ensure heatmap instance also has the updated value
+                    this.grid.heatmap.maxSlices = this.maxHeatmapSlices;
                 }
-                // Trigger an update. We need to pass the current timeStep.
                 if (this.grid.current_slice) {
                     this.grid.onCurrentSliceChange(
                         this.grid.current_slice.timeStep,
@@ -116,7 +114,6 @@ export class Playground {
             }
         });
 
-        // Add instruction text
         const instructionText = document.createElement("div");
         instructionText.textContent = "Press Space to generate new slices.";
         instructionText.style.position = "absolute";
@@ -131,28 +128,36 @@ export class Playground {
         document.body.appendChild(instructionText);
     }
 
+    updateLegend() {
+        if (
+            this.legendRedValue &&
+            this.legendYellowValue &&
+            this.legendGreenValue
+        ) {
+            this.legendRedValue.textContent = `${this.maxHeatmapSlices}`;
+            this.legendYellowValue.textContent = `${Math.ceil(
+                this.maxHeatmapSlices * 0.5,
+            )}`;
+            this.legendGreenValue.textContent = `0`;
+        }
+    }
+
     setupLights() {
-        // Static ambient light
         const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
         this.scene.add(ambientLight);
 
-        // Create a light rig that follows the camera
         this.lightRig = new THREE.Group();
 
-        // Main light
         const mainLight = new THREE.DirectionalLight(0xffffff, 1);
         mainLight.position.set(5, 5, 5);
         this.lightRig.add(mainLight);
 
-        // Point light
         const pointLight = new THREE.PointLight(0xffffff, 0.5);
         pointLight.position.set(0, 2, 2);
         this.lightRig.add(pointLight);
 
-        // Add the light rig to the camera
         this.camera.add(this.lightRig);
 
-        // Optional: Add static hemisphere light
         const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.2);
         this.scene.add(hemiLight);
     }
@@ -171,12 +176,11 @@ export class Playground {
         const intersects = this.raycaster.intersectObjects(
             this.scene.children,
             true,
-        ); // Add true for recursive check
+        );
 
         const tooltip = document.getElementById("qubit-tooltip");
 
         if (intersects.length > 0) {
-            // Find the parent group (Bloch sphere) of the intersected object
             let qubit = intersects[0].object;
             while (qubit.parent && !qubit.userData.id) {
                 qubit = qubit.parent;

@@ -67,10 +67,8 @@ export class Heatmap {
                 
                 vec3 colorValue;
                 if (vIntensity <= 0.5) {
-                    // Transition from Green (0,1,0) at intensity 0 to Yellow (1,1,0) at intensity 0.5
                     colorValue = vec3(vIntensity * 2.0, 1.0, 0.0);
                 } else {
-                    // Transition from Yellow (1,1,0) at intensity 0.5 to Red (1,0,0) at intensity 1.0
                     colorValue = vec3(1.0, 1.0 - (vIntensity - 0.5) * 2.0, 0.0);
                 }
                 
@@ -92,26 +90,22 @@ export class Heatmap {
         let posIndex = 0;
         let intIndex = 0;
 
-        // Update camera-dependent uniforms
         this.material.uniforms.cameraPosition.value.copy(this.camera.position);
         this.material.uniforms.scaleFactor.value = this.camera.zoom;
         this.material.uniformsNeedUpdate = true;
 
         qubits.forEach((qubit, id) => {
-            // Get world position once during initialization
             if (!this.qubitPositions[id]) {
                 const pos = new THREE.Vector3();
                 qubit.blochSphere.blochSphere.getWorldPosition(pos);
                 this.qubitPositions[id] = pos;
             }
 
-            // Update positions array
             const pos = this.qubitPositions[id];
             this.positions[posIndex++] = pos.x;
             this.positions[posIndex++] = pos.y;
             this.positions[posIndex++] = pos.z;
 
-            // Calculate cumulative intensity based on interaction count
             let interactionCount = 0;
             const slicesToConsider = changedIdSlices.slice(0, this.maxSlices);
 
@@ -126,10 +120,9 @@ export class Heatmap {
                 intensity = interactionCount / slicesToConsider.length;
             }
 
-            this.intensities[intIndex++] = intensity; // Already clamped between 0 and 1 by calculation
+            this.intensities[intIndex++] = intensity;
         });
 
-        // Update buffer attributes
         const positionAttr = this.mesh.geometry.attributes
             .position as THREE.BufferAttribute;
         positionAttr.needsUpdate = true;
