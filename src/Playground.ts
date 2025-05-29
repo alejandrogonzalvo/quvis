@@ -12,12 +12,29 @@ export class Playground {
     grid: QubitGrid;
     mouse: THREE.Vector2;
     raycaster: THREE.Raycaster;
+    heatmapSlicesSlider: HTMLInputElement;
+    heatmapSlicesValueDisplay: HTMLSpanElement;
+    maxHeatmapSlices: number;
 
     constructor() {
         // Scene setup
         this.scene = new THREE.Scene();
         this.mouse = new THREE.Vector2();
         this.scene.background = new THREE.Color(0x121212);
+
+        // Heatmap slices slider initialization (moved earlier)
+        this.heatmapSlicesSlider = document.getElementById(
+            "heatmap-slices",
+        ) as HTMLInputElement;
+        this.heatmapSlicesValueDisplay = document.getElementById(
+            "heatmap-slices-value",
+        ) as HTMLSpanElement;
+        this.maxHeatmapSlices = parseInt(this.heatmapSlicesSlider.value);
+        if (this.heatmapSlicesValueDisplay) {
+            // Ensure the display element exists
+            this.heatmapSlicesValueDisplay.textContent =
+                this.heatmapSlicesSlider.value;
+        }
 
         // Camera setup
         this.camera = new THREE.PerspectiveCamera(
@@ -60,13 +77,43 @@ export class Playground {
         window.addEventListener("mouseleave", this.onMouseLeave.bind(this));
 
         // Create Qubit Grid
-        this.grid = new QubitGrid(this.scene, this.mouse, this.camera, 20, 5);
+        this.grid = new QubitGrid(
+            this.scene,
+            this.mouse,
+            this.camera,
+            20,
+            this.maxHeatmapSlices,
+        );
 
         this.grid.heatmap.material.uniforms.aspect.value =
             window.innerWidth / window.innerHeight;
         window.addEventListener("resize", () => {
             this.grid.heatmap.material.uniforms.aspect.value =
                 window.innerWidth / window.innerHeight;
+        });
+
+        // Heatmap slices slider event listener (this part should remain, the declaration above is for initial value)
+        // this.heatmapSlicesSlider = document.getElementById("heatmap-slices") as HTMLInputElement; // Already initialized
+        // this.heatmapSlicesValueDisplay = document.getElementById("heatmap-slices-value") as HTMLSpanElement; // Already initialized
+        // this.maxHeatmapSlices = parseInt(this.heatmapSlicesSlider.value); // Already initialized
+
+        this.heatmapSlicesSlider.addEventListener("input", (event) => {
+            const target = event.currentTarget as HTMLInputElement;
+            this.maxHeatmapSlices = parseInt(target.value);
+            this.heatmapSlicesValueDisplay.textContent = target.value;
+
+            if (this.grid) {
+                this.grid.maxSlicesForHeatmap = this.maxHeatmapSlices;
+                if (this.grid.heatmap) {
+                    this.grid.heatmap.maxSlices = this.maxHeatmapSlices; // Ensure heatmap instance also has the updated value
+                }
+                // Trigger an update. We need to pass the current timeStep.
+                if (this.grid.current_slice) {
+                    this.grid.onCurrentSliceChange(
+                        this.grid.current_slice.timeStep,
+                    );
+                }
+            }
         });
 
         // Add instruction text
