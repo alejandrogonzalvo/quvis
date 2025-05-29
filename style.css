@@ -39,3 +39,62 @@ body {
     background: white;
     cursor: pointer;
 }
+
+#heatmap-controls-vertical-container {
+    position: fixed;
+    right: 20px; /* Adjust as needed */
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: rgba(0,0,0,0.5);
+    padding: 15px;
+    border-radius: 8px;
+}
+
+#heatmap-controls-vertical-container label {
+    color: white;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+#heatmap-controls-vertical-container input[type="range"] {
+    -webkit-appearance: slider-vertical; /* Safari, Chrome, Opera */
+    -moz-appearance: none; /* Firefox - often needs appearance: none for custom styling */
+    appearance: none; /* Reset default appearance */
+    writing-mode: bt-lr; /* For vertical slider */
+    width: 8px; /* Adjust width of the vertical track */
+    height: 150px; /* Adjust height/length of the vertical track */
+    padding: 0 5px;
+    margin-bottom: 10px;
+    background: rgba(255, 255, 255, 0.2); /* Added a track background for better visibility */
+    border-radius: 5px; /* Added border-radius to track */
+}
+
+/* Optional: Style the thumb for vertical slider if needed */
+#heatmap-controls-vertical-container input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px; /* Example size */
+    height: 20px; /* Example size */
+    background: white; /* Example color */
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+#heatmap-controls-vertical-container input[type="range"]::-moz-range-thumb {
+    width: 20px; /* Example size */
+    height: 20px; /* Example size */
+    background: white; /* Example color */
+    cursor: pointer;
+    border-radius: 50%;
+    border: none; /* Reset border for Firefox thumb */
+}
+
+#heatmap-controls-vertical-container span {
+    color: white;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+}

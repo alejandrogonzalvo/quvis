@@ -85,7 +85,7 @@ export class QubitGrid {
     //     }
     // }
 
-    private onCurrentSliceChange(currentSliceTimeStep: number) {
+    public onCurrentSliceChange(currentSliceTimeStep: number) {
         this._current_slice.qubits.forEach((qubit) => {
             qubit.animate();
         });
