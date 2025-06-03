@@ -1,0 +1,208 @@
+{
+    "num_qubits": 9,
+    "operations_per_slice": [
+        [
+            {
+                "name": "u1",
+                "qubits": [
+                    0
+                ]
+            },
+            {
+                "name": "u3",
+                "qubits": [
+                    1
+                ]
+            }
+        ],
+        [
+            {
+                "name": "cx",
+                "qubits": [
+                    0,
+                    1
+                ]
+            }
+        ],
+        [
+            {
+                "name": "u3",
+                "qubits": [
+                    0
+                ]
+            },
+            {
+                "name": "u3",
+                "qubits": [
+                    1
+                ]
+            }
+        ],
+        [
+            {
+                "name": "cx",
+                "qubits": [
+                    0,
+                    1
+                ]
+            }
+        ],
+        [
+            {
+                "name": "u3",
+                "qubits": [
+                    0
+                ]
+            },
+            {
+                "name": "u3",
+                "qubits": [
+                    1
+                ]
+            }
+        ],
+        [
+            {
+                "name": "cx",
+                "qubits": [
+                    1,
+                    2
+                ]
+            }
+        ],
+        [
+            {
+                "name": "u3",
+                "qubits": [
+                    2
+                ]
+            }
+        ],
+        [
+            {
+                "name": "cx",
+                "qubits": [
+                    1,
+                    2
+                ]
+            }
+        ],
+        [
+            {
+                "name": "u3",
+                "qubits": [
+                    1
+                ]
+            },
+            {
+                "name": "u3",
+                "qubits": [
+                    2
+                ]
+            }
+        ],
+        [
+            {
+                "name": "cx",
+                "qubits": [
+                    0,
+                    1
+                ]
+            }
+        ],
+        [
+            {
+                "name": "u2",
+                "qubits": [
+                    0
+                ]
+            },
+            {
+                "name": "u3",
+                "qubits": [
+                    1
+                ]
+            }
+        ],
+        [
+            {
+                "name": "cx",
+                "qubits": [
+                    0,
+                    1
+                ]
+            }
+        ],
+        [
+            {
+                "name": "u2",
+                "qubits": [
+                    0
+                ]
+            },
+            {
+                "name": "u3",
+                "qubits": [
+                    1
+                ]
+            }
+        ],
+        [
+            {
+                "name": "cx",
+                "qubits": [
+                    0,
+                    1
+                ]
+            }
+        ],
+        [
+            {
+                "name": "u2",
+                "qubits": [
+                    0
+                ]
+            },
+            {
+                "name": "u2",
+                "qubits": [
+                    1
+                ]
+            }
+        ],
+        [
+            {
+                "name": "cx",
+                "qubits": [
+                    1,
+                    2
+                ]
+            }
+        ],
+        [
+            {
+                "name": "u3",
+                "qubits": [
+                    2
+                ]
+            }
+        ],
+        [
+            {
+                "name": "cx",
+                "qubits": [
+                    1,
+                    2
+                ]
+            }
+        ],
+        [
+            {
+                "name": "u2",
+                "qubits": [
+                    2
+                ]
+            }
+        ]
+    ]
+}

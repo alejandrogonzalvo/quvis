@@ -74,6 +74,13 @@ export class Timeline {
         this.updateMarkers();
     }
 
+    setSliceCount(count: number) {
+        this.slices = count;
+        this.currentSlice = count > 0 ? 0 : 0; // Current slice is 0-indexed
+        this.slider.value = "0"; // Reset slider position to the beginning
+        this.updateView();
+    }
+
     destroy() {
         // Cleanup method to remove event listener
         this.slider.removeEventListener("input", this.handleInput);
