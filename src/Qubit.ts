@@ -14,7 +14,7 @@ export class Qubit {
         this.id = id;
         this._state = initialState;
         this.blochSphere = blochSphereInstance;
-        this.state = this._state;
+        // console.log(`Qubit ${this.id} constructed. Initial _state: ${this._state}, typeof _state: ${typeof this._state}. (Enum string: ${State[this._state]})`);
     }
 
     get state(): State {
@@ -22,8 +22,18 @@ export class Qubit {
     }
 
     set state(newState: State) {
+        // console.log(`Qubit ${this.id} SET state: received newState: ${newState}, typeof newState: ${typeof newState}. (Enum string: ${State[newState]})`);
+        // console.log(`Qubit ${this.id} SET state: current _state BEFORE: ${this._state}, typeof _state: ${typeof this._state}. (Enum string: ${State[this._state]})`);
         this._state = newState;
-        this.animate();
+        // console.log(`Qubit ${this.id} SET state: _state AFTER: ${this._state}, typeof _state: ${typeof this._state}. (Enum string: ${State[this._state]})`);
+        try {
+            this.animate();
+        } catch (error) {
+            console.error(
+                `Qubit ${this.id} Error during animate() in state setter:`,
+                error,
+            );
+        }
     }
 
     animate() {

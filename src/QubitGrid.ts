@@ -51,6 +51,7 @@ const CYLINDER_FRAGMENT_SHADER = `
 export class QubitGrid {
     scene: THREE.Scene;
     slices: Array<Slice>;
+    interactionPairsPerSlice: Array<Array<{ q1: number; q2: number }>> = [];
     mouse: THREE.Vector2;
     timeline: Timeline;
     heatmap!: Heatmap;
@@ -60,7 +61,7 @@ export class QubitGrid {
     private qubitPositions: Map<number, THREE.Vector3> = new Map();
     private lastCalculatedSlicesChangeIDs: Array<Set<number>> = [];
 
-    private qubitInstances: Map<number, Qubit> = new Map();
+    public qubitInstances: Map<number, Qubit> = new Map();
     private current_slice_index: number = 0;
 
     private _qubit_count: number;
@@ -75,6 +76,10 @@ export class QubitGrid {
 
     private currentConnectionThickness: number;
     private currentInactiveElementAlpha: number;
+
+    private onSlicesLoadedCallback:
+        | ((count: number, initialIndex: number) => void)
+        | undefined;
 
     get current_slice_data(): Slice | null {
         if (
@@ -98,6 +103,7 @@ export class QubitGrid {
         initialCoolingFactor: number = 0.95,
         initialConnectionThickness: number = 0.05,
         initialInactiveElementAlpha: number = 0.1,
+        onSlicesLoadedCallback?: (count: number, initialIndex: number) => void,
     ) {
         this.scene = scene;
         this.mouse = mouse;
@@ -114,6 +120,7 @@ export class QubitGrid {
         this.coolingFactor = initialCoolingFactor;
         this.currentConnectionThickness = initialConnectionThickness;
         this.currentInactiveElementAlpha = initialInactiveElementAlpha;
+        this.onSlicesLoadedCallback = onSlicesLoadedCallback;
 
         this.timeline = new Timeline((sliceIndex) =>
             this.loadStateFromSlice(sliceIndex),
@@ -278,7 +285,7 @@ export class QubitGrid {
             this._qubit_count,
             this.maxSlicesForHeatmap,
         );
-        this.scene.add(this.heatmap.mesh);
+        if (this.heatmap.mesh) this.scene.add(this.heatmap.mesh);
         const errorAreaSize = 10;
         this.calculateQubitPositions(
             this._qubit_count,
@@ -293,90 +300,96 @@ export class QubitGrid {
         this.slices = [errorSlice];
         this.timeline.setSliceCount(1);
         this.loadStateFromSlice(0);
+        this.onSlicesLoadedCallback?.(
+            this.slices.length,
+            this.current_slice_index,
+        );
     }
 
     async loadSlicesFromJSON(url: string, camera: THREE.PerspectiveCamera) {
+        this.slices = [];
+        this.interactionPairsPerSlice = [];
+        this.qubitInstances.forEach((qubit) => qubit.dispose());
+        this.qubitInstances.clear();
+        this.heatmap.clearPositionsCache();
+
         try {
             const response = await fetch(url);
-            if (!response.ok)
-                throw new Error(
-                    `HTTP error! status: ${response.status} while fetching ${url}`,
-                );
-            const jsonData = (await response.json()) as VizData;
-            console.log("[QubitGrid] JSON data loaded:", jsonData);
-            if (
-                !jsonData ||
-                typeof jsonData.num_qubits === "undefined" ||
-                !jsonData.operations_per_slice
-            ) {
-                this.handleLoadError(
-                    new Error("Invalid JSON data structure"),
-                    camera,
-                    "Invalid JSON data structure",
-                );
-                return;
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-            this._qubit_count = Number(jsonData.num_qubits);
-            this.couplingMap = jsonData.coupling_map || null;
+            const vizData = (await response.json()) as VizData;
 
-            if (this.heatmap && this.heatmap.mesh)
+            this._qubit_count = vizData.num_qubits;
+            this.couplingMap = vizData.coupling_map || null;
+
+            if (
+                this.heatmap &&
+                this.heatmap.mesh.geometry.attributes.position.count !==
+                    this._qubit_count
+            ) {
                 this.scene.remove(this.heatmap.mesh);
-            this.heatmap = new Heatmap(
-                camera,
-                this._qubit_count,
-                this.maxSlicesForHeatmap,
-            );
-            this.scene.add(this.heatmap.mesh);
+                this.heatmap.dispose();
+                this.heatmap = new Heatmap(
+                    camera,
+                    this._qubit_count,
+                    this.maxSlicesForHeatmap,
+                );
+                this.scene.add(this.heatmap.mesh);
+            }
 
-            const layoutAreaSide = Math.max(
-                5,
-                Math.sqrt(this._qubit_count) * 2.5 * (this.idealDist / 5),
-            );
             this.calculateQubitPositions(
                 this._qubit_count,
                 this.couplingMap,
-                layoutAreaSide,
-                layoutAreaSide,
-                layoutAreaSide * 0.5,
+                20,
+                20,
+                10,
             );
-
             this.createGrid();
 
-            const loadedSlices: Slice[] = [];
-            jsonData.operations_per_slice.forEach((sliceOps, timeStep) => {
-                const newSlice = new Slice(timeStep);
-                const interactingQubitsThisSlice = new Set<number>();
-                sliceOps.forEach((op) =>
-                    op.qubits.forEach((qIndex) =>
-                        interactingQubitsThisSlice.add(qIndex),
-                    ),
-                );
-                newSlice.interacting_qubits = interactingQubitsThisSlice;
-                loadedSlices.push(newSlice);
+            this.slices = vizData.operations_per_slice.map((rawSlice, t) => {
+                const newSlice = new Slice(t);
+                const currentSlicePairs: Array<{ q1: number; q2: number }> = [];
+                rawSlice.forEach((op) => {
+                    op.qubits.forEach((qid) =>
+                        newSlice.interacting_qubits.add(qid),
+                    );
+                    if (op.qubits.length === 2) {
+                        currentSlicePairs.push({
+                            q1: op.qubits[0],
+                            q2: op.qubits[1],
+                        });
+                    }
+                });
+                this.interactionPairsPerSlice.push(currentSlicePairs);
+                return newSlice;
             });
-            this.slices = loadedSlices;
+
             if (this.slices.length > 0) {
+                this.current_slice_index = 0;
+                this.loadStateFromSlice(this.current_slice_index);
                 this.timeline.setSliceCount(this.slices.length);
-                this.loadStateFromSlice(0);
-            } else {
-                this.timeline.setSliceCount(
-                    this.qubitInstances.size > 0 ? 1 : 0,
-                );
-                if (this.qubitInstances.size > 0) {
-                    this.slices = [new Slice(0)];
-                    this.loadStateFromSlice(0);
-                } else {
-                    this.current_slice_index = -1;
-                    this.slices = [];
-                    this.onCurrentSliceChange();
+                if (this.onSlicesLoadedCallback) {
+                    this.onSlicesLoadedCallback(
+                        this.slices.length,
+                        this.current_slice_index,
+                    );
                 }
-                console.warn("[QubitGrid] No operational slices loaded...");
+            } else {
+                this.current_slice_index = -1;
+                if (this.onSlicesLoadedCallback) {
+                    this.onSlicesLoadedCallback(0, -1);
+                }
             }
+
+            this.drawConnections();
+            this.updateQubitOpacities();
         } catch (error) {
+            console.error("Error loading or processing slice data:", error);
             this.handleLoadError(
                 error as Error,
                 camera,
-                "Failed to load or parse JSON file",
+                "Failed to load quantum circuit data.",
             );
         }
     }
@@ -386,7 +399,7 @@ export class QubitGrid {
             this.qubitInstances.size === 0 &&
             (this.slices.length === 0 || this.current_slice_index < 0)
         ) {
-            if (this.heatmap) this.heatmap.updatePoints(new Map(), []);
+            if (this.heatmap) this.heatmap.updatePoints(new Map(), [], -1, []);
             this.lastCalculatedSlicesChangeIDs = [];
             this.updateQubitOpacities();
             this.drawConnections();
@@ -427,9 +440,20 @@ export class QubitGrid {
         }
         this.lastCalculatedSlicesChangeIDs = slicesChangeIDs;
         if (this.heatmap) {
-            if (this.qubitInstances.size > 0)
-                this.heatmap.updatePoints(this.qubitInstances, slicesChangeIDs);
-            else this.heatmap.updatePoints(new Map(), []);
+            if (
+                this.qubitInstances.size > 0 &&
+                this.interactionPairsPerSlice &&
+                this.slices
+            ) {
+                this.heatmap.updatePoints(
+                    this.qubitInstances,
+                    this.interactionPairsPerSlice,
+                    this.current_slice_index,
+                    this.slices,
+                );
+            } else {
+                this.heatmap.updatePoints(new Map(), [], -1, []);
+            }
         }
         this.updateQubitOpacities();
         this.drawConnections();
@@ -459,6 +483,22 @@ export class QubitGrid {
             this.current_slice_index = sliceIndex;
         else if (this.slices.length > 0) this.current_slice_index = 0;
         else this.current_slice_index = -1;
+
+        const currentSliceData = this.current_slice_data;
+
+        this.qubitInstances.forEach((qubit, id) => {
+            let targetState: State;
+            if (
+                currentSliceData &&
+                currentSliceData.interacting_qubits.has(id)
+            ) {
+                targetState = State.ONE;
+            } else {
+                targetState = State.ZERO;
+            }
+            qubit.state = targetState;
+        });
+
         this.onCurrentSliceChange();
     }
 
@@ -521,15 +561,30 @@ export class QubitGrid {
                     const distance = posA.distanceTo(posB);
                     if (distance === 0) return;
 
-                    const intensityA = this.getQubitInteractionIntensity(
+                    const activityA = this.getQubitInteractionIntensity(
                         qubitIdA,
                         currentSlicesChangeData,
                     );
-                    const intensityB = this.getQubitInteractionIntensity(
+                    const activityB = this.getQubitInteractionIntensity(
                         qubitIdB,
                         currentSlicesChangeData,
                     );
-                    const connectionIntensity = (intensityA + intensityB) / 2.0;
+
+                    const bothHistoricallyActive =
+                        activityA > 0 && activityB > 0;
+
+                    let connectionIntensity;
+                    if (bothHistoricallyActive) {
+                        connectionIntensity = 1.0;
+                    } else {
+                        connectionIntensity = 0.0;
+                    }
+
+                    if (this.current_slice_index < 5) {
+                        console.log(
+                            `Slice ${this.current_slice_index}: Connection ${qubitIdA}-${qubitIdB} -> ActivityA: ${activityA.toFixed(2)}, ActivityB: ${activityB.toFixed(2)}, BothHistoricallyActive: ${bothHistoricallyActive}, Intensity: ${connectionIntensity}`,
+                        );
+                    }
 
                     const material = new THREE.ShaderMaterial({
                         vertexShader: CYLINDER_VERTEX_SHADER,
@@ -651,5 +706,110 @@ export class QubitGrid {
         this.currentInactiveElementAlpha = alpha;
         this.updateQubitOpacities();
         this.drawConnections();
+    }
+
+    public updateLayoutParameters(params: {
+        repelForce?: number;
+        idealDistance?: number;
+        iterations?: number;
+        coolingFactor?: number;
+    }) {
+        let changed = false;
+        if (
+            params.repelForce !== undefined &&
+            this.kRepel !== params.repelForce
+        ) {
+            this.kRepel = params.repelForce;
+            changed = true;
+        }
+        if (
+            params.idealDistance !== undefined &&
+            this.idealDist !== params.idealDistance
+        ) {
+            this.idealDist = params.idealDistance;
+            changed = true;
+        }
+        if (
+            params.iterations !== undefined &&
+            this.iterations !== params.iterations
+        ) {
+            this.iterations = params.iterations;
+            changed = true;
+        }
+        if (
+            params.coolingFactor !== undefined &&
+            this.coolingFactor !== params.coolingFactor
+        ) {
+            this.coolingFactor = params.coolingFactor;
+            changed = true;
+        }
+
+        if (changed) {
+            this.recalculateLayoutAndRedraw(
+                this.kRepel,
+                this.idealDist,
+                this.iterations,
+                this.coolingFactor,
+            );
+        }
+    }
+
+    public updateAppearanceParameters(params: {
+        qubitSize?: number;
+        connectionThickness?: number;
+        inactiveAlpha?: number;
+    }) {
+        if (params.qubitSize !== undefined) {
+            this.setQubitScale(params.qubitSize);
+        }
+        if (params.connectionThickness !== undefined) {
+            this.setConnectionThickness(params.connectionThickness);
+        }
+        if (params.inactiveAlpha !== undefined) {
+            this.setInactiveElementAlpha(params.inactiveAlpha);
+        }
+    }
+
+    public setCurrentSlice(sliceIndex: number): void {
+        this.loadStateFromSlice(sliceIndex);
+    }
+
+    public dispose(): void {
+        console.log("QubitGrid dispose called");
+        this.qubitInstances.forEach((qubit) => {
+            if (qubit.blochSphere && qubit.blochSphere.blochSphere) {
+                this.scene.remove(qubit.blochSphere.blochSphere);
+            }
+            qubit.dispose();
+        });
+        this.qubitInstances.clear();
+
+        this.scene.remove(this.connectionLines);
+        this.connectionLines.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+                object.geometry?.dispose();
+                if (Array.isArray(object.material)) {
+                    object.material.forEach((m) => m.dispose());
+                } else {
+                    object.material?.dispose();
+                }
+            }
+        });
+        while (this.connectionLines.children.length > 0) {
+            this.connectionLines.remove(this.connectionLines.children[0]);
+        }
+
+        if (this.heatmap && this.heatmap.mesh) {
+            this.scene.remove(this.heatmap.mesh);
+            this.heatmap.dispose();
+        }
+
+        if (this.timeline && typeof this.timeline.dispose === "function") {
+            this.timeline.dispose();
+        }
+
+        this.qubitPositions.clear();
+        this.slices = [];
+        console.log("QubitGrid resources cleaned up");
     }
 }

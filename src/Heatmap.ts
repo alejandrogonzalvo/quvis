@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { Qubit } from "./Qubit.js";
+import { Slice } from "./Slice.js";
 
 export class Heatmap {
     mesh: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
@@ -74,12 +75,29 @@ export class Heatmap {
                     finalAlpha = smoothstep(radius, radius * 0.1, distanceFromCenter);
                     
                     // Determine color based on intensity
-                    if (vIntensity <= 0.5) {
-                        // Intensity > 0.001 up to 0.5: Greenish to Yellow
-                        colorValue = vec3(vIntensity * 2.0, 1.0, 0.0);
+                    float yellow_threshold = 0.3; // Highlights start becoming "redder" (from yellow) above this intensity
+                    float effective_vIntensity = clamp(vIntensity, 0.0, 1.0); // Ensure intensity is within [0,1]
+
+                    if (effective_vIntensity <= yellow_threshold) {
+                        // Intensity > 0.001 up to yellow_threshold: Greenish to Yellow
+                        // Normalize effective_vIntensity from 0 to yellow_threshold for this range
+                        float normalized_intensity_for_green_yellow;
+                        if (yellow_threshold > 0.001) { // Avoid division by zero or near-zero if threshold is tiny
+                           normalized_intensity_for_green_yellow = effective_vIntensity / yellow_threshold;
+                        } else {
+                           normalized_intensity_for_green_yellow = 1.0; // Effectively yellow if threshold is tiny and intensity is above it
+                        }
+                        colorValue = vec3(normalized_intensity_for_green_yellow, 1.0, 0.0); // Green (0,1,0) to Yellow (1,1,0)
                     } else {
-                        // Intensity > 0.5 up to 1.0: Yellow to Red
-                        colorValue = vec3(1.0, 1.0 - (vIntensity - 0.5) * 2.0, 0.0);
+                        // Intensity > yellow_threshold up to 1.0: Yellow to Red
+                        // Normalize effective_vIntensity from yellow_threshold to 1.0 for this range
+                        float normalized_intensity_for_yellow_red;
+                        if ((1.0 - yellow_threshold) > 0.001) { // Avoid division by zero or near-zero
+                            normalized_intensity_for_yellow_red = (effective_vIntensity - yellow_threshold) / (1.0 - yellow_threshold);
+                        } else {
+                            normalized_intensity_for_yellow_red = 1.0; // Effectively red if threshold is near 1.0 and intensity is above it
+                        }
+                        colorValue = vec3(1.0, 1.0 - normalized_intensity_for_yellow_red, 0.0); // Yellow (1,1,0) to Red (1,0,0)
                     }
                 }
                 
@@ -100,50 +118,125 @@ export class Heatmap {
 
     updatePoints(
         qubits: Map<number, Qubit>,
-        changedIdSlices: Array<Set<number>>,
+        allInteractionPairsPerSlice: Array<Array<{ q1: number; q2: number }>>,
+        currentSliceIndex: number,
+        allSlicesData: Array<Slice>,
     ) {
         let posIndex = 0;
         let intIndex = 0;
 
-        this.material.uniforms.cameraPosition.value.copy(this.camera.position);
-        this.material.uniforms.scaleFactor.value = this.camera.zoom;
-        this.material.uniformsNeedUpdate = true;
+        // Determine the window of slices to consider for heatmap intensity
+        const windowEndSlice = currentSliceIndex + 1;
+        const windowStartSlice = Math.max(0, windowEndSlice - this.maxSlices);
 
-        qubits.forEach((qubit, id) => {
-            if (!this.qubitPositions[id]) {
-                const pos = new THREE.Vector3();
-                qubit.blochSphere.blochSphere.getWorldPosition(pos);
-                this.qubitPositions[id] = pos;
+        // Get the interaction pairs and slice data for the current window
+        const relevantSliceInteractionPairs = allInteractionPairsPerSlice.slice(
+            windowStartSlice,
+            windowEndSlice,
+        );
+        const relevantSlicesData = allSlicesData.slice(
+            windowStartSlice,
+            windowEndSlice,
+        );
+        const numSlicesInWindow = relevantSliceInteractionPairs.length;
+
+        // Calculate the maximum possible weighted sum for normalization
+        // Weights are exponential, increasing for more recent slices.
+        const weight_base = 1.5; // Base for exponential weighting
+        let maxPossibleWeightedSum = 0;
+        if (numSlicesInWindow > 0) {
+            for (let i = 0; i < numSlicesInWindow; i++) {
+                maxPossibleWeightedSum += Math.pow(weight_base, i); // Weight for slice i (0=oldest, numSlicesInWindow-1=newest)
+            }
+        }
+
+        // Iterate over qubit IDs for which we have position data pre-calculated or can calculate
+        // Assuming this.positions and this.intensities are ordered by qubit ID from 0 to N-1
+        for (
+            let heatmapQubitId = 0;
+            heatmapQubitId < this.positions.length / 3;
+            heatmapQubitId++
+        ) {
+            const qubitInfo = qubits.get(heatmapQubitId); // Get the qubit object for its Bloch sphere position
+
+            if (!this.qubitPositions[heatmapQubitId] && qubitInfo) {
+                const posVec = new THREE.Vector3();
+                qubitInfo.blochSphere.blochSphere.getWorldPosition(posVec);
+                this.qubitPositions[heatmapQubitId] = posVec;
+            }
+            const pos = this.qubitPositions[heatmapQubitId];
+
+            if (pos) {
+                this.positions[posIndex++] = pos.x;
+                this.positions[posIndex++] = pos.y;
+                this.positions[posIndex++] = pos.z;
+            } else {
+                this.positions[posIndex++] = 0;
+                this.positions[posIndex++] = 0;
+                this.positions[posIndex++] = 0;
             }
 
-            const pos = this.qubitPositions[id];
-            this.positions[posIndex++] = pos.x;
-            this.positions[posIndex++] = pos.y;
-            this.positions[posIndex++] = pos.z;
+            let currentQubitWeightedSum = 0;
+            if (
+                numSlicesInWindow > 0 &&
+                relevantSlicesData.length === numSlicesInWindow
+            ) {
+                for (let i = 0; i < numSlicesInWindow; i++) {
+                    // i = 0 is oldest, i = numSlicesInWindow - 1 is newest
+                    const sliceInteractionPairs =
+                        relevantSliceInteractionPairs[i];
+                    const sliceDataForWindow = relevantSlicesData[i];
 
-            let interactionCount = 0;
-            const slicesToConsider = changedIdSlices.slice(0, this.maxSlices);
+                    // Check if the current heatmapQubit was "active" in this specific historical slice
+                    const qubitWasActiveInWindowSlice =
+                        sliceDataForWindow.interacting_qubits.has(
+                            heatmapQubitId,
+                        );
 
-            slicesToConsider.forEach((slice) => {
-                if (slice.has(id)) {
-                    interactionCount++;
+                    if (qubitWasActiveInWindowSlice) {
+                        // Now check if it was part of any 2-qubit interaction in that same slice
+                        for (const pair of sliceInteractionPairs) {
+                            if (
+                                pair.q1 === heatmapQubitId ||
+                                pair.q2 === heatmapQubitId
+                            ) {
+                                const weight = Math.pow(weight_base, i); // More recent slices (larger i) get higher exponential weight
+                                currentQubitWeightedSum += weight;
+                                break; // Count this slice with its weight and move to the next slice in the window
+                            }
+                        }
+                    }
                 }
-            });
+            }
 
             let intensity = 0;
-            if (slicesToConsider.length > 0) {
-                intensity = interactionCount / slicesToConsider.length;
+            if (maxPossibleWeightedSum > 0) {
+                // Use maxPossibleWeightedSum for normalization
+                intensity = currentQubitWeightedSum / maxPossibleWeightedSum;
             }
-
             this.intensities[intIndex++] = intensity;
-        });
+        }
 
+        // Ensure buffers are marked for update
         const positionAttr = this.mesh.geometry.attributes
             .position as THREE.BufferAttribute;
         positionAttr.needsUpdate = true;
-
         const intensityAttr = this.mesh.geometry.attributes
             .intensity as THREE.BufferAttribute;
         intensityAttr.needsUpdate = true;
+
+        // Uniforms like cameraPosition and scaleFactor are updated in Playground's animate loop directly
+        // this.material.uniformsNeedUpdate = true; // This might not be needed if individual uniforms are updated
+    }
+
+    public dispose(): void {
+        if (this.mesh.geometry) {
+            this.mesh.geometry.dispose();
+        }
+        if (this.mesh.material) {
+            this.mesh.material.dispose();
+        }
+        // this.mesh is removed from the scene by QubitGrid
+        console.log("Heatmap disposed");
     }
 }

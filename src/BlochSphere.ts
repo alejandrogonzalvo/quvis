@@ -4,6 +4,7 @@ import { gsap } from "gsap";
 
 export class BlochSphere {
     blochSphere: THREE.Group;
+    private readonly maxMainSphereOpacity: number = 0.25;
 
     constructor(x: number, y: number, z: number) {
         this.blochSphere = new THREE.Group();
@@ -14,10 +15,11 @@ export class BlochSphere {
         const sphereMaterial = new THREE.MeshPhongMaterial({
             color: 0xffffff,
             transparent: true,
-            opacity: 0.3,
+            opacity: this.maxMainSphereOpacity,
             side: THREE.DoubleSide,
         });
         const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+        sphere.name = "mainBlochSphere";
         this.blochSphere.add(sphere);
 
         // Axes
@@ -79,16 +81,21 @@ export class BlochSphere {
                 const material = object.material as
                     | THREE.Material
                     | THREE.Material[];
-                if (Array.isArray(material)) {
-                    material.forEach((mat) => {
-                        mat.transparent = true;
+
+                const applyOpacity = (mat: THREE.Material) => {
+                    mat.transparent = true;
+                    if (object.name === "mainBlochSphere") {
+                        mat.opacity = this.maxMainSphereOpacity * opacity;
+                    } else {
                         mat.opacity = opacity;
-                        mat.needsUpdate = true;
-                    });
+                    }
+                    mat.needsUpdate = true;
+                };
+
+                if (Array.isArray(material)) {
+                    material.forEach(applyOpacity);
                 } else {
-                    material.transparent = true;
-                    material.opacity = opacity;
-                    material.needsUpdate = true;
+                    applyOpacity(material);
                 }
             }
         });
@@ -102,17 +109,29 @@ export class BlochSphere {
 
     createArrow(direction) {
         const arrowGroup = new THREE.Group();
-        const color = "0xffffff";
+        const color = 0xffffff;
 
         // Create the shaft
         const shaftGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.35);
-        const shaftMaterial = new THREE.MeshBasicMaterial({ color: color });
+        const shaftMaterial = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 1,
+            side: THREE.DoubleSide,
+            depthTest: false,
+        });
         const shaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
         shaft.position.y = 0.175; // Half of the shaft length
 
         // Create the arrow head (cone)
         const headGeometry = new THREE.ConeGeometry(0.05, 0.1);
-        const headMaterial = new THREE.MeshBasicMaterial({ color: color });
+        const headMaterial = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 1,
+            side: THREE.DoubleSide,
+            depthTest: false,
+        });
         const head = new THREE.Mesh(headGeometry, headMaterial);
         head.position.y = 0.35; // Position at the end of the shaft
 
@@ -130,26 +149,38 @@ export class BlochSphere {
             (child) => child instanceof THREE.Group,
         );
 
-        // Calculate target rotation based on state
+        if (!stateVector) {
+            console.warn(
+                "BlochSphere: State vector arrow group not found for animation.",
+            );
+            return;
+        }
+
         const targetRotation = new THREE.Euler();
-        switch (State[state]) {
-            case State.ZERO:
+        // console.log(`BlochSphere: Animating to state: ${state} (numeric), string key: ${State[state]}`); // For debugging
+
+        switch (
+            state // Switch directly on the state value (which can be number or string)
+        ) {
+            case State.ZERO: // Compares with numeric 0 if state is 0
                 targetRotation.set(0, 0, 0); // Point up
                 break;
-            case State.ONE:
+            case State.ONE: // Compares with numeric 1 if state is 1
                 targetRotation.set(Math.PI, 0, 0); // Point down
                 break;
-            case State.PLUS:
+            case State.PLUS: // Compares with string "+" if state is "+"
                 targetRotation.set(Math.PI / 2, 0, -Math.PI / 2); // Point right
                 break;
-            case State.MINUS:
+            case State.MINUS: // Compares with string "-" if state is "-"
                 targetRotation.set(Math.PI / 2, 0, Math.PI / 2); // Point left
                 break;
             default:
-                targetRotation.set(0, 0, 0);
+                console.log(
+                    `BlochSphere: Unhandled state for animation: ${state} (type: ${typeof state}), string rep: ${State[state as number] || state}`,
+                );
+                targetRotation.set(0, 0, 0); // Default to |0⟩ orientation
         }
 
-        // Animate rotation
         gsap.to(stateVector.rotation, {
             x: targetRotation.x,
             y: targetRotation.y,
