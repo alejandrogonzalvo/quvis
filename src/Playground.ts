@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { QubitGrid } from "./QubitGrid.js";
+import { State } from "./State.js";
 
 export class Playground {
     scene: THREE.Scene;
@@ -18,6 +19,39 @@ export class Playground {
     legendRedValue: HTMLSpanElement;
     legendYellowValue: HTMLSpanElement;
     legendGreenValue: HTMLSpanElement;
+
+    // Layout control elements
+    repelForceSlider: HTMLInputElement;
+    repelForceValueDisplay: HTMLSpanElement;
+    idealDistanceSlider: HTMLInputElement;
+    idealDistanceValueDisplay: HTMLSpanElement;
+    iterationsSlider: HTMLInputElement;
+    iterationsValueDisplay: HTMLSpanElement;
+    coolingFactorSlider: HTMLInputElement;
+    coolingFactorValueDisplay: HTMLSpanElement;
+    recompileLayoutButton: HTMLButtonElement;
+
+    // Stored layout parameters
+    currentRepelForce: number;
+    currentIdealDistance: number;
+    currentIterations: number;
+    currentCoolingFactor: number;
+
+    // Loading screen element
+    loadingScreen: HTMLElement;
+
+    // Appearance control elements
+    qubitSizeSlider: HTMLInputElement;
+    qubitSizeValueDisplay: HTMLSpanElement;
+    connectionThicknessSlider: HTMLInputElement;
+    connectionThicknessValueDisplay: HTMLSpanElement;
+    inactiveAlphaSlider: HTMLInputElement;
+    inactiveAlphaValueDisplay: HTMLSpanElement;
+
+    // Stored appearance parameters
+    currentQubitSize: number;
+    currentConnectionThickness: number;
+    currentInactiveAlpha: number;
 
     constructor() {
         this.scene = new THREE.Scene();
@@ -46,6 +80,98 @@ export class Playground {
             "legend-green-value",
         ) as HTMLSpanElement;
         this.updateLegend();
+
+        // Initialize layout control elements and parameters
+        this.repelForceSlider = document.getElementById(
+            "repel-force",
+        ) as HTMLInputElement;
+        this.repelForceValueDisplay = document.getElementById(
+            "repel-force-value",
+        ) as HTMLSpanElement;
+        this.idealDistanceSlider = document.getElementById(
+            "ideal-distance",
+        ) as HTMLInputElement;
+        this.idealDistanceValueDisplay = document.getElementById(
+            "ideal-distance-value",
+        ) as HTMLSpanElement;
+        this.iterationsSlider = document.getElementById(
+            "iterations",
+        ) as HTMLInputElement;
+        this.iterationsValueDisplay = document.getElementById(
+            "iterations-value",
+        ) as HTMLSpanElement;
+        this.coolingFactorSlider = document.getElementById(
+            "cooling-factor",
+        ) as HTMLInputElement;
+        this.coolingFactorValueDisplay = document.getElementById(
+            "cooling-factor-value",
+        ) as HTMLSpanElement;
+        this.recompileLayoutButton = document.getElementById(
+            "recompile-layout-button",
+        ) as HTMLButtonElement;
+
+        // Set initial layout parameter values from sliders (which have defaults)
+        this.currentRepelForce = parseFloat(this.repelForceSlider.value);
+        this.currentIdealDistance = parseFloat(this.idealDistanceSlider.value);
+        this.currentIterations = parseInt(this.iterationsSlider.value);
+        this.currentCoolingFactor = parseFloat(this.coolingFactorSlider.value);
+
+        // Update display spans to match initial slider values (though HTML should handle it, this is safer)
+        if (this.repelForceValueDisplay)
+            this.repelForceValueDisplay.textContent =
+                this.repelForceSlider.value;
+        if (this.idealDistanceValueDisplay)
+            this.idealDistanceValueDisplay.textContent =
+                this.idealDistanceSlider.value;
+        if (this.iterationsValueDisplay)
+            this.iterationsValueDisplay.textContent =
+                this.iterationsSlider.value;
+        if (this.coolingFactorValueDisplay)
+            this.coolingFactorValueDisplay.textContent =
+                this.coolingFactorSlider.value;
+
+        // Get loading screen element
+        this.loadingScreen = document.getElementById(
+            "loading-screen",
+        ) as HTMLElement;
+
+        // Initialize appearance control elements and parameters
+        this.qubitSizeSlider = document.getElementById(
+            "qubit-size",
+        ) as HTMLInputElement;
+        this.qubitSizeValueDisplay = document.getElementById(
+            "qubit-size-value",
+        ) as HTMLSpanElement;
+
+        this.currentQubitSize = parseFloat(this.qubitSizeSlider.value);
+        if (this.qubitSizeValueDisplay)
+            this.qubitSizeValueDisplay.textContent = this.qubitSizeSlider.value;
+
+        // Get and initialize connection thickness slider
+        this.connectionThicknessSlider = document.getElementById(
+            "connection-thickness",
+        ) as HTMLInputElement;
+        this.connectionThicknessValueDisplay = document.getElementById(
+            "connection-thickness-value",
+        ) as HTMLSpanElement;
+        this.currentConnectionThickness = parseFloat(
+            this.connectionThicknessSlider.value,
+        );
+        if (this.connectionThicknessValueDisplay)
+            this.connectionThicknessValueDisplay.textContent =
+                this.connectionThicknessSlider.value;
+
+        // Get and initialize inactive alpha slider
+        this.inactiveAlphaSlider = document.getElementById(
+            "inactive-alpha",
+        ) as HTMLInputElement;
+        this.inactiveAlphaValueDisplay = document.getElementById(
+            "inactive-alpha-value",
+        ) as HTMLSpanElement;
+        this.currentInactiveAlpha = parseFloat(this.inactiveAlphaSlider.value);
+        if (this.inactiveAlphaValueDisplay)
+            this.inactiveAlphaValueDisplay.textContent =
+                this.inactiveAlphaSlider.value;
 
         this.camera = new THREE.PerspectiveCamera(
             75,
@@ -85,6 +211,12 @@ export class Playground {
             this.mouse,
             this.camera,
             this.maxHeatmapSlices,
+            this.currentRepelForce,
+            this.currentIdealDistance,
+            this.currentIterations,
+            this.currentCoolingFactor,
+            this.currentConnectionThickness,
+            this.currentInactiveAlpha,
         );
 
         if (this.grid.heatmap) {
@@ -97,7 +229,9 @@ export class Playground {
                 }
             });
         } else {
-            console.warn("Heatmap not immediately available after QubitGrid construction.");
+            console.warn(
+                "Heatmap not immediately available after QubitGrid construction.",
+            );
         }
 
         this.heatmapSlicesSlider.addEventListener("input", (event) => {
@@ -111,13 +245,12 @@ export class Playground {
                 if (this.grid.heatmap) {
                     this.grid.heatmap.maxSlices = this.maxHeatmapSlices;
                 }
-                if (this.grid.current_slice) {
-                    this.grid.onCurrentSliceChange(
-                        this.grid.current_slice.timeStep,
-                    );
-                }
+                this.grid.onCurrentSliceChange();
             }
         });
+
+        this.setupLayoutControlEvents();
+        this.setupAppearanceControlEvents();
 
         const instructionText = document.createElement("div");
         instructionText.textContent = "Press Space to generate new slices.";
@@ -146,6 +279,92 @@ export class Playground {
             )}`;
             this.legendGreenValue.textContent = `0`;
         }
+    }
+
+    setupLayoutControlEvents() {
+        this.repelForceSlider.addEventListener("input", (event) => {
+            const target = event.currentTarget as HTMLInputElement;
+            this.currentRepelForce = parseFloat(target.value);
+            if (this.repelForceValueDisplay)
+                this.repelForceValueDisplay.textContent = target.value;
+        });
+
+        this.idealDistanceSlider.addEventListener("input", (event) => {
+            const target = event.currentTarget as HTMLInputElement;
+            this.currentIdealDistance = parseFloat(target.value);
+            if (this.idealDistanceValueDisplay)
+                this.idealDistanceValueDisplay.textContent = target.value;
+        });
+
+        this.iterationsSlider.addEventListener("input", (event) => {
+            const target = event.currentTarget as HTMLInputElement;
+            this.currentIterations = parseInt(target.value);
+            if (this.iterationsValueDisplay)
+                this.iterationsValueDisplay.textContent = target.value;
+        });
+
+        this.coolingFactorSlider.addEventListener("input", (event) => {
+            const target = event.currentTarget as HTMLInputElement;
+            this.currentCoolingFactor = parseFloat(target.value);
+            if (this.coolingFactorValueDisplay)
+                this.coolingFactorValueDisplay.textContent = target.value;
+        });
+
+        this.recompileLayoutButton.addEventListener("click", () => {
+            if (this.grid) {
+                if (this.loadingScreen)
+                    this.loadingScreen.style.display = "flex"; // Show loading screen
+
+                // Use a short timeout to allow the browser to render the loading screen
+                setTimeout(() => {
+                    try {
+                        this.grid.recalculateLayoutAndRedraw(
+                            this.currentRepelForce,
+                            this.currentIdealDistance,
+                            this.currentIterations,
+                            this.currentCoolingFactor,
+                        );
+                    } finally {
+                        if (this.loadingScreen)
+                            this.loadingScreen.style.display = "none"; // Hide loading screen
+                    }
+                }, 50); // 50ms delay, adjust as needed
+            }
+        });
+    }
+
+    setupAppearanceControlEvents() {
+        this.qubitSizeSlider.addEventListener("input", (event) => {
+            const target = event.currentTarget as HTMLInputElement;
+            this.currentQubitSize = parseFloat(target.value);
+            if (this.qubitSizeValueDisplay)
+                this.qubitSizeValueDisplay.textContent = target.value;
+            if (this.grid) {
+                this.grid.setQubitScale(this.currentQubitSize);
+            }
+        });
+
+        this.connectionThicknessSlider.addEventListener("input", (event) => {
+            const target = event.currentTarget as HTMLInputElement;
+            this.currentConnectionThickness = parseFloat(target.value);
+            if (this.connectionThicknessValueDisplay)
+                this.connectionThicknessValueDisplay.textContent = target.value;
+            if (this.grid) {
+                this.grid.setConnectionThickness(
+                    this.currentConnectionThickness,
+                );
+            }
+        });
+
+        this.inactiveAlphaSlider.addEventListener("input", (event) => {
+            const target = event.currentTarget as HTMLInputElement;
+            this.currentInactiveAlpha = parseFloat(target.value);
+            if (this.inactiveAlphaValueDisplay)
+                this.inactiveAlphaValueDisplay.textContent = target.value;
+            if (this.grid) {
+                this.grid.setInactiveElementAlpha(this.currentInactiveAlpha);
+            }
+        });
     }
 
     setupLights() {
@@ -187,16 +406,32 @@ export class Playground {
         const tooltip = document.getElementById("qubit-tooltip");
 
         if (intersects.length > 0) {
-            let qubit = intersects[0].object;
-            while (qubit.parent && !qubit.userData.id) {
-                qubit = qubit.parent;
+            let intersectedObject = intersects[0].object;
+            let targetObject = null;
+
+            while (intersectedObject) {
+                if (typeof intersectedObject.userData.qubitId !== "undefined") {
+                    targetObject = intersectedObject;
+                    break;
+                }
+                if (
+                    !intersectedObject.parent ||
+                    !(intersectedObject.parent instanceof THREE.Object3D)
+                ) {
+                    break;
+                }
+                intersectedObject = intersectedObject.parent;
             }
 
-            if (qubit.userData.state) {
+            if (
+                targetObject &&
+                typeof targetObject.userData.qubitId !== "undefined" &&
+                typeof targetObject.userData.qubitState !== "undefined"
+            ) {
                 tooltip.style.display = "block";
                 tooltip.style.left = event.clientX + 10 + "px";
                 tooltip.style.top = event.clientY + 10 + "px";
-                tooltip.textContent = `Qubit ${qubit.userData.id}: State |${qubit.userData.state}⟩`;
+                tooltip.textContent = `Qubit ${targetObject.userData.qubitId}: State |${State[targetObject.userData.qubitState]}⟩`;
             } else {
                 tooltip.style.display = "none";
             }

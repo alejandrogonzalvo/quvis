@@ -34,7 +34,7 @@ export class Heatmap {
             uniforms: {
                 aspect: { value: window.innerWidth / window.innerHeight },
                 radius: { value: 1.0 },
-                baseSize: { value: 2800.0 },
+                baseSize: { value: 1000.0 },
                 cameraPosition: { value: new THREE.Vector3() },
                 scaleFactor: { value: 1.0 },
             },
@@ -61,18 +61,29 @@ export class Heatmap {
             
             void main() {
                 vec2 coord = gl_PointCoord * 2.0 - vec2(1.0);
-                float distance = length(coord);
+                float distanceFromCenter = length(coord);
                 
-                float alpha = smoothstep(radius, radius * 0.1, distance);
-                
+                float finalAlpha;
                 vec3 colorValue;
-                if (vIntensity <= 0.5) {
-                    colorValue = vec3(vIntensity * 2.0, 1.0, 0.0);
+
+                if (vIntensity <= 0.001) { // Check against a small epsilon for floating point
+                    finalAlpha = 0.0; // Make transparent for zero or very low intensity
+                    colorValue = vec3(0.0, 0.0, 0.0); // Color doesn't matter when alpha is 0
                 } else {
-                    colorValue = vec3(1.0, 1.0 - (vIntensity - 0.5) * 2.0, 0.0);
+                    // For active points, calculate alpha based on distance from center (for soft edges)
+                    finalAlpha = smoothstep(radius, radius * 0.1, distanceFromCenter);
+                    
+                    // Determine color based on intensity
+                    if (vIntensity <= 0.5) {
+                        // Intensity > 0.001 up to 0.5: Greenish to Yellow
+                        colorValue = vec3(vIntensity * 2.0, 1.0, 0.0);
+                    } else {
+                        // Intensity > 0.5 up to 1.0: Yellow to Red
+                        colorValue = vec3(1.0, 1.0 - (vIntensity - 0.5) * 2.0, 0.0);
+                    }
                 }
                 
-                gl_FragColor = vec4(colorValue, alpha);
+                gl_FragColor = vec4(colorValue, finalAlpha);
             }
         `,
             transparent: true,
@@ -81,6 +92,10 @@ export class Heatmap {
         });
 
         this.mesh = new THREE.Points(geometry, this.material);
+    }
+
+    public clearPositionsCache() {
+        this.qubitPositions = []; // Reset the internal cache
     }
 
     updatePoints(

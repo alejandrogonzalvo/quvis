@@ -5,9 +5,9 @@ import { gsap } from "gsap";
 export class BlochSphere {
     blochSphere: THREE.Group;
 
-    constructor(x: number, y: number) {
+    constructor(x: number, y: number, z: number) {
         this.blochSphere = new THREE.Group();
-        this.blochSphere.position.set(x, y, 0);
+        this.blochSphere.position.set(x, y, z);
 
         // Main sphere (transparent)
         const sphereGeometry = new THREE.SphereGeometry(0.4, 32, 32);
@@ -73,6 +73,33 @@ export class BlochSphere {
         this.blochSphere.add(stateVector);
     }
 
+    public setOpacity(opacity: number): void {
+        this.blochSphere.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+                const material = object.material as
+                    | THREE.Material
+                    | THREE.Material[];
+                if (Array.isArray(material)) {
+                    material.forEach((mat) => {
+                        mat.transparent = true;
+                        mat.opacity = opacity;
+                        mat.needsUpdate = true;
+                    });
+                } else {
+                    material.transparent = true;
+                    material.opacity = opacity;
+                    material.needsUpdate = true;
+                }
+            }
+        });
+    }
+
+    public setScale(scale: number): void {
+        if (this.blochSphere) {
+            this.blochSphere.scale.set(scale, scale, scale);
+        }
+    }
+
     createArrow(direction) {
         const arrowGroup = new THREE.Group();
         const color = "0xffffff";
@@ -130,5 +157,26 @@ export class BlochSphere {
             duration: 1,
             ease: "power1.inOut",
         });
+    }
+
+    dispose() {
+        // Dispose of all geometries and materials in the blochSphere group
+        this.blochSphere.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+                if (object.geometry) {
+                    object.geometry.dispose();
+                }
+                if (object.material) {
+                    if (Array.isArray(object.material)) {
+                        object.material.forEach((material) =>
+                            material.dispose(),
+                        );
+                    } else {
+                        object.material.dispose();
+                    }
+                }
+            }
+        });
+        // Children are removed when the group is removed from the scene, or manually if needed
     }
 }

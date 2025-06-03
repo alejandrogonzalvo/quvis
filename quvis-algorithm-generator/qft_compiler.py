@@ -99,7 +99,6 @@ def main():
     # The QFT object from the library is already a QuantumCircuit instance.
 
     print("Original QFT circuit (using qiskit.circuit.library.QFT):")
-    print(qft_qc.draw(output="text"))
 
     # Transpile the QFT circuit for the grid
     # We need to ensure the coupling map is correctly formatted for the transpile function
@@ -133,12 +132,6 @@ def main():
         optimization_level=3,  # Higher level for potentially better, but slower, optimization
     )
 
-    print("\nTranspiled QFT circuit:")
-    print(transpiled_qc.draw(output="text"))
-
-    print("\nQASM for the transpiled circuit:")
-    print(qasm3.dumps(transpiled_qc))
-
     # --- Extract qubit interactions per time slice ---
     print("\nExtracting qubit interactions for visualization...")
     dag = circuit_to_dag(transpiled_qc)
@@ -167,7 +160,8 @@ def main():
     # Create the data structure for JSON
     output_data = {
         "num_qubits": num_qubits_for_viz,
-        "operations_per_slice": slices_data_for_json
+        "operations_per_slice": slices_data_for_json,
+        "coupling_map": coupling_map_list
     }
 
     output_filename = "qft_viz_data.json" # New filename and extension

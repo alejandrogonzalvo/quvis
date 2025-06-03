@@ -9,28 +9,32 @@ export class Qubit {
     constructor(
         id: number = 0,
         initialState: State = State.ZERO,
-        blockSphere: BlochSphere,
+        blochSphereInstance: BlochSphere,
     ) {
         this.id = id;
         this._state = initialState;
-        this.blochSphere = blockSphere;
+        this.blochSphere = blochSphereInstance;
         this.state = this._state;
     }
 
-    // Getter for public access
     get state(): State {
         return this._state;
     }
 
-    // Setter that triggers animation on change
     set state(newState: State) {
-        if (this._state !== newState) {
-            this._state = newState;
-            this.animate();
-        }
+        this._state = newState;
+        this.animate();
     }
 
     animate() {
-        this.blochSphere.animateStateVector(this.state);
+        if (this.blochSphere) {
+            this.blochSphere.animateStateVector(this.state);
+        }
+    }
+
+    dispose() {
+        if (this.blochSphere) {
+            this.blochSphere.dispose();
+        }
     }
 }
