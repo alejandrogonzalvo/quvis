@@ -27,20 +27,24 @@ const CYLINDER_VERTEX_SHADER = `
 
 const CYLINDER_FRAGMENT_SHADER = `
     uniform float uIntensity;
-    varying vec3 vNormal; // Available if needed for lighting effects later
+    uniform float uInactiveAlpha;
+    varying vec3 vNormal;
 
     void main() {
         vec3 colorValue;
-        if (uIntensity <= 0.001) { // Check against a small epsilon for floating point
-            colorValue = vec3(0.0, 1.0, 0.0); // Green for zero or very low intensity
+        float alphaValue;
+
+        if (uIntensity <= 0.001) {
+            alphaValue = uInactiveAlpha;
+            colorValue = vec3(0.5, 0.5, 0.5);
         } else if (uIntensity <= 0.5) {
-            // Green (0,1,0) to Yellow (1,1,0)
+            alphaValue = 1.0;
             colorValue = vec3(uIntensity * 2.0, 1.0, 0.0);
         } else {
-            // Yellow (1,1,0) to Red (1,0,0)
+            alphaValue = 1.0;
             colorValue = vec3(1.0, 1.0 - (uIntensity - 0.5) * 2.0, 0.0);
         }
-        gl_FragColor = vec4(colorValue, 1.0);
+        gl_FragColor = vec4(colorValue, alphaValue);
     }
 `;
 
@@ -52,7 +56,7 @@ export class QubitGrid {
     heatmap!: Heatmap;
     maxSlicesForHeatmap: number;
     private couplingMap: number[][] | null = null;
-    private connectionLines: THREE.Group; // Will hold cylinder Meshes
+    private connectionLines: THREE.Group;
     private qubitPositions: Map<number, THREE.Vector3> = new Map();
     private lastCalculatedSlicesChangeIDs: Array<Set<number>> = [];
 
@@ -63,16 +67,14 @@ export class QubitGrid {
     private _grid_rows: number;
     private _grid_cols: number;
 
-    // Force-directed layout parameters
     private kRepel: number;
     private idealDist: number;
     private iterations: number;
     private coolingFactor: number;
     private kAttract: number = 0.05;
 
-    // Appearance parameters
     private currentConnectionThickness: number;
-    // No longer a single shared connectionMaterial
+    private currentInactiveElementAlpha: number;
 
     get current_slice_data(): Slice | null {
         if (
@@ -95,6 +97,7 @@ export class QubitGrid {
         initialIterations: number = 300,
         initialCoolingFactor: number = 0.95,
         initialConnectionThickness: number = 0.05,
+        initialInactiveElementAlpha: number = 0.1,
     ) {
         this.scene = scene;
         this.mouse = mouse;
@@ -110,6 +113,7 @@ export class QubitGrid {
         this.iterations = initialIterations;
         this.coolingFactor = initialCoolingFactor;
         this.currentConnectionThickness = initialConnectionThickness;
+        this.currentInactiveElementAlpha = initialInactiveElementAlpha;
 
         this.timeline = new Timeline((sliceIndex) =>
             this.loadStateFromSlice(sliceIndex),
@@ -138,7 +142,7 @@ export class QubitGrid {
             const rows = Math.ceil(numQubits / cols);
             this._grid_cols = cols;
             this._grid_rows = rows;
-            const spacing = 2;
+            const spacing = this.idealDist;
             const offsetX = ((cols - 1) * spacing) / 2;
             const offsetY = ((rows - 1) * spacing) / 2;
             let count = 0;
@@ -157,7 +161,7 @@ export class QubitGrid {
                     }
                 }
             }
-            return;
+            if (numQubits <= 1 || !couplingMap) return;
         }
 
         for (let i = 0; i < numQubits; i++) {
@@ -315,17 +319,6 @@ export class QubitGrid {
             this._qubit_count = Number(jsonData.num_qubits);
             this.couplingMap = jsonData.coupling_map || null;
 
-            const layoutAreaSide = Math.max(
-                5,
-                Math.sqrt(this._qubit_count) * 2,
-            );
-            this.calculateQubitPositions(
-                this._qubit_count,
-                this.couplingMap,
-                layoutAreaSide,
-                layoutAreaSide,
-                layoutAreaSide,
-            );
             if (this.heatmap && this.heatmap.mesh)
                 this.scene.remove(this.heatmap.mesh);
             this.heatmap = new Heatmap(
@@ -334,7 +327,21 @@ export class QubitGrid {
                 this.maxSlicesForHeatmap,
             );
             this.scene.add(this.heatmap.mesh);
+
+            const layoutAreaSide = Math.max(
+                5,
+                Math.sqrt(this._qubit_count) * 2.5 * (this.idealDist / 5),
+            );
+            this.calculateQubitPositions(
+                this._qubit_count,
+                this.couplingMap,
+                layoutAreaSide,
+                layoutAreaSide,
+                layoutAreaSide * 0.5,
+            );
+
             this.createGrid();
+
             const loadedSlices: Slice[] = [];
             jsonData.operations_per_slice.forEach((sliceOps, timeStep) => {
                 const newSlice = new Slice(timeStep);
@@ -381,7 +388,8 @@ export class QubitGrid {
         ) {
             if (this.heatmap) this.heatmap.updatePoints(new Map(), []);
             this.lastCalculatedSlicesChangeIDs = [];
-            this.drawConnections(); // Will clear if nothing to draw
+            this.updateQubitOpacities();
+            this.drawConnections();
             return;
         }
         if (
@@ -423,7 +431,27 @@ export class QubitGrid {
                 this.heatmap.updatePoints(this.qubitInstances, slicesChangeIDs);
             else this.heatmap.updatePoints(new Map(), []);
         }
+        this.updateQubitOpacities();
         this.drawConnections();
+    }
+
+    private updateQubitOpacities() {
+        const currentSlicesChangeData = this.lastCalculatedSlicesChangeIDs;
+        this.qubitInstances.forEach((qubit, qubitId) => {
+            if (qubit.blochSphere) {
+                const intensity = this.getQubitInteractionIntensity(
+                    qubitId,
+                    currentSlicesChangeData,
+                );
+                if (intensity <= 0.001) {
+                    qubit.blochSphere.setOpacity(
+                        this.currentInactiveElementAlpha,
+                    );
+                } else {
+                    qubit.blochSphere.setOpacity(1.0);
+                }
+            }
+        });
     }
 
     loadStateFromSlice(sliceIndex: number): void {
@@ -446,6 +474,7 @@ export class QubitGrid {
                 this.qubitPositions.get(i) || new THREE.Vector3(0, 0, 0);
             this.createQubit(i, pos.x, pos.y, pos.z);
         }
+        this.updateQubitOpacities();
     }
 
     createQubit(id: number, x: number, y: number, z: number) {
@@ -463,7 +492,7 @@ export class QubitGrid {
             this.connectionLines.remove(cylinder);
             cylinder.geometry.dispose();
             if (cylinder.material instanceof THREE.Material)
-                cylinder.material.dispose(); // Dispose material instance
+                cylinder.material.dispose();
         }
     }
 
@@ -478,9 +507,8 @@ export class QubitGrid {
             return;
         }
 
-        const yAxis = new THREE.Vector3(0, 1, 0); // Default cylinder orientation
-
-        const currentSlicesChangeData = this.lastCalculatedSlicesChangeIDs; // Used by getQubitInteractionIntensity
+        const yAxis = new THREE.Vector3(0, 1, 0);
+        const currentSlicesChangeData = this.lastCalculatedSlicesChangeIDs;
 
         this.couplingMap.forEach((pair) => {
             if (pair.length === 2) {
@@ -491,7 +519,7 @@ export class QubitGrid {
 
                 if (posA && posB) {
                     const distance = posA.distanceTo(posB);
-                    if (distance === 0) return; // Avoid zero-length cylinder
+                    if (distance === 0) return;
 
                     const intensityA = this.getQubitInteractionIntensity(
                         qubitIdA,
@@ -508,7 +536,11 @@ export class QubitGrid {
                         fragmentShader: CYLINDER_FRAGMENT_SHADER,
                         uniforms: {
                             uIntensity: { value: connectionIntensity },
+                            uInactiveAlpha: {
+                                value: this.currentInactiveElementAlpha,
+                            },
                         },
+                        transparent: true,
                     });
 
                     const cylinderGeo = new THREE.CylinderGeometry(
@@ -520,13 +552,11 @@ export class QubitGrid {
                     );
                     const cylinderMesh = new THREE.Mesh(cylinderGeo, material);
 
-                    // Position at midpoint
                     cylinderMesh.position
                         .copy(posA)
                         .add(posB)
                         .multiplyScalar(0.5);
 
-                    // Orient cylinder
                     const direction = new THREE.Vector3()
                         .subVectors(posB, posA)
                         .normalize();
@@ -560,7 +590,16 @@ export class QubitGrid {
             )
                 interactionCount++;
         });
+        if (
+            slicesToConsider.length === 0 &&
+            this.qubitInstances.has(qubitId) &&
+            this.maxSlicesForHeatmap > 0
+        )
+            return 0;
+        if (slicesToConsider.length === 0 && this.maxSlicesForHeatmap === 0)
+            return 0;
         if (slicesToConsider.length === 0) return 0;
+
         return interactionCount / slicesToConsider.length;
     }
 
@@ -581,17 +620,20 @@ export class QubitGrid {
             return;
         }
         this.qubitPositions.clear();
-        const layoutAreaSide = Math.max(5, Math.sqrt(this._qubit_count) * 2);
+        const layoutAreaSide = Math.max(
+            5,
+            Math.sqrt(this._qubit_count) * 2.5 * (this.idealDist / 5),
+        );
         this.calculateQubitPositions(
             this._qubit_count,
             this.couplingMap,
             layoutAreaSide,
             layoutAreaSide,
-            layoutAreaSide,
+            layoutAreaSide * 0.5,
         );
         this.createGrid();
         if (this.heatmap) this.heatmap.clearPositionsCache();
-        this.onCurrentSliceChange(); // This will call drawConnections
+        this.onCurrentSliceChange();
     }
 
     public setQubitScale(scale: number): void {
@@ -602,10 +644,12 @@ export class QubitGrid {
 
     public setConnectionThickness(thickness: number): void {
         this.currentConnectionThickness = thickness;
-        this.drawConnections(); // Redraw connections with new thickness
+        this.drawConnections();
     }
 
-    // xyzToState, getQubitInteractionIntensity, clearConnections are omitted for brevity if unchanged
-    // but ensure they are present if needed by other parts of your code.
-    // For this refactor, getQubitInteractionIntensity is not used for cylinder color yet.
+    public setInactiveElementAlpha(alpha: number): void {
+        this.currentInactiveElementAlpha = alpha;
+        this.updateQubitOpacities();
+        this.drawConnections();
+    }
 }

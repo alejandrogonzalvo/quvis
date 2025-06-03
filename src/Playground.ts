@@ -45,10 +45,13 @@ export class Playground {
     qubitSizeValueDisplay: HTMLSpanElement;
     connectionThicknessSlider: HTMLInputElement;
     connectionThicknessValueDisplay: HTMLSpanElement;
+    inactiveAlphaSlider: HTMLInputElement;
+    inactiveAlphaValueDisplay: HTMLSpanElement;
 
     // Stored appearance parameters
     currentQubitSize: number;
     currentConnectionThickness: number;
+    currentInactiveAlpha: number;
 
     constructor() {
         this.scene = new THREE.Scene();
@@ -158,6 +161,18 @@ export class Playground {
             this.connectionThicknessValueDisplay.textContent =
                 this.connectionThicknessSlider.value;
 
+        // Get and initialize inactive alpha slider
+        this.inactiveAlphaSlider = document.getElementById(
+            "inactive-alpha",
+        ) as HTMLInputElement;
+        this.inactiveAlphaValueDisplay = document.getElementById(
+            "inactive-alpha-value",
+        ) as HTMLSpanElement;
+        this.currentInactiveAlpha = parseFloat(this.inactiveAlphaSlider.value);
+        if (this.inactiveAlphaValueDisplay)
+            this.inactiveAlphaValueDisplay.textContent =
+                this.inactiveAlphaSlider.value;
+
         this.camera = new THREE.PerspectiveCamera(
             75,
             window.innerWidth / window.innerHeight,
@@ -201,6 +216,7 @@ export class Playground {
             this.currentIterations,
             this.currentCoolingFactor,
             this.currentConnectionThickness,
+            this.currentInactiveAlpha,
         );
 
         if (this.grid.heatmap) {
@@ -337,6 +353,16 @@ export class Playground {
                 this.grid.setConnectionThickness(
                     this.currentConnectionThickness,
                 );
+            }
+        });
+
+        this.inactiveAlphaSlider.addEventListener("input", (event) => {
+            const target = event.currentTarget as HTMLInputElement;
+            this.currentInactiveAlpha = parseFloat(target.value);
+            if (this.inactiveAlphaValueDisplay)
+                this.inactiveAlphaValueDisplay.textContent = target.value;
+            if (this.grid) {
+                this.grid.setInactiveElementAlpha(this.currentInactiveAlpha);
             }
         });
     }

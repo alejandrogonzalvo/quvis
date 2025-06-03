@@ -73,6 +73,27 @@ export class BlochSphere {
         this.blochSphere.add(stateVector);
     }
 
+    public setOpacity(opacity: number): void {
+        this.blochSphere.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+                const material = object.material as
+                    | THREE.Material
+                    | THREE.Material[];
+                if (Array.isArray(material)) {
+                    material.forEach((mat) => {
+                        mat.transparent = true;
+                        mat.opacity = opacity;
+                        mat.needsUpdate = true;
+                    });
+                } else {
+                    material.transparent = true;
+                    material.opacity = opacity;
+                    material.needsUpdate = true;
+                }
+            }
+        });
+    }
+
     public setScale(scale: number): void {
         if (this.blochSphere) {
             this.blochSphere.scale.set(scale, scale, scale);
