@@ -36,7 +36,7 @@ export class QubitGrid {
     set current_slice(value: Slice) {
         this._current_slice = value;
         if (this._current_slice && this._current_slice.qubits.size > 0) {
-            this.onCurrentSliceChange(value.timeStep);
+            this.onCurrentSliceChange();
         }
     }
 
@@ -64,45 +64,71 @@ export class QubitGrid {
         this.loadSlicesFromJSON("/quvis/qft_viz_data.json", camera);
     }
 
-    private handleLoadError(error: any, camera: THREE.PerspectiveCamera, message: string = "Error loading data") {
+    private handleLoadError(
+        error: Error,
+        camera: THREE.PerspectiveCamera,
+        message: string = "Error loading data",
+    ) {
         console.error(message, error);
         this._qubit_count = 9;
         this._grid_rows = 3;
-        this._grid_cols = 3;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
-        if (this.heatmap && this.heatmap.mesh) this.scene.remove(this.heatmap.mesh);
-        this.heatmap = new Heatmap(camera, this._qubit_count, this.maxSlicesForHeatmap);
+        this._grid_cols = 3;
+        if (this.heatmap && this.heatmap.mesh)
+            this.scene.remove(this.heatmap.mesh);
+        this.heatmap = new Heatmap(
+            camera,
+            this._qubit_count,
+            this.maxSlicesForHeatmap,
+        );
         this.scene.add(this.heatmap.mesh);
 
         this.createGrid(this._grid_rows, this._grid_cols);
         this.slices = [this._current_slice.clone()];
-        this.timeline.setSliceCount(this.slices.length > 0 ? 1: 0);
-        if(this.slices.length > 0) this.loadStateFromSlice(0);
+        this.timeline.setSliceCount(this.slices.length > 0 ? 1 : 0);
+        if (this.slices.length > 0) this.loadStateFromSlice(0);
     }
 
     async loadSlicesFromJSON(url: string, camera: THREE.PerspectiveCamera) {
         try {
             const response = await fetch(url);
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status} while fetching ${url}`);
+                throw new Error(
+                    `HTTP error! status: ${response.status} while fetching ${url}`,
+                );
             }
-            const jsonData = await response.json() as VizData;
+            const jsonData = (await response.json()) as VizData;
             console.log("[QubitGrid] JSON data loaded:", jsonData);
 
-            if (!jsonData || typeof jsonData.num_qubits === 'undefined' || !jsonData.operations_per_slice) {
-                this.handleLoadError(jsonData, camera, "Invalid JSON data structure");
+            if (
+                !jsonData ||
+                typeof jsonData.num_qubits === "undefined" ||
+                !jsonData.operations_per_slice
+            ) {
+                this.handleLoadError(
+                    new Error(
+                        "Invalid JSON data structure: jsonData is missing expected properties.",
+                    ),
+                    camera,
+                    "Invalid JSON data structure",
+                );
                 return;
             }
-            
+
             this._qubit_count = Number(jsonData.num_qubits);
 
             this._grid_rows = Math.ceil(Math.sqrt(this._qubit_count));
             this._grid_cols = Math.ceil(this._qubit_count / this._grid_rows);
 
-            if (this.heatmap && this.heatmap.mesh) this.scene.remove(this.heatmap.mesh);
-            this.heatmap = new Heatmap(camera, this._qubit_count, this.maxSlicesForHeatmap);
+            if (this.heatmap && this.heatmap.mesh)
+                this.scene.remove(this.heatmap.mesh);
+            this.heatmap = new Heatmap(
+                camera,
+                this._qubit_count,
+                this.maxSlicesForHeatmap,
+            );
             this.scene.add(this.heatmap.mesh);
 
-            this._current_slice.qubits.forEach(qubit => {
+            this._current_slice.qubits.forEach((qubit) => {
                 if (qubit.blochSphere && qubit.blochSphere.blochSphere) {
                     this.scene.remove(qubit.blochSphere.blochSphere);
                 }
@@ -114,7 +140,9 @@ export class QubitGrid {
             const loadedSlices: Slice[] = [];
             const baseQubits = new Map<number, Qubit>();
             this._current_slice.qubits.forEach((qubit, id) => {
-                const bloch = qubit.blochSphere ? qubit.blochSphere : new BlochSphere(0,0);
+                const bloch = qubit.blochSphere
+                    ? qubit.blochSphere
+                    : new BlochSphere(0, 0);
                 baseQubits.set(id, new Qubit(id, qubit.state, bloch));
             });
 
@@ -122,25 +150,37 @@ export class QubitGrid {
 
             allSlicesOps.forEach((sliceOps, timeStep) => {
                 const newSlice = new Slice(timeStep);
-                
+
                 for (let i = 0; i < this._qubit_count; i++) {
                     const baseQubit = baseQubits.get(i);
                     if (baseQubit && baseQubit.blochSphere) {
-                        const newQubitBlochSphere = new BlochSphere(baseQubit.blochSphere.blochSphere.position.x, baseQubit.blochSphere.blochSphere.position.y);
+                        const newQubitBlochSphere = new BlochSphere(
+                            baseQubit.blochSphere.blochSphere.position.x,
+                            baseQubit.blochSphere.blochSphere.position.y,
+                        );
                         this.scene.add(newQubitBlochSphere.blochSphere);
-                        const newQubitObject = new Qubit(i, baseQubit.state, newQubitBlochSphere);
+                        const newQubitObject = new Qubit(
+                            i,
+                            baseQubit.state,
+                            newQubitBlochSphere,
+                        );
                         newSlice.qubits.set(i, newQubitObject);
                     } else {
-                        console.warn(`[QubitGrid] Base qubit or Bloch sphere missing for qubit ${i}. Creating new at origin.`);
-                        const tempBloch = new BlochSphere(0,0);
+                        console.warn(
+                            `[QubitGrid] Base qubit or Bloch sphere missing for qubit ${i}. Creating new at origin.`,
+                        );
+                        const tempBloch = new BlochSphere(0, 0);
                         this.scene.add(tempBloch.blochSphere);
-                        newSlice.qubits.set(i, new Qubit(i, State.ZERO, tempBloch));
+                        newSlice.qubits.set(
+                            i,
+                            new Qubit(i, State.ZERO, tempBloch),
+                        );
                     }
                 }
 
                 const interactingQubitsThisSlice = new Set<number>();
-                sliceOps.forEach(op => {
-                    op.qubits.forEach(qIndex => {
+                sliceOps.forEach((op) => {
+                    op.qubits.forEach((qIndex) => {
                         interactingQubitsThisSlice.add(qIndex);
                     });
                 });
@@ -148,10 +188,10 @@ export class QubitGrid {
                 loadedSlices.push(newSlice);
             });
 
-            this.slices.forEach(slice => {
-                slice.qubits.forEach(qubit => {
+            this.slices.forEach((slice) => {
+                slice.qubits.forEach((qubit) => {
                     if (qubit.blochSphere && qubit.blochSphere.blochSphere) {
-                         this.scene.remove(qubit.blochSphere.blochSphere);
+                        this.scene.remove(qubit.blochSphere.blochSphere);
                     }
                 });
             });
@@ -163,25 +203,31 @@ export class QubitGrid {
                 this.loadStateFromSlice(0);
             } else {
                 this.timeline.setSliceCount(0);
-                this.onCurrentSliceChange(0);
+                this.onCurrentSliceChange();
                 console.warn("[QubitGrid] No slices were loaded from JSON.");
             }
-
         } catch (error) {
-            this.handleLoadError(error, camera, "Failed to load or parse JSON file");
+            this.handleLoadError(
+                error,
+                camera,
+                "Failed to load or parse JSON file",
+            );
         }
     }
 
-    public onCurrentSliceChange(currentSliceTimeStep: number) {
+    public onCurrentSliceChange() {
         if (!this._current_slice) {
-            console.warn("[QubitGrid] onCurrentSliceChange called but _current_slice is null/undefined.");
+            console.warn(
+                "[QubitGrid] onCurrentSliceChange called but _current_slice is null/undefined.",
+            );
             return;
         }
         this.slices.forEach((slice, index) => {
-            slice.qubits.forEach(qubit => {
+            slice.qubits.forEach((qubit) => {
                 if (qubit.blochSphere && qubit.blochSphere.blochSphere) {
-                    qubit.blochSphere.blochSphere.visible = (index === this.slices.indexOf(this._current_slice));
-                    if(qubit.blochSphere.blochSphere.visible) {
+                    qubit.blochSphere.blochSphere.visible =
+                        index === this.slices.indexOf(this._current_slice);
+                    if (qubit.blochSphere.blochSphere.visible) {
                         qubit.animate();
                     }
                 }
@@ -193,7 +239,8 @@ export class QubitGrid {
             sliceschangeIDs.push(this._current_slice.interacting_qubits);
         }
 
-        let historicalStartIndexInSlicesArray = this.slices.indexOf(this._current_slice) -1;
+        const historicalStartIndexInSlicesArray =
+            this.slices.indexOf(this._current_slice) - 1;
 
         const numAdditionalSlicesToConsider = Math.min(
             this.maxSlicesForHeatmap - 1,
@@ -202,20 +249,32 @@ export class QubitGrid {
 
         for (let i = 0; i < numAdditionalSlicesToConsider; i++) {
             const targetHistoricalIndex = historicalStartIndexInSlicesArray - i;
-            if (targetHistoricalIndex >= 0 && this.slices[targetHistoricalIndex] && this.slices[targetHistoricalIndex].interacting_qubits) {
-                sliceschangeIDs.push(this.slices[targetHistoricalIndex].interacting_qubits);
+            if (
+                targetHistoricalIndex >= 0 &&
+                this.slices[targetHistoricalIndex] &&
+                this.slices[targetHistoricalIndex].interacting_qubits
+            ) {
+                sliceschangeIDs.push(
+                    this.slices[targetHistoricalIndex].interacting_qubits,
+                );
             } else {
                 break;
             }
         }
         if (this.heatmap && this._current_slice.qubits) {
-          this.heatmap.updatePoints(this._current_slice.qubits, sliceschangeIDs);
+            this.heatmap.updatePoints(
+                this._current_slice.qubits,
+                sliceschangeIDs,
+            );
         } else {
-          console.warn("[QubitGrid] Heatmap or current_slice.qubits not initialized when trying to update points.");
+            console.warn(
+                "[QubitGrid] Heatmap or current_slice.qubits not initialized when trying to update points.",
+            );
         }
     }
 
-    xyzToState([x, _y, z]: [number,number,number]) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    xyzToState([x, _y, z]: [number, number, number]) {
         const THRESHOLD = 0.9;
         if (z > THRESHOLD) return State.ZERO;
         if (z < -THRESHOLD) return State.ONE;
@@ -225,29 +284,37 @@ export class QubitGrid {
     }
 
     saveCurrentState(): void {
-        console.warn("[QubitGrid] saveCurrentState called. This is unexpected when driven by JSON.");
+        console.warn(
+            "[QubitGrid] saveCurrentState called. This is unexpected when driven by JSON.",
+        );
     }
 
     loadStateFromSlice(sliceIndex: number): void {
         if (sliceIndex >= 0 && sliceIndex < this.slices.length) {
             this.current_slice = this.slices[sliceIndex];
         } else if (this.slices.length > 0) {
-            console.warn(`[QubitGrid] Slice index ${sliceIndex} out of bounds, loading first slice`);
+            console.warn(
+                `[QubitGrid] Slice index ${sliceIndex} out of bounds, loading first slice`,
+            );
             this.current_slice = this.slices[0];
         } else {
             console.warn("[QubitGrid] No slices available to load.");
             if (this._current_slice) {
-                this._current_slice.qubits.forEach(q => {
-                    if (q.blochSphere && q.blochSphere.blochSphere) q.blochSphere.blochSphere.visible = true;
+                this._current_slice.qubits.forEach((q) => {
+                    if (q.blochSphere && q.blochSphere.blochSphere)
+                        q.blochSphere.blochSphere.visible = true;
                 });
-                this.onCurrentSliceChange(this._current_slice.timeStep);
+                this.onCurrentSliceChange();
             }
         }
     }
 
     createGrid(rows: number, cols: number) {
-        this._current_slice.qubits.forEach(existingQubit => {
-            if (existingQubit.blochSphere && existingQubit.blochSphere.blochSphere) {
+        this._current_slice.qubits.forEach((existingQubit) => {
+            if (
+                existingQubit.blochSphere &&
+                existingQubit.blochSphere.blochSphere
+            ) {
                 this.scene.remove(existingQubit.blochSphere.blochSphere);
             }
         });
@@ -261,7 +328,7 @@ export class QubitGrid {
         for (let i = 0; i < rows; i++) {
             for (let j = 0; j < cols; j++) {
                 if (createdQubitCount >= this._qubit_count) break;
-                
+
                 const x = j * spacing - offsetX;
                 const y = i * spacing - offsetY;
                 this.createQubit(createdQubitCount, x, y);
@@ -269,9 +336,9 @@ export class QubitGrid {
             }
             if (createdQubitCount >= this._qubit_count) break;
         }
-        this._current_slice.qubits.forEach(q => {
+        this._current_slice.qubits.forEach((q) => {
             if (q.blochSphere && q.blochSphere.blochSphere) {
-                 q.blochSphere.blochSphere.visible = true; 
+                q.blochSphere.blochSphere.visible = true;
             }
         });
     }

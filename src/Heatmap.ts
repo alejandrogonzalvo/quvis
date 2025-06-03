@@ -34,7 +34,7 @@ export class Heatmap {
             uniforms: {
                 aspect: { value: window.innerWidth / window.innerHeight },
                 radius: { value: 1.0 },
-                baseSize: { value: 2800.0 },
+                baseSize: { value: 1500.0 },
                 cameraPosition: { value: new THREE.Vector3() },
                 scaleFactor: { value: 1.0 },
             },

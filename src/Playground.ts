@@ -97,7 +97,9 @@ export class Playground {
                 }
             });
         } else {
-            console.warn("Heatmap not immediately available after QubitGrid construction.");
+            console.warn(
+                "Heatmap not immediately available after QubitGrid construction.",
+            );
         }
 
         this.heatmapSlicesSlider.addEventListener("input", (event) => {
@@ -112,9 +114,7 @@ export class Playground {
                     this.grid.heatmap.maxSlices = this.maxHeatmapSlices;
                 }
                 if (this.grid.current_slice) {
-                    this.grid.onCurrentSliceChange(
-                        this.grid.current_slice.timeStep,
-                    );
+                    this.grid.onCurrentSliceChange();
                 }
             }
         });
