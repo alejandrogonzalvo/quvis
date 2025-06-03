@@ -131,4 +131,25 @@ export class BlochSphere {
             ease: "power1.inOut",
         });
     }
+
+    dispose() {
+        // Dispose of all geometries and materials in the blochSphere group
+        this.blochSphere.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+                if (object.geometry) {
+                    object.geometry.dispose();
+                }
+                if (object.material) {
+                    if (Array.isArray(object.material)) {
+                        object.material.forEach((material) =>
+                            material.dispose(),
+                        );
+                    } else {
+                        object.material.dispose();
+                    }
+                }
+            }
+        });
+        // Children are removed when the group is removed from the scene, or manually if needed
+    }
 }

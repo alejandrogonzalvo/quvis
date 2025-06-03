@@ -30,22 +30,51 @@ export class QubitGrid {
     private lineMaterial: THREE.ShaderMaterial; // For colored lines
     private lastCalculatedSlicesChangeIDs: Array<Set<number>> = []; // Store for drawConnections
 
-    private _current_slice: Slice;
+    // New/modified members for persistent Qubit objects
+    private qubitInstances: Map<number, Qubit> = new Map();
+    private current_slice_index: number = 0; // Index for the 'slices' array
+
+    // _current_slice might be deprecated or change role.
+    // For now, let's try to remove direct usage of _current_slice.qubits
+    // private _current_slice: Slice; // This was the heavy Slice, to be re-evaluated
+
     private _qubit_count: number;
     // grid_rows and grid_cols might become less relevant for positioning with force-directed layout
     private _grid_rows: number;
     private _grid_cols: number;
 
-    get current_slice(): Slice {
+    // For optimized connection lines
+    private connectionLineSegments: THREE.LineSegments | null = null;
+    private connectionLineGeometry: THREE.BufferGeometry | null = null;
+    private maxConnections: number = 0; // To track buffer sizes
+
+    // Getter for current slice data (lightweight)
+    get current_slice_data(): Slice | null {
+        if (
+            this.slices &&
+            this.current_slice_index >= 0 &&
+            this.current_slice_index < this.slices.length
+        ) {
+            return this.slices[this.current_slice_index];
+        }
+        return null;
+    }
+
+    // The public getter 'current_slice' might need to be removed or re-defined
+    // if it was exposing the old Slice with Qubit objects.
+    // For now, let's comment it out.
+    /*
+    get current_slice(): Slice { // This was the old Slice
         return this._current_slice;
     }
 
-    set current_slice(value: Slice) {
+    set current_slice(value: Slice) { // This was the old Slice
         this._current_slice = value;
-        if (this._current_slice && this._current_slice.qubits.size > 0) {
+        if (this._current_slice && this._current_slice.qubits.size > 0) { // Old check
             this.onCurrentSliceChange();
         }
     }
+    */
 
     constructor(
         scene: THREE.Scene,
@@ -60,7 +89,9 @@ export class QubitGrid {
         this._qubit_count = 0;
         this._grid_rows = 0;
         this._grid_cols = 0;
-        this._current_slice = new Slice();
+        // this._current_slice = new Slice(); // Initialize with new lightweight Slice if needed, or manage through index
+        this.current_slice_index = -1; // Indicates no slice loaded initially
+
         this.timeline = new Timeline((sliceIndex) =>
             this.loadStateFromSlice(sliceIndex),
         );
@@ -242,13 +273,14 @@ export class QubitGrid {
         message: string = "Error loading data",
     ) {
         console.error(message, error);
-        this._qubit_count = 9; // Default to a 3x3 grid for error case
+        this._qubit_count = 9;
         this._grid_rows = 3;
         this._grid_cols = 3;
-        this.couplingMap = null; // No coupling map on error
+        this.couplingMap = null;
 
         if (this.heatmap && this.heatmap.mesh)
             this.scene.remove(this.heatmap.mesh);
+        // Ensure heatmap is created even in error, with the default qubit count
         this.heatmap = new Heatmap(
             camera,
             this._qubit_count,
@@ -256,17 +288,22 @@ export class QubitGrid {
         );
         this.scene.add(this.heatmap.mesh);
 
+        // This will calculate positions and create qubitInstances
         this.calculateQubitPositions(
             this._qubit_count,
             this.couplingMap,
             10,
             10,
-        ); // Use default area
-        this.createGrid(); // Calls createQubit which uses this.qubitPositions
-        this.slices = [this._current_slice.clone()];
-        this.timeline.setSliceCount(this.slices.length > 0 ? 1 : 0);
-        if (this.slices.length > 0) this.loadStateFromSlice(0);
-        this.drawConnections();
+        );
+        this.createGrid();
+
+        const errorSlice = new Slice(0);
+        errorSlice.interacting_qubits = new Set();
+        this.slices = [errorSlice];
+
+        this.timeline.setSliceCount(1);
+        this.loadStateFromSlice(0); // Sets current_slice_index and calls onCurrentSliceChange
+        // drawConnections is called by onCurrentSliceChange
     }
 
     async loadSlicesFromJSON(url: string, camera: THREE.PerspectiveCamera) {
@@ -286,9 +323,7 @@ export class QubitGrid {
                 !jsonData.operations_per_slice
             ) {
                 this.handleLoadError(
-                    new Error(
-                        "Invalid JSON data structure: jsonData is missing expected properties.",
-                    ),
+                    new Error("Invalid JSON data structure"),
                     camera,
                     "Invalid JSON data structure",
                 );
@@ -298,13 +333,20 @@ export class QubitGrid {
             this._qubit_count = Number(jsonData.num_qubits);
             this.couplingMap = jsonData.coupling_map || null;
 
-            // Determine layout area (can be adjusted)
+            // Initialize for connection lines if couplingMap exists
+            if (this.couplingMap) {
+                this.maxConnections = this.couplingMap.length;
+                this.initializeConnectionLines();
+            } else {
+                this.maxConnections = 0;
+                this.clearConnectionLineObject(); // Ensure any old line object is gone
+            }
+
             const layoutAreaWidth = Math.max(
                 5,
                 Math.sqrt(this._qubit_count) * 2,
             );
             const layoutAreaHeight = layoutAreaWidth;
-
             this.calculateQubitPositions(
                 this._qubit_count,
                 this.couplingMap,
@@ -312,8 +354,10 @@ export class QubitGrid {
                 layoutAreaHeight,
             );
 
-            if (this.heatmap && this.heatmap.mesh)
+            if (this.heatmap && this.heatmap.mesh) {
                 this.scene.remove(this.heatmap.mesh);
+                // Assuming Heatmap doesn't have a complex dispose, otherwise call it
+            }
             this.heatmap = new Heatmap(
                 camera,
                 this._qubit_count,
@@ -321,64 +365,19 @@ export class QubitGrid {
             );
             this.scene.add(this.heatmap.mesh);
 
-            // Clear old qubits from scene and current_slice
-            this._current_slice.qubits.forEach((qubit) => {
-                if (qubit.blochSphere && qubit.blochSphere.blochSphere) {
-                    this.scene.remove(qubit.blochSphere.blochSphere);
-                }
-            });
-            this._current_slice = new Slice(); // Reset current slice to be populated by createGrid
-
-            this.createGrid(); // This will now use this.qubitPositions
-            this.drawConnections();
+            this.createGrid();
 
             const loadedSlices: Slice[] = [];
-            // Base qubits for cloning state and initial visual setup are now from the freshly created grid
-            const baseQubits = new Map<number, Qubit>();
-            this._current_slice.qubits.forEach((qubit, id) => {
-                // The BlochSphere objects are already created and positioned by createQubit
-                baseQubits.set(
-                    id,
-                    new Qubit(id, qubit.state, qubit.blochSphere!),
-                );
-            });
-
-            const allSlicesOps = jsonData.operations_per_slice;
-
-            // Create subsequent slices based on the initial layout and states
-            allSlicesOps.forEach((sliceOps, timeStep) => {
+            jsonData.operations_per_slice.forEach((sliceOps, timeStep) => {
                 const newSlice = new Slice(timeStep);
-                for (let i = 0; i < this._qubit_count; i++) {
-                    const baseQubit = baseQubits.get(i)!; // Should exist
-                    // Create a new BlochSphere for each slice, positioned like the base one
-                    const newBlochSphere = new BlochSphere(
-                        baseQubit.blochSphere.blochSphere.position.x,
-                        baseQubit.blochSphere.blochSphere.position.y,
-                    );
-                    this.scene.add(newBlochSphere.blochSphere);
-                    newBlochSphere.blochSphere.visible = false; // Initially hide
-                    newSlice.qubits.set(
-                        i,
-                        new Qubit(i, baseQubit.state, newBlochSphere),
-                    );
-                }
-
                 const interactingQubitsThisSlice = new Set<number>();
                 sliceOps.forEach((op) => {
-                    op.qubits.forEach((qIndex) => {
-                        interactingQubitsThisSlice.add(qIndex);
-                    });
+                    op.qubits.forEach((qIndex) =>
+                        interactingQubitsThisSlice.add(qIndex),
+                    );
                 });
                 newSlice.interacting_qubits = interactingQubitsThisSlice;
                 loadedSlices.push(newSlice);
-            });
-
-            // Remove the initial Bloch spheres from the scene that were part of the _current_slice template
-            // as loadedSlices now contain their own managed Bloch spheres.
-            this._current_slice.qubits.forEach((qubit) => {
-                if (qubit.blochSphere && qubit.blochSphere.blochSphere) {
-                    this.scene.remove(qubit.blochSphere.blochSphere);
-                }
             });
 
             this.slices = loadedSlices;
@@ -387,18 +386,23 @@ export class QubitGrid {
                 this.timeline.setSliceCount(this.slices.length);
                 this.loadStateFromSlice(0);
             } else {
-                // If no operations/slices, ensure the initial grid (current_slice) is shown
-                this._current_slice.qubits.forEach((q) => {
-                    if (q.blochSphere && q.blochSphere.blochSphere)
-                        q.blochSphere.blochSphere.visible = true;
-                });
-                this.timeline.setSliceCount(1); // At least one slice (the initial state)
-                this.current_slice = this._current_slice; // Ensure it's set
-                this.onCurrentSliceChange();
+                this.timeline.setSliceCount(
+                    this.qubitInstances.size > 0 ? 1 : 0,
+                );
+                if (this.qubitInstances.size > 0) {
+                    const defaultSlice = new Slice(0);
+                    this.slices = [defaultSlice]; // Create a single slice representing the initial state
+                    this.loadStateFromSlice(0); // This will set current_slice_index = 0 and call onCurrentSliceChange
+                } else {
+                    this.current_slice_index = -1;
+                    this.slices = []; // Ensure slices is empty
+                    this.onCurrentSliceChange();
+                }
                 console.warn(
-                    "[QubitGrid] No operational slices were loaded from JSON, showing initial state.",
+                    "[QubitGrid] No operational slices loaded, showing initial/empty state.",
                 );
             }
+            // drawConnections is called by onCurrentSliceChange, which is called by loadStateFromSlice or directly.
         } catch (error) {
             this.handleLoadError(
                 error as Error,
@@ -409,71 +413,74 @@ export class QubitGrid {
     }
 
     public onCurrentSliceChange() {
-        if (!this._current_slice) {
+        // Check if there are no qubits and no slice data to process
+        if (
+            this.qubitInstances.size === 0 &&
+            (this.slices.length === 0 || this.current_slice_index < 0)
+        ) {
             console.warn(
-                "[QubitGrid] onCurrentSliceChange called but _current_slice is null/undefined.",
+                "[QubitGrid] onCurrentSliceChange: No qubits or no valid slice data.",
             );
+            if (this.heatmap) this.heatmap.updatePoints(new Map(), []);
+            this.lastCalculatedSlicesChangeIDs = [];
+            this.drawConnections();
             return;
         }
-        // Make only the Bloch spheres of the current slice visible
-        this.slices.forEach((slice) => {
-            const isCurrent = slice === this._current_slice;
-            slice.qubits.forEach((qubit) => {
-                if (qubit.blochSphere && qubit.blochSphere.blochSphere) {
-                    qubit.blochSphere.blochSphere.visible = isCurrent;
-                    if (isCurrent) {
-                        qubit.animate();
-                    }
-                }
-            });
-        });
 
-        // Update heatmap based on the current and previous slices
-        const sliceschangeIDs = new Array<Set<number>>();
-        if (this._current_slice.interacting_qubits) {
-            sliceschangeIDs.push(this._current_slice.interacting_qubits);
+        // If there are qubits but no slices (e.g. error or empty JSON but num_qubits was > 0)
+        // ensure current_slice_index is valid if slices array was populated with a default.
+        if (
+            this.qubitInstances.size > 0 &&
+            this.slices.length > 0 &&
+            this.current_slice_index < 0
+        ) {
+            this.current_slice_index = 0; // Default to first slice if available
         }
 
-        const currentIndexInSlicesArray = this.slices.indexOf(
-            this._current_slice,
-        );
-        const historicalStartIndexInSlicesArray = currentIndexInSlicesArray - 1;
+        const currentVisibleSliceData = this.current_slice_data; // Uses getter, depends on current_slice_index
 
+        const slicesChangeIDs = new Array<Set<number>>();
+        // Ensure currentVisibleSliceData is not null before accessing its properties
+        if (
+            currentVisibleSliceData &&
+            currentVisibleSliceData.interacting_qubits
+        ) {
+            slicesChangeIDs.push(currentVisibleSliceData.interacting_qubits);
+        }
+
+        const historicalStartIndex = this.current_slice_index - 1;
+        // Ensure current_slice_index is non-negative for the next calculation
         const numAdditionalSlicesToConsider = Math.min(
             this.maxSlicesForHeatmap - 1,
-            historicalStartIndexInSlicesArray + 1,
-            currentIndexInSlicesArray, // Ensure we don't go before the first slice
+            historicalStartIndex + 1, // This can be 0 if current_slice_index is 0
+            Math.max(0, this.current_slice_index), // Max with 0 ensures non-negative value here
         );
 
         for (let i = 0; i < numAdditionalSlicesToConsider; i++) {
-            const targetHistoricalIndex = historicalStartIndexInSlicesArray - i;
+            const targetHistoricalIndex = historicalStartIndex - i;
             if (
                 targetHistoricalIndex >= 0 &&
                 this.slices[targetHistoricalIndex] &&
                 this.slices[targetHistoricalIndex].interacting_qubits
             ) {
-                sliceschangeIDs.push(
+                slicesChangeIDs.push(
                     this.slices[targetHistoricalIndex].interacting_qubits,
                 );
             } else {
                 break;
             }
         }
-        if (
-            this.heatmap &&
-            this._current_slice.qubits &&
-            this._current_slice.qubits.size > 0
-        ) {
-            this.heatmap.updatePoints(
-                this._current_slice.qubits, // Pass the qubits of the *currently visible* slice
-                sliceschangeIDs,
-            );
-        } else {
-            console.warn(
-                "[QubitGrid] Heatmap or current_slice.qubits not initialized/empty when trying to update points.",
-            );
+        this.lastCalculatedSlicesChangeIDs = slicesChangeIDs;
+
+        if (this.heatmap) {
+            // Check if heatmap is initialized
+            if (this.qubitInstances.size > 0) {
+                this.heatmap.updatePoints(this.qubitInstances, slicesChangeIDs);
+            } else {
+                this.heatmap.updatePoints(new Map(), []); // Clear heatmap if no qubits
+            }
         }
-        // Ensure connections are drawn based on the current qubit positions (which are static after layout)
+
         this.drawConnections();
     }
 
@@ -495,108 +502,147 @@ export class QubitGrid {
 
     loadStateFromSlice(sliceIndex: number): void {
         if (sliceIndex >= 0 && sliceIndex < this.slices.length) {
-            this.current_slice = this.slices[sliceIndex];
-        } else if (this.slices.length > 0 && this.slices[0]) {
-            // Check if slices[0] exists
+            this.current_slice_index = sliceIndex;
+        } else if (this.slices.length > 0) {
             console.warn(
                 `[QubitGrid] Slice index ${sliceIndex} out of bounds, loading first slice`,
             );
-            this.current_slice = this.slices[0];
+            this.current_slice_index = 0;
         } else {
-            console.warn(
-                "[QubitGrid] No slices available to load or slices[0] is undefined.",
-            );
-            // If no slices, ensure current_slice is at least an empty slice or a default state.
-            // The createGrid and subsequent logic should handle populating a displayable state.
-            if (!this._current_slice) this._current_slice = new Slice();
-            this.onCurrentSliceChange();
+            console.warn("[QubitGrid] No slices available to load.");
+            this.current_slice_index = -1; // No valid slice
         }
+        // Qubit states are not changing per slice in this model,
+        // Bloch spheres are persistent and show default state.
+        // We just need to trigger heatmap/connection updates.
+        this.onCurrentSliceChange();
     }
 
     createGrid() {
-        // Removed rows and cols parameters as layout is now dynamic
-        // Clear existing qubits from the scene and current_slice before creating new ones
-        this._current_slice.qubits.forEach((existingQubit) => {
-            if (
-                existingQubit.blochSphere &&
-                existingQubit.blochSphere.blochSphere
-            ) {
-                this.scene.remove(existingQubit.blochSphere.blochSphere);
+        // Clear existing qubit instances from the scene and map
+        this.qubitInstances.forEach((qubit) => {
+            if (qubit.blochSphere && qubit.blochSphere.blochSphere) {
+                this.scene.remove(qubit.blochSphere.blochSphere);
             }
+            qubit.dispose(); // Call dispose on Qubit, which calls on BlochSphere
         });
-        this._current_slice.qubits.clear();
-        this.clearConnections();
+        this.qubitInstances.clear();
+
+        // Connection lines buffers might depend on couplingMap which is set in loadSlicesFromJSON.
+        // If createGrid is called standalone or before couplingMap is known, lines might not be ready.
+        // For now, initialization is in loadSlicesFromJSON. If couplingMap changes, re-init is needed.
 
         for (let i = 0; i < this._qubit_count; i++) {
-            const pos = this.qubitPositions.get(i) || new THREE.Vector2(0, 0); // Fallback to origin
+            const pos = this.qubitPositions.get(i) || new THREE.Vector2(0, 0);
             this.createQubit(i, pos.x, pos.y);
         }
-
-        // Ensure all qubits in the (new) _current_slice are visible by default after creation
-        this._current_slice.qubits.forEach((q) => {
-            if (q.blochSphere && q.blochSphere.blochSphere) {
-                q.blochSphere.blochSphere.visible = true;
-            }
-        });
     }
 
     createQubit(id: number, x: number, y: number) {
-        const qubit = new Qubit(id, State.ZERO, new BlochSphere(x, y));
-        this.scene.add(qubit.blochSphere.blochSphere);
-        this._current_slice.qubits.set(id, qubit); // Add to the current_slice being built
+        const blochSphere = new BlochSphere(x, y); // Creates the 3D object
+        // Scene addition of blochSphere.blochSphere handled here:
+        this.scene.add(blochSphere.blochSphere);
+
+        const qubit = new Qubit(id, State.ZERO, blochSphere); // Default state
+        this.qubitInstances.set(id, qubit);
+        // No longer adding to a _current_slice.qubits here
     }
 
-    clearConnections() {
-        while (this.connectionLines.children.length > 0) {
-            const line = this.connectionLines.children[0] as THREE.Line;
-            line.geometry.dispose(); // Dispose geometry
-            if (line.material instanceof THREE.ShaderMaterial) {
-                line.material.dispose(); // Dispose material
+    private initializeConnectionLines() {
+        this.clearConnectionLineObject(); // Clear previous if any
+
+        if (this.maxConnections === 0 || !this.couplingMap) return;
+
+        this.connectionLineGeometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(this.maxConnections * 2 * 3); // 2 points per line, 3 xyz per point
+        const intensities = new Float32Array(this.maxConnections * 2 * 1); // 2 points per line, 1 intensity per point
+
+        this.connectionLineGeometry.setAttribute(
+            "position",
+            new THREE.BufferAttribute(positions, 3).setUsage(
+                THREE.DynamicDrawUsage,
+            ),
+        );
+        this.connectionLineGeometry.setAttribute(
+            "vertexIntensity",
+            new THREE.BufferAttribute(intensities, 1).setUsage(
+                THREE.DynamicDrawUsage,
+            ),
+        );
+
+        this.connectionLineSegments = new THREE.LineSegments(
+            this.connectionLineGeometry,
+            this.lineMaterial,
+        );
+        this.connectionLines.add(this.connectionLineSegments); // Add to the group dedicated to lines
+    }
+
+    private clearConnectionLineObject() {
+        if (this.connectionLineSegments) {
+            this.connectionLines.remove(this.connectionLineSegments);
+            if (this.connectionLineSegments.geometry) {
+                this.connectionLineSegments.geometry.dispose();
             }
-            this.connectionLines.remove(line);
+            // lineMaterial is shared, do not dispose here
+            this.connectionLineSegments = null;
+            this.connectionLineGeometry = null;
         }
     }
 
-    private getQubitInteractionIntensity(
-        qubitId: number,
-        slicesChangeData: Array<Set<number>>,
-    ): number {
-        let interactionCount = 0;
-        const slicesToConsider = slicesChangeData.slice(
-            0,
-            this.maxSlicesForHeatmap,
-        );
-        slicesToConsider.forEach((sliceInteractionSet) => {
-            if (sliceInteractionSet.has(qubitId)) {
-                interactionCount++;
-            }
-        });
-        if (slicesToConsider.length === 0) return 0;
-        return interactionCount / slicesToConsider.length;
+    // This method is now for hiding/showing or clearing attributes, not full disposal of the main object.
+    clearConnections() {
+        if (this.connectionLineSegments && this.connectionLineGeometry) {
+            // Option 1: Hide the lines object if no connections should be drawn
+            // this.connectionLineSegments.visible = false;
+            // Option 2: Zero out attributes if you want to keep the object for potential reuse
+            // This is more complex if the number of active lines changes drastically.
+            // For now, we assume drawConnections will populate up to activeConnectionsCount.
+            // If couplingMap is truly dynamic, re-initialization is better (already handled somewhat).
+            // The current drawConnections will overwrite attributes, so this might not be strictly needed
+            // if drawConnections handles the count of lines to draw correctly.
+        }
+        // The old full clear is replaced by drawConnections updating existing buffers.
+        // If couplingMap becomes null or empty after initialization, drawConnections should handle that.
     }
 
     drawConnections() {
-        this.clearConnections();
-
+        // If no coupling map, or no qubit positions, or the line object isn't initialized, hide and exit.
         if (
             !this.couplingMap ||
-            !this._current_slice ||
-            this._current_slice.qubits.size === 0
+            this.couplingMap.length === 0 ||
+            !this.qubitPositions ||
+            this.qubitPositions.size === 0 ||
+            !this.connectionLineSegments ||
+            !this.connectionLineGeometry
         ) {
-            // If no coupling map, or no qubits in the current slice, don't draw connections.
-            // Qubits might not be populated in _current_slice if this is called too early.
-            // It's better to rely on the positions stored in this.qubitPositions and iterate up to this._qubit_count
+            if (this.connectionLineSegments) {
+                this.connectionLineSegments.visible = false;
+            }
             return;
         }
 
+        this.connectionLineSegments.visible = true;
+
+        const positionsAttribute = this.connectionLineGeometry.attributes
+            .position as THREE.BufferAttribute;
+        const intensityAttribute = this.connectionLineGeometry.attributes
+            .vertexIntensity as THREE.BufferAttribute;
+
+        let lineCount = 0;
         const currentSlicesChangeData = this.lastCalculatedSlicesChangeIDs;
 
         this.couplingMap.forEach((pair) => {
+            if (lineCount >= this.maxConnections) {
+                // Safety break, should not happen if maxConnections is correct
+                console.warn(
+                    "[QubitGrid] Exceeded maxConnections when drawing lines.",
+                );
+                return;
+            }
             if (pair.length === 2) {
                 const qubitIdA = pair[0];
                 const qubitIdB = pair[1];
 
-                // Get positions from the pre-calculated layout
                 const posA = this.qubitPositions.get(qubitIdA);
                 const posB = this.qubitPositions.get(qubitIdB);
 
@@ -610,32 +656,55 @@ export class QubitGrid {
                         currentSlicesChangeData,
                     );
 
-                    const points = [
-                        new THREE.Vector3(posA.x, posA.y, 0),
-                        new THREE.Vector3(posB.x, posB.y, 0),
-                    ];
-                    const geometry = new THREE.BufferGeometry().setFromPoints(
-                        points,
-                    );
+                    const pIndex = lineCount * 2; // Each line has two points
+                    positionsAttribute.setXYZ(pIndex, posA.x, posA.y, 0);
+                    positionsAttribute.setXYZ(pIndex + 1, posB.x, posB.y, 0);
 
-                    // For gradient line, we need intensity at each vertex
-                    const intensities = new Float32Array([
-                        intensityA,
-                        intensityB,
-                    ]);
-                    geometry.setAttribute(
-                        "vertexIntensity",
-                        new THREE.BufferAttribute(intensities, 1),
-                    );
+                    intensityAttribute.setX(pIndex, intensityA);
+                    intensityAttribute.setX(pIndex + 1, intensityB);
 
-                    const line = new THREE.Line(geometry, this.lineMaterial);
-                    this.connectionLines.add(line);
+                    lineCount++;
                 } else {
-                    console.warn(
-                        `[QubitGrid] Could not find positions for connection: ${qubitIdA} - ${qubitIdB}`,
-                    );
+                    // Fill with degenerate triangles if a connection is missing, to keep attributes aligned
+                    // Or, ensure couplingMap only contains valid qubit IDs that have positions.
+                    // For now, skip if positions are missing, which might misalign buffers if not careful.
+                    // Better: ensure this.maxConnections is based on *drawable* lines.
+                    // console.warn(`[QubitGrid] Could not find positions for connection: ${qubitIdA} - ${qubitIdB}`);
                 }
             }
         });
+
+        // If fewer lines are drawn than maxConnections, zero out the rest of the buffer
+        // or use geometry.setDrawRange to only draw the active lines.
+        this.connectionLineGeometry.setDrawRange(0, lineCount * 2); // 2 vertices per line
+
+        positionsAttribute.needsUpdate = true;
+        intensityAttribute.needsUpdate = true;
+        this.connectionLineGeometry.computeBoundingSphere(); // Optional, but good for culling
+    }
+
+    private getQubitInteractionIntensity(
+        qubitId: number,
+        slicesChangeData: Array<Set<number>>, // This is lastCalculatedSlicesChangeIDs
+    ): number {
+        let interactionCount = 0;
+        // Ensure slicesChangeData is defined and an array
+        if (!slicesChangeData || !Array.isArray(slicesChangeData)) {
+            return 0;
+        }
+        const slicesToConsider = slicesChangeData.slice(
+            0,
+            this.maxSlicesForHeatmap,
+        );
+        slicesToConsider.forEach((sliceInteractionSet) => {
+            if (
+                sliceInteractionSet instanceof Set &&
+                sliceInteractionSet.has(qubitId)
+            ) {
+                interactionCount++;
+            }
+        });
+        if (slicesToConsider.length === 0) return 0;
+        return interactionCount / slicesToConsider.length;
     }
 }

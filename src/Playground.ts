@@ -113,9 +113,7 @@ export class Playground {
                 if (this.grid.heatmap) {
                     this.grid.heatmap.maxSlices = this.maxHeatmapSlices;
                 }
-                if (this.grid.current_slice) {
-                    this.grid.onCurrentSliceChange();
-                }
+                this.grid.onCurrentSliceChange();
             }
         });
 
