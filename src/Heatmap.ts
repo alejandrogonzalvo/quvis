@@ -83,6 +83,10 @@ export class Heatmap {
         this.mesh = new THREE.Points(geometry, this.material);
     }
 
+    public clearPositionsCache() {
+        this.qubitPositions = []; // Reset the internal cache
+    }
+
     updatePoints(
         qubits: Map<number, Qubit>,
         changedIdSlices: Array<Set<number>>,

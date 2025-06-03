@@ -73,6 +73,12 @@ export class BlochSphere {
         this.blochSphere.add(stateVector);
     }
 
+    public setScale(scale: number): void {
+        if (this.blochSphere) {
+            this.blochSphere.scale.set(scale, scale, scale);
+        }
+    }
+
     createArrow(direction) {
         const arrowGroup = new THREE.Group();
         const color = "0xffffff";
