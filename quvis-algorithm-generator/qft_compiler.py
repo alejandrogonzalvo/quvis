@@ -99,7 +99,6 @@ def main():
     # The QFT object from the library is already a QuantumCircuit instance.
 
     print("Original QFT circuit (using qiskit.circuit.library.QFT):")
-    print(qft_qc.draw(output="text"))
 
     # Transpile the QFT circuit for the grid
     # We need to ensure the coupling map is correctly formatted for the transpile function
@@ -132,12 +131,6 @@ def main():
         basis_gates=["u1", "u2", "u3", "cx"],  # Example basis gates
         optimization_level=3,  # Higher level for potentially better, but slower, optimization
     )
-
-    print("\nTranspiled QFT circuit:")
-    print(transpiled_qc.draw(output="text"))
-
-    print("\nQASM for the transpiled circuit:")
-    print(qasm3.dumps(transpiled_qc))
 
     # --- Extract qubit interactions per time slice ---
     print("\nExtracting qubit interactions for visualization...")

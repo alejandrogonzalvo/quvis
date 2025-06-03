@@ -26,7 +26,7 @@ export class QubitGrid {
     maxSlicesForHeatmap: number;
     private couplingMap: number[][] | null = null;
     private connectionLines: THREE.Group;
-    private qubitPositions: Map<number, THREE.Vector2> = new Map();
+    private qubitPositions: Map<number, THREE.Vector3> = new Map();
     private lineMaterial: THREE.ShaderMaterial; // For colored lines
     private lastCalculatedSlicesChangeIDs: Array<Set<number>> = []; // Store for drawConnections
 
@@ -137,15 +137,16 @@ export class QubitGrid {
         couplingMap: number[][] | null,
         areaWidth: number,
         areaHeight: number,
+        areaDepth: number,
     ): void {
         this.qubitPositions.clear();
         if (numQubits === 0) return;
 
-        // Fallback to grid if no coupling map or for very simple cases
+        // Fallback to grid if no coupling map or for very simple cases (remains 2D for simplicity here)
         if (!couplingMap || numQubits <= 1) {
             const cols = Math.ceil(Math.sqrt(numQubits));
             const rows = Math.ceil(numQubits / cols);
-            const spacing = 2; // Keep existing spacing logic for fallback
+            const spacing = 2;
             const offsetX = ((cols - 1) * spacing) / 2;
             const offsetY = ((rows - 1) * spacing) / 2;
             let count = 0;
@@ -154,9 +155,10 @@ export class QubitGrid {
                     if (count < numQubits) {
                         this.qubitPositions.set(
                             count,
-                            new THREE.Vector2(
+                            new THREE.Vector3(
                                 j * spacing - offsetX,
                                 i * spacing - offsetY,
+                                0,
                             ),
                         );
                         count++;
@@ -167,28 +169,29 @@ export class QubitGrid {
         }
 
         // Simplified Force-Directed Layout
-        const kRepel = 0.1; // Repulsion strength
-        const kAttract = 0.05; // Attraction strength (spring constant)
-        const idealDist = 2.5; // Ideal distance between connected qubits
-        const iterations = 100;
-        let temperature = areaWidth / 10; // Initial temperature for cooling
+        const kRepel = 0.3;
+        const kAttract = 0.05;
+        const idealDist = 5.0;
+        const iterations = 300;
+        let temperature = Math.max(areaWidth, areaHeight, areaDepth) / 10; // Use max dimension
         const coolingFactor = 0.95;
 
         // Initialize positions (e.g., randomly or in a circle)
         for (let i = 0; i < numQubits; i++) {
             this.qubitPositions.set(
                 i,
-                new THREE.Vector2(
+                new THREE.Vector3(
                     (Math.random() - 0.5) * areaWidth * 0.1,
                     (Math.random() - 0.5) * areaHeight * 0.1,
+                    (Math.random() - 0.5) * areaDepth * 0.1,
                 ),
             );
         }
 
         for (let iter = 0; iter < iterations; iter++) {
-            const forces = new Map<number, THREE.Vector2>();
+            const forces = new Map<number, THREE.Vector3>();
             for (let i = 0; i < numQubits; i++) {
-                forces.set(i, new THREE.Vector2(0, 0));
+                forces.set(i, new THREE.Vector3(0, 0, 0));
             }
 
             // Calculate repulsive forces
@@ -196,8 +199,8 @@ export class QubitGrid {
                 for (let j = i + 1; j < numQubits; j++) {
                     const posI = this.qubitPositions.get(i)!;
                     const posJ = this.qubitPositions.get(j)!;
-                    const delta = new THREE.Vector2().subVectors(posI, posJ);
-                    const dist = delta.length() || 1e-6; // Avoid division by zero
+                    const delta = new THREE.Vector3().subVectors(posI, posJ);
+                    const dist = delta.length() || 1e-6;
                     const forceMag = (kRepel * kRepel) / dist;
                     const force = delta.normalize().multiplyScalar(forceMag);
                     forces.get(i)!.add(force);
@@ -213,13 +216,12 @@ export class QubitGrid {
                     const posU = this.qubitPositions.get(u)!;
                     const posV = this.qubitPositions.get(v)!;
                     if (posU && posV) {
-                        const delta = new THREE.Vector2().subVectors(
+                        const delta = new THREE.Vector3().subVectors(
                             posV,
                             posU,
                         );
                         const dist = delta.length() || 1e-6;
-                        const forceMag = ((dist * dist) / idealDist) * kAttract; // Spring force variant
-                        // const forceMag = kAttract * (dist - idealDist); // Simpler spring
+                        const forceMag = kAttract * (dist - idealDist);
                         const force = delta
                             .normalize()
                             .multiplyScalar(forceMag);
@@ -234,6 +236,7 @@ export class QubitGrid {
                 const pos = this.qubitPositions.get(i)!;
                 const force = forces.get(i)!;
                 const displacement = force
+                    .clone()
                     .normalize()
                     .multiplyScalar(Math.min(force.length(), temperature));
                 pos.add(displacement);
@@ -244,26 +247,35 @@ export class QubitGrid {
         // Center and scale positions
         let minX = Infinity,
             minY = Infinity,
+            minZ = Infinity,
             maxX = -Infinity,
-            maxY = -Infinity;
+            maxY = -Infinity,
+            maxZ = -Infinity;
+
         this.qubitPositions.forEach((pos) => {
             minX = Math.min(minX, pos.x);
             minY = Math.min(minY, pos.y);
+            minZ = Math.min(minZ, pos.z);
             maxX = Math.max(maxX, pos.x);
             maxY = Math.max(maxY, pos.y);
+            maxZ = Math.max(maxZ, pos.z);
         });
 
         const currentWidth = maxX - minX;
         const currentHeight = maxY - minY;
+        const currentDepth = maxZ - minZ;
+
         const scale =
             Math.min(
                 areaWidth / (currentWidth || 1),
                 areaHeight / (currentHeight || 1),
+                areaDepth / (currentDepth || 1),
             ) * 0.8;
 
         this.qubitPositions.forEach((pos) => {
             pos.x = (pos.x - (minX + currentWidth / 2)) * scale;
             pos.y = (pos.y - (minY + currentHeight / 2)) * scale;
+            pos.z = (pos.z - (minZ + currentDepth / 2)) * scale;
         });
     }
 
@@ -292,6 +304,7 @@ export class QubitGrid {
         this.calculateQubitPositions(
             this._qubit_count,
             this.couplingMap,
+            10,
             10,
             10,
         );
@@ -347,11 +360,13 @@ export class QubitGrid {
                 Math.sqrt(this._qubit_count) * 2,
             );
             const layoutAreaHeight = layoutAreaWidth;
+            const layoutAreaDepth = layoutAreaWidth;
             this.calculateQubitPositions(
                 this._qubit_count,
                 this.couplingMap,
                 layoutAreaWidth,
                 layoutAreaHeight,
+                layoutAreaDepth,
             );
 
             if (this.heatmap && this.heatmap.mesh) {
@@ -533,13 +548,14 @@ export class QubitGrid {
         // For now, initialization is in loadSlicesFromJSON. If couplingMap changes, re-init is needed.
 
         for (let i = 0; i < this._qubit_count; i++) {
-            const pos = this.qubitPositions.get(i) || new THREE.Vector2(0, 0);
-            this.createQubit(i, pos.x, pos.y);
+            const pos =
+                this.qubitPositions.get(i) || new THREE.Vector3(0, 0, 0);
+            this.createQubit(i, pos.x, pos.y, pos.z);
         }
     }
 
-    createQubit(id: number, x: number, y: number) {
-        const blochSphere = new BlochSphere(x, y); // Creates the 3D object
+    createQubit(id: number, x: number, y: number, z: number) {
+        const blochSphere = new BlochSphere(x, y, z);
         // Scene addition of blochSphere.blochSphere handled here:
         this.scene.add(blochSphere.blochSphere);
 
@@ -657,8 +673,13 @@ export class QubitGrid {
                     );
 
                     const pIndex = lineCount * 2; // Each line has two points
-                    positionsAttribute.setXYZ(pIndex, posA.x, posA.y, 0);
-                    positionsAttribute.setXYZ(pIndex + 1, posB.x, posB.y, 0);
+                    positionsAttribute.setXYZ(pIndex, posA.x, posA.y, posA.z);
+                    positionsAttribute.setXYZ(
+                        pIndex + 1,
+                        posB.x,
+                        posB.y,
+                        posB.z,
+                    );
 
                     intensityAttribute.setX(pIndex, intensityA);
                     intensityAttribute.setX(pIndex + 1, intensityB);

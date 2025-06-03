@@ -5,9 +5,9 @@ import { gsap } from "gsap";
 export class BlochSphere {
     blochSphere: THREE.Group;
 
-    constructor(x: number, y: number) {
+    constructor(x: number, y: number, z: number) {
         this.blochSphere = new THREE.Group();
-        this.blochSphere.position.set(x, y, 0);
+        this.blochSphere.position.set(x, y, z);
 
         // Main sphere (transparent)
         const sphereGeometry = new THREE.SphereGeometry(0.4, 32, 32);
