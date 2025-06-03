@@ -2,6 +2,11 @@ from qiskit import transpile
 from qiskit.transpiler import CouplingMap
 from qiskit.circuit.library import QFT
 from qiskit import qasm3
+from qiskit.converters import circuit_to_dag
+# import numpy as np # No longer needed for direct JSON output
+import json
+# import time # No longer needed for timestamped filename in this simplified approach
+import argparse # Import argparse
 
 
 def create_nxn_grid_coupling_map(n: int) -> list[list[int]]:
@@ -15,35 +20,47 @@ def create_nxn_grid_coupling_map(n: int) -> list[list[int]]:
         return []
 
     coupling_map = []
-    num_qubits = n * n
-    for i in range(num_qubits):
+    num_qubits_grid = n * n # Renamed to avoid conflict with transpiled_qc.num_qubits
+    for i in range(num_qubits_grid):
         row, col = divmod(i, n)
 
-        # Connection to the right neighbor
         if col < n - 1:
             right_neighbor = i + 1
             coupling_map.append([i, right_neighbor])
-            # Qiskit's transpile needs symmetric connections if not specified by backend
             coupling_map.append([right_neighbor, i])
 
-        # Connection to the bottom neighbor
         if row < n - 1:
             bottom_neighbor = i + n
             coupling_map.append([i, bottom_neighbor])
-            # Qiskit's transpile needs symmetric connections if not specified by backend
             coupling_map.append([bottom_neighbor, i])
 
-    # Remove duplicates that might arise from symmetric additions if not careful
-    # A set of frozensets handles order-agnostic pairs
     unique_couplings = {frozenset(pair) for pair in coupling_map}
     return [list(pair) for pair in unique_couplings]
 
 
 def main():
-    # --- Configuration ---
-    n_grid_size = 3  # Dimension of the n x n grid (e.g., 3 for a 3x3 grid)
-    m_qft_qubits = 3  # Number of qubits for the QFT circuit
+    # --- Argument Parsing --- 
+    parser = argparse.ArgumentParser(description="Compile a QFT circuit and extract interactions.")
+    parser.add_argument(
+        "-q", "--qft_qubits", 
+        type=int, 
+        default=3, 
+        help="Number of qubits for the QFT circuit (default: 3)"
+    )
+    parser.add_argument(
+        "-g", "--grid_size",
+        type=int,
+        default=3,
+        help="Dimension of the n x n grid for qubit coupling (default: 3, for a 3x3 grid)"
+    )
+    args = parser.parse_args()
+
+    # --- Configuration from args ---
+    n_grid_size = args.grid_size
+    m_qft_qubits = args.qft_qubits
     # ---------------------
+
+    print(f"Config: QFT qubits = {m_qft_qubits}, Grid size = {n_grid_size}x{n_grid_size}")
 
     if m_qft_qubits > n_grid_size * n_grid_size:
         print(
@@ -67,7 +84,7 @@ def main():
 
     # Create QFT circuit
     print(
-        f"\\nCreating a QFT circuit for {m_qft_qubits} qubits using qiskit.circuit.library.QFT."
+        f"\nCreating a QFT circuit for {m_qft_qubits} qubits using qiskit.circuit.library.QFT."
     )
     # Note: qiskit.circuit.library.QFT is pending deprecation.
     # Consider using qiskit.circuit.library.QFTGate or qiskit.synthesis.qft.synth_qft_full in the future.
@@ -92,7 +109,7 @@ def main():
     # will try to map the m logical qubits to a subset of the n*n physical qubits.
     # The `optimization_level` can be adjusted for different trade-offs.
     print(
-        f"\\nTranspiling QFT circuit for the {n_grid_size}x{n_grid_size} grid topology..."
+        f"\nTranspiling QFT circuit for the {n_grid_size}x{n_grid_size} grid topology..."
     )
 
     # For transpilation, all qubits in the circuit must be addressable by the coupling map.
@@ -116,11 +133,52 @@ def main():
         optimization_level=3,  # Higher level for potentially better, but slower, optimization
     )
 
-    print("\\nTranspiled QFT circuit:")
+    print("\nTranspiled QFT circuit:")
     print(transpiled_qc.draw(output="text"))
 
-    print("\\nQASM for the transpiled circuit:")
+    print("\nQASM for the transpiled circuit:")
     print(qasm3.dumps(transpiled_qc))
+
+    # --- Extract qubit interactions per time slice ---
+    print("\nExtracting qubit interactions for visualization...")
+    dag = circuit_to_dag(transpiled_qc)
+    slices_data_for_json = [] # Renamed to avoid confusion if old 'slices_data' was used differently
+    
+    # Create a mapping from Qubit objects to their integer indices in the transpiled circuit
+    qubit_indices = {qubit: i for i, qubit in enumerate(transpiled_qc.qubits)}
+
+    for i, layer in enumerate(dag.layers()):
+        slice_ops = []
+        # layer['graph'] is a DAGCircuit representing the current layer
+        for node in layer['graph'].op_nodes(): # Iterate over actual operation nodes
+            op = node.op
+            op_name = op.name
+            # node.qargs contains the Qubit objects this operation acts on
+            # We need their integer indices
+            op_qubit_indices = [qubit_indices[q] for q in node.qargs]
+            slice_ops.append({"name": op_name, "qubits": op_qubit_indices})
+        
+        if slice_ops: # Only add the slice if it contains operations
+            slices_data_for_json.append(slice_ops)
+            # print(f"Slice {len(slices_data_for_json) - 1}: {slice_ops}") # Optional: for debugging
+
+    num_qubits_for_viz = transpiled_qc.num_qubits # This is the actual number of qubits in the circuit used
+    
+    # Create the data structure for JSON
+    output_data = {
+        "num_qubits": num_qubits_for_viz,
+        "operations_per_slice": slices_data_for_json
+    }
+
+    output_filename = "qft_viz_data.json" # New filename and extension
+
+    with open(output_filename, 'w') as f:
+        json.dump(output_data, f, indent=4) # Use indent for readability
+
+    print(f"Interaction data saved to {output_filename}")
+    print(f"  Number of qubits: {num_qubits_for_viz}")
+    print(f"  Number of time slices: {len(slices_data_for_json)}")
+    # --- End of interaction extraction ---
 
 
 if __name__ == "__main__":

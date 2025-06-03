@@ -84,16 +84,21 @@ export class Playground {
             this.scene,
             this.mouse,
             this.camera,
-            20,
             this.maxHeatmapSlices,
         );
 
-        this.grid.heatmap.material.uniforms.aspect.value =
-            window.innerWidth / window.innerHeight;
-        window.addEventListener("resize", () => {
+        if (this.grid.heatmap) {
             this.grid.heatmap.material.uniforms.aspect.value =
                 window.innerWidth / window.innerHeight;
-        });
+            window.addEventListener("resize", () => {
+                if (this.grid.heatmap) {
+                    this.grid.heatmap.material.uniforms.aspect.value =
+                        window.innerWidth / window.innerHeight;
+                }
+            });
+        } else {
+            console.warn("Heatmap not immediately available after QubitGrid construction.");
+        }
 
         this.heatmapSlicesSlider.addEventListener("input", (event) => {
             const target = event.currentTarget as HTMLInputElement;
@@ -126,6 +131,7 @@ export class Playground {
         instructionText.style.padding = "5px 10px";
         instructionText.style.borderRadius = "5px";
         document.body.appendChild(instructionText);
+        instructionText.remove();
     }
 
     updateLegend() {
@@ -207,7 +213,9 @@ export class Playground {
     animate() {
         requestAnimationFrame(() => this.animate());
 
-        this.grid.heatmap.mesh.renderOrder = -1;
+        if (this.grid && this.grid.heatmap && this.grid.heatmap.mesh) {
+            this.grid.heatmap.mesh.renderOrder = -1;
+        }
 
         this.controls.update();
         this.lightRig.quaternion.copy(this.camera.quaternion);
