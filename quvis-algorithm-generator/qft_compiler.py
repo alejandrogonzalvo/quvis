@@ -167,7 +167,8 @@ def main():
     # Create the data structure for JSON
     output_data = {
         "num_qubits": num_qubits_for_viz,
-        "operations_per_slice": slices_data_for_json
+        "operations_per_slice": slices_data_for_json,
+        "coupling_map": coupling_map_list
     }
 
     output_filename = "qft_viz_data.json" # New filename and extension
