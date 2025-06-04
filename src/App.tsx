@@ -6,6 +6,7 @@ import LayoutControls from "./components/LayoutControls.js"; // Import LayoutCon
 import HeatmapControls from "./components/HeatmapControls.js"; // Import HeatmapControls
 import Tooltip from "./components/Tooltip.js"; // Import the Tooltip component
 import DatasetSelection from "./components/DatasetSelection.js"; // Import the new component
+import VisualizationModeSwitcher from "./components/VisualizationModeSwitcher.js"; // Import the new switcher
 import "./../style.css"; // Assuming global styles are still desired
 
 // Constants for panel height calculations (in pixels)
@@ -39,8 +40,14 @@ const App: React.FC = () => {
     // State for dataset selection
     const [selectedDataset, setSelectedDataset] = useState<string | null>(null);
 
+    // State for visualization mode
+    const [visualizationMode, setVisualizationMode] = useState<
+        "compiled" | "logical"
+    >("compiled");
+
     // State for timeline
-    const [totalSlices, setTotalSlices] = useState<number>(0);
+    const [maxSliceIndex, setMaxSliceIndex] = useState<number>(0); // Renamed from totalSlices, represents max slider index
+    const [actualSliceCount, setActualSliceCount] = useState<number>(0); // New state for the actual number of slices
     const [currentSliceValue, setCurrentSliceValue] = useState<number>(0);
     const [isTimelineInitialized, setIsTimelineInitialized] =
         useState<boolean>(false);
@@ -88,27 +95,28 @@ const App: React.FC = () => {
     const handleDatasetSelect = (datasetName: string) => {
         setSelectedDataset(datasetName);
         // Reset playground and timeline related states if a new dataset is selected
-        // This ensures that if a user goes back and selects a different dataset,
-        // the old playground instance is properly disposed of and states are fresh.
         if (playgroundRef.current) {
             playgroundRef.current.dispose();
             playgroundRef.current = null;
         }
         setIsPlaygroundInitialized(false);
         setIsTimelineInitialized(false);
-        setTotalSlices(0);
+        setMaxSliceIndex(0); // Reset max index
+        setActualSliceCount(0); // Reset actual count
         setCurrentSliceValue(0);
+        // setVisualizationMode("compiled"); // Optionally reset mode on new dataset
     };
 
     // Callback for when QubitGrid has loaded slice data
     const handleSlicesLoaded = (
-        sliceCount: number,
+        sliceCount: number, // This is the actual number of slices from QubitGrid
         initialSliceIndex: number,
     ) => {
         console.log(
             `App: Slices loaded. Count: ${sliceCount}, Initial Index: ${initialSliceIndex}`,
         );
-        setTotalSlices(sliceCount > 0 ? sliceCount - 1 : 0);
+        setActualSliceCount(sliceCount); // Store the raw slice count
+        setMaxSliceIndex(sliceCount > 0 ? sliceCount - 1 : 0); // Max index for slider
         setCurrentSliceValue(initialSliceIndex);
         setIsTimelineInitialized(true);
     };
@@ -127,11 +135,10 @@ const App: React.FC = () => {
     useEffect(() => {
         if (mountRef.current && selectedDataset && !playgroundRef.current) {
             // Check for selectedDataset and ensure playground isn't already initialized
-            // Ensure Playground does not try to access DOM elements for controls during construction
-            // as those have been removed from index.html and commented out in Playground.ts
             const playgroundInstance = new Playground(
                 mountRef.current,
                 selectedDataset, // Pass the selected dataset name
+                visualizationMode, // Pass the current visualization mode
                 handleSlicesLoaded,
                 handleTooltipUpdate,
             );
@@ -163,14 +170,23 @@ const App: React.FC = () => {
                 playgroundRef.current = null;
             }
             setIsTimelineInitialized(false); // Reset on unmount or dataset change
+            setActualSliceCount(0); // Also reset actualSliceCount
             setIsPlaygroundInitialized(false); // Reset on unmount or dataset change
         };
-    }, [selectedDataset]); // Add selectedDataset to dependency array
+    }, [selectedDataset, visualizationMode]); // Add visualizationMode to dependency array
 
     const handleTimelineChange = (newSliceIndex: number) => {
         if (playgroundRef.current) {
             playgroundRef.current.setCurrentSlice(newSliceIndex);
             setCurrentSliceValue(newSliceIndex);
+        }
+    };
+
+    const handleModeChange = (mode: "compiled" | "logical") => {
+        if (visualizationMode !== mode) {
+            setVisualizationMode(mode);
+            // The useEffect hook watching selectedDataset and visualizationMode
+            // will handle disposing and re-creating the Playground instance.
         }
     };
 
@@ -180,6 +196,11 @@ const App: React.FC = () => {
                 <DatasetSelection onSelect={handleDatasetSelect} />
             ) : (
                 <>
+                    <VisualizationModeSwitcher
+                        currentMode={visualizationMode}
+                        onModeChange={handleModeChange}
+                        disabled={!isPlaygroundInitialized} // Disable while playground is loading/initializing
+                    />
                     {/* Container for the Three.js canvas */}
                     <div
                         ref={mountRef}
@@ -214,17 +235,17 @@ const App: React.FC = () => {
                         </>
                     )}
 
-                    {isTimelineInitialized && totalSlices > 0 && (
+                    {isTimelineInitialized && actualSliceCount > 0 && (
                         <TimelineSlider
                             min={0}
-                            max={totalSlices}
+                            max={maxSliceIndex} // Use maxSliceIndex for the slider's max prop
                             value={currentSliceValue}
                             onChange={handleTimelineChange}
-                            disabled={totalSlices === 0}
+                            disabled={actualSliceCount === 0} // Or simply actualSliceCount <= 1 for single slice no-slide
                             label="Time Slice"
                         />
                     )}
-                    {isTimelineInitialized && totalSlices === 0 && (
+                    {isTimelineInitialized && actualSliceCount === 0 && (
                         <div
                             style={{
                                 position: "fixed",

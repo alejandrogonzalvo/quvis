@@ -76,15 +76,18 @@ export class Playground {
     private boundOnMouseLeave: () => void;
     public readonly instanceId: string; // For debugging
     private readonly datasetName: string; // To store the selected dataset name
+    private readonly visualizationMode: "compiled" | "logical"; // Added to store the mode
 
     constructor(
         container: HTMLElement | undefined, // Made container explicitly possibly undefined to match usage
         datasetName: string, // New parameter for the dataset name
+        visualizationMode: "compiled" | "logical", // New parameter for visualization mode
         onSlicesLoadedCallback?: (count: number, initialIndex: number) => void,
         onTooltipUpdate?: (data: TooltipData | null) => void, // Added callback for tooltip
     ) {
         this.containerElement = container || null;
         this.datasetName = datasetName; // Store the dataset name
+        this.visualizationMode = visualizationMode; // Store the visualization mode
         this.onSlicesLoadedCallback = onSlicesLoadedCallback;
         this.onTooltipUpdateCallback = onTooltipUpdate; // Store the callback
         this.scene = new THREE.Scene();
@@ -153,6 +156,7 @@ export class Playground {
             this.mouse,
             this.camera,
             this.datasetName, // Pass datasetName to QubitGrid
+            this.visualizationMode, // Pass visualizationMode to QubitGrid
             this.maxHeatmapSlices,
             this.currentRepelForce,
             this.currentIdealDistance,
