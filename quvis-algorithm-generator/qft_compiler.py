@@ -6,41 +6,12 @@ from qiskit.converters import circuit_to_dag
 # import numpy as np # No longer needed for direct JSON output
 import json
 # import time # No longer needed for timestamped filename in this simplified approach
-import argparse # Import argparse
-
-
-def create_nxn_grid_coupling_map(n: int) -> list[list[int]]:
-    """
-    Generates a coupling map for an n x n grid of qubits.
-    Qubits are numbered row by row, from 0 to n*n - 1.
-    """
-    if n <= 0:
-        raise ValueError("n must be a positive integer")
-    if n == 1:  # Single qubit, no connections
-        return []
-
-    coupling_map = []
-    num_qubits_grid = n * n # Renamed to avoid conflict with transpiled_qc.num_qubits
-    for i in range(num_qubits_grid):
-        row, col = divmod(i, n)
-
-        if col < n - 1:
-            right_neighbor = i + 1
-            coupling_map.append([i, right_neighbor])
-            coupling_map.append([right_neighbor, i])
-
-        if row < n - 1:
-            bottom_neighbor = i + n
-            coupling_map.append([i, bottom_neighbor])
-            coupling_map.append([bottom_neighbor, i])
-
-    unique_couplings = {frozenset(pair) for pair in coupling_map}
-    return [list(pair) for pair in unique_couplings]
+import argparse
 
 
 def main():
     # --- Argument Parsing --- 
-    parser = argparse.ArgumentParser(description="Compile a QFT circuit and extract interactions.")
+    parser = argparse.ArgumentParser(description="Compile a QFT circuit for a given device topology (from file) and extract interactions.")
     parser.add_argument(
         "-q", "--qft_qubits", 
         type=int, 
@@ -48,39 +19,63 @@ def main():
         help="Number of qubits for the QFT circuit (default: 3)"
     )
     parser.add_argument(
-        "-g", "--grid_size",
-        type=int,
-        default=3,
-        help="Dimension of the n x n grid for qubit coupling (default: 3, for a 3x3 grid)"
+        "--coupling_map_file",
+        type=str,
+        required=True,
+        help="Path to the JSON file containing the device coupling map and info."
     )
     args = parser.parse_args()
 
     # --- Configuration from args ---
-    n_grid_size = args.grid_size
     m_qft_qubits = args.qft_qubits
+    coupling_map_filepath = args.coupling_map_file
     # ---------------------
 
-    print(f"Config: QFT qubits = {m_qft_qubits}, Grid size = {n_grid_size}x{n_grid_size}")
+    # --- Load Coupling Map from File ---
+    print(f"Loading coupling map from: {coupling_map_filepath}")
+    try:
+        with open(coupling_map_filepath, 'r') as f:
+            device_data = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: Coupling map file not found at {coupling_map_filepath}")
+        return
+    except json.JSONDecodeError:
+        print(f"Error: Could not decode JSON from {coupling_map_filepath}")
+        return
 
-    if m_qft_qubits > n_grid_size * n_grid_size:
+    coupling_map_list = device_data.get("coupling_map")
+    num_device_qubits = device_data.get("num_qubits")
+    topology_type = device_data.get("topology_type", "unknown")
+
+    if coupling_map_list is None or num_device_qubits is None:
+        print("Error: The coupling map file must contain 'coupling_map' (list) and 'num_qubits' (int).")
+        return
+
+    if not isinstance(num_device_qubits, int) or num_device_qubits <= 0:
+        print(f"Error: 'num_qubits' in {coupling_map_filepath} must be a positive integer. Found: {num_device_qubits}")
+        return
+
+    print(f"Successfully loaded device data: Topology='{topology_type}', Device Qubits='{num_device_qubits}'")
+    # --- End Load Coupling Map ---
+
+    print(f"Config: QFT qubits = {m_qft_qubits}, Device Qubits (from file) = {num_device_qubits}")
+
+    if m_qft_qubits > num_device_qubits:
         print(
-            f"Warning: QFT circuit has {m_qft_qubits} qubits, but the grid only has {n_grid_size * n_grid_size} qubits."
+            f"Warning: QFT circuit has {m_qft_qubits} qubits, but the device (from {coupling_map_filepath}) only has {num_device_qubits} qubits."
         )
         print(
-            "Compilation might fail or produce a very inefficient circuit if m > n*n."
+            "Compilation might fail or produce a very inefficient circuit if QFT qubits > device qubits."
         )
         # Decide if we should proceed or exit. For now, let's proceed.
         # return
 
-    print(f"Defining a {n_grid_size}x{n_grid_size} quantum processor grid.")
-    coupling_map_list = create_nxn_grid_coupling_map(n_grid_size)
-
-    if not coupling_map_list and n_grid_size > 1:  # Should not happen if n > 1
+    if not coupling_map_list and num_device_qubits > 1: 
         print(
-            f"Generated an empty coupling map for n={n_grid_size}. This might be an issue."
+            f"Warning: Loaded an empty coupling map for a device with {num_device_qubits} qubits from {coupling_map_filepath}. This might be an issue if num_device_qubits > 1."
         )
-    elif n_grid_size > 1:
-        print(f"Generated coupling map: {coupling_map_list}")
+    elif coupling_map_list:
+        print(f"Using coupling map (loaded from file): {coupling_map_list}")
 
     # Create QFT circuit
     print(
@@ -94,30 +89,20 @@ def main():
         approximation_degree=0,
         insert_barriers=False,
     )
-    # Ensure the circuit has a name for drawing, if QFT doesn't set one by default.
-    # qft_qc.name = "QFT" # The QFT class likely sets a name, but this is a fallback.
-    # The QFT object from the library is already a QuantumCircuit instance.
 
     # --- DECOMPOSE THE QFT CIRCUIT FOR THE LOGICAL VIEW ---
     print("\nDecomposing the original QFT circuit into standard gates for logical view...")
-    # Choose a basis set you consider 'logical' or 'standard'.
-    # This decomposition happens assuming all-to-all connectivity (no coupling_map specified here).
+
     logical_basis_gates = ['u3', 'cx'] # Example: or ['u', 'cx'], or ['h', 's', 'sdg', 'cx', 'u1', 'u2', 'u3'] etc.
     # You might want to experiment with different basis gates.
     # Using qft_qc.decompose() might also work to break it down one level,
     # but transpile with a basis set is more thorough.
     decomposed_qft_qc = transpile(qft_qc, basis_gates=logical_basis_gates, optimization_level=0) 
-                                        # optimization_level=0 to minimize changes beyond decomposition
-
-    print("Decomposed QFT circuit for logical view (using qiskit.transpile):")
-    # print(decomposed_qft_qc.draw(output='text')) # Optional: print the decomposed circuit
 
     # --- Extract interactions from the DECOMPOSED (logical) QFT circuit ---
     print("\nExtracting logical interactions from the decomposed QFT circuit...")
-    # Use the decomposed_qft_qc now
     original_dag = circuit_to_dag(decomposed_qft_qc) 
     logical_operations_per_slice = []
-    # Qubit indices should be based on the decomposed circuit's qubits
     logical_qubit_indices = {qubit: i for i, qubit in enumerate(decomposed_qft_qc.qubits)}
 
 
@@ -145,7 +130,7 @@ def main():
     # will try to map the m logical qubits to a subset of the n*n physical qubits.
     # The `optimization_level` can be adjusted for different trade-offs.
     print(
-        f"\nTranspiling QFT circuit for the {n_grid_size}x{n_grid_size} grid topology..."
+        f"\nTranspiling QFT circuit for the device topology (from {coupling_map_filepath})..."
     )
 
     # For transpilation, all qubits in the circuit must be addressable by the coupling map.
@@ -154,7 +139,7 @@ def main():
     # The transpiler handles this mapping.
 
     # Create a CouplingMap object if you have a list of lists
-    custom_coupling_map = CouplingMap(couplinglist=coupling_map_list)
+    custom_coupling_map = CouplingMap(couplinglist=coupling_map_list) if coupling_map_list else None
 
     # Transpile the circuit
     # For a custom device with only a coupling map, we don't specify a backend.
@@ -162,11 +147,16 @@ def main():
     # If the coupling map involves more qubits than m_qft_qubits, the transpiler
     # will choose a layout. The final circuit will act on a subset of the device qubits.
 
+    transpile_options = {
+        "basis_gates": ["u1", "u2", "u3", "cx"],
+        "optimization_level": 3,
+    }
+    if custom_coupling_map:
+        transpile_options["coupling_map"] = custom_coupling_map
+
     transpiled_qc = transpile(
         qft_qc,
-        coupling_map=custom_coupling_map,
-        basis_gates=["u1", "u2", "u3", "cx"],  # Example basis gates
-        optimization_level=3,  # Higher level for potentially better, but slower, optimization
+        **transpile_options
     )
 
     # --- Extract qubit interactions per time slice from the transpiled circuit ---
@@ -205,7 +195,9 @@ def main():
             "compiled_interaction_graph_ops_per_slice": compiled_operations_per_slice
         },
         "device_info": {
-            "num_qubits_on_device": n_grid_size * n_grid_size, # Total physical qubits on device
+            "source_coupling_map_file": coupling_map_filepath,
+            "topology_type": topology_type,
+            "num_qubits_on_device": num_device_qubits,
             "connectivity_graph_coupling_map": coupling_map_list
         }
     }
@@ -218,7 +210,7 @@ def main():
     print(f"\nInteraction data saved to {output_filename}")
     print(f"  Logical circuit: {decomposed_qft_qc.num_qubits} qubits, {len(logical_operations_per_slice)} slices.")
     print(f"  Compiled circuit: {num_qubits_in_compiled_circuit} qubits, {len(compiled_operations_per_slice)} slices.")
-    print(f"  Device: {n_grid_size * n_grid_size} qubits on an {n_grid_size}x{n_grid_size} grid.")
+    print(f"  Device: {num_device_qubits} qubits, topology '{topology_type}' (loaded from {coupling_map_filepath}).")
     # --- End of interaction extraction ---
 
 
