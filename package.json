@@ -1,6 +1,6 @@
 {
   "name": "quvis",
-  "version": "0.8.5",
+  "version": "0.9.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
