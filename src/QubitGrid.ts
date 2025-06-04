@@ -12,10 +12,25 @@ interface QubitOperation {
     qubits: number[];
 }
 
-interface VizData {
+interface LogicalCircuitInfo {
     num_qubits: number;
-    operations_per_slice: QubitOperation[][];
-    coupling_map?: number[][];
+    interaction_graph_ops_per_slice: QubitOperation[][];
+}
+
+interface CompiledCircuitInfo {
+    num_qubits: number;
+    compiled_interaction_graph_ops_per_slice: QubitOperation[][];
+}
+
+interface DeviceInfo {
+    num_qubits_on_device: number;
+    connectivity_graph_coupling_map: number[][];
+}
+
+interface QFTVizData {
+    logical_circuit_info: LogicalCircuitInfo;
+    compiled_circuit_info: CompiledCircuitInfo;
+    device_info: DeviceInfo;
 }
 
 const CYLINDER_VERTEX_SHADER = `
@@ -90,6 +105,7 @@ export class QubitGrid {
     private readonly heatmapYellowThreshold = 0.5;
     private readonly heatmapWeightBase = 1.3;
     private readonly datasetName: string;
+    private readonly visualizationMode: "compiled" | "logical";
 
     get current_slice_data(): Slice | null {
         if (
@@ -107,6 +123,7 @@ export class QubitGrid {
         mouse: THREE.Vector2,
         camera: THREE.PerspectiveCamera,
         datasetName: string,
+        visualizationMode: "compiled" | "logical",
         initialMaxSlicesForHeatmap: number = 10,
         initialKRepel: number = 0.3,
         initialIdealDist: number = 5.0,
@@ -135,6 +152,7 @@ export class QubitGrid {
 
         this.camera = camera;
         this.datasetName = datasetName;
+        this.visualizationMode = visualizationMode;
 
         this.timeline = new Timeline((sliceIndex) =>
             this.loadStateFromSlice(sliceIndex),
@@ -381,15 +399,116 @@ export class QubitGrid {
         this.lastEffectiveSlicesForHeatmap = 0;
 
         try {
+            console.log(`Fetching data from: ${url}`);
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            const vizData = (await response.json()) as VizData;
+            const jsonData: QFTVizData = await response.json();
+            console.log("Successfully fetched and parsed JSON data:", jsonData);
 
-            this._qubit_count = vizData.num_qubits;
-            this.couplingMap = vizData.coupling_map || null;
+            let num_qubits_for_mode: number;
+            let operations_list_for_mode: QubitOperation[][];
 
+            if (this.visualizationMode === "logical") {
+                console.log("LOGICAL MODE SELECTED");
+                console.log(
+                    "jsonData.logical_circuit_info:",
+                    jsonData.logical_circuit_info,
+                );
+                if (jsonData.logical_circuit_info) {
+                    num_qubits_for_mode =
+                        jsonData.logical_circuit_info.num_qubits;
+                    operations_list_for_mode =
+                        jsonData.logical_circuit_info
+                            .interaction_graph_ops_per_slice;
+                    console.log("Logical num_qubits:", num_qubits_for_mode);
+                    console.log(
+                        "Logical operations_list_for_mode:",
+                        operations_list_for_mode,
+                    );
+                    if (!operations_list_for_mode) {
+                        console.error(
+                            "ERROR: Logical operations_list_for_mode is undefined/null AFTER assignment!",
+                        );
+                    } else if (!Array.isArray(operations_list_for_mode)) {
+                        console.error(
+                            "ERROR: Logical operations_list_for_mode is NOT AN ARRAY!",
+                        );
+                    }
+                } else {
+                    console.error(
+                        "ERROR: jsonData.logical_circuit_info IS UNDEFINED!",
+                    );
+                    // Fallback to prevent further errors, though this indicates a major issue
+                    num_qubits_for_mode = 0;
+                    operations_list_for_mode = [];
+                }
+            } else {
+                // "compiled"
+                console.log("COMPILED MODE SELECTED");
+                console.log(
+                    "jsonData.compiled_circuit_info:",
+                    jsonData.compiled_circuit_info,
+                );
+                num_qubits_for_mode = jsonData.compiled_circuit_info.num_qubits;
+                operations_list_for_mode =
+                    jsonData.compiled_circuit_info
+                        .compiled_interaction_graph_ops_per_slice;
+                console.log("Compiled num_qubits:", num_qubits_for_mode);
+                console.log(
+                    "Compiled operations_list_for_mode:",
+                    operations_list_for_mode,
+                );
+            }
+
+            this._qubit_count = num_qubits_for_mode;
+            // Always load the coupling map from device_info if available.
+            // Positioning will use it. Drawing connections will be mode-dependent.
+            this.couplingMap =
+                jsonData.device_info.connectivity_graph_coupling_map;
+
+            // Determine grid dimensions based on the number of qubits in the selected view
+            this._grid_cols = Math.ceil(Math.sqrt(this._qubit_count));
+            this._grid_rows = Math.ceil(this._qubit_count / this._grid_cols);
+
+            this.slices = operations_list_for_mode.map(
+                (ops_in_slice, sliceIdx) => {
+                    const slice = new Slice(sliceIdx); // Correct constructor call
+                    const interactionPairs: Array<{ q1: number; q2: number }> =
+                        [];
+
+                    ops_in_slice.forEach((op) => {
+                        op.qubits.forEach((qid) =>
+                            slice.interacting_qubits.add(qid),
+                        ); // Populate interacting_qubits
+                        if (op.qubits.length === 2) {
+                            interactionPairs.push({
+                                q1: op.qubits[0],
+                                q2: op.qubits[1],
+                            });
+                        }
+                    });
+                    this.interactionPairsPerSlice.push(interactionPairs);
+                    return slice;
+                },
+            );
+
+            console.log(
+                `Processing complete. Number of slices generated: ${this.slices.length}`,
+            );
+
+            if (this.slices.length > 0) {
+                this.current_slice_index = 0; // Start at the first slice
+                this.timeline.setSliceCount(this.slices.length); // Corrected Timeline method
+                this.timeline.setSlice(this.current_slice_index); // Corrected Timeline method
+                this.loadStateFromSlice(this.current_slice_index); // Load initial state
+            } else {
+                this.current_slice_index = -1;
+                this.timeline.setSliceCount(0); // Corrected Timeline method
+            }
+
+            // Re-create heatmap if qubit count changed for the new mode
             if (
                 this.heatmap &&
                 this.heatmap.mesh.geometry.attributes.position.count !==
@@ -403,19 +522,10 @@ export class QubitGrid {
                     this.maxSlicesForHeatmap,
                 );
                 this.scene.add(this.heatmap.mesh);
-                if (this.heatmapLegend) {
-                    const effectiveSlices =
-                        this.maxSlicesForHeatmap === -1
-                            ? 0
-                            : this.maxSlicesForHeatmap;
-                    this.heatmapLegend.update(
-                        this.maxSlicesForHeatmap,
-                        effectiveSlices,
-                        0,
-                    );
-                }
+                // Legend update is handled by refreshLegend below
             }
 
+            // Pass the potentially nulled-out couplingMap for logical mode
             this.calculateQubitPositions(
                 this._qubit_count,
                 this.couplingMap,
@@ -424,50 +534,21 @@ export class QubitGrid {
                 10,
             );
             this.createGrid();
+            this.drawConnections(); // Initial drawing of connections
+            this.updateQubitOpacities(); // Update opacities based on the initial slice
 
-            this.slices = vizData.operations_per_slice.map((rawSlice, t) => {
-                const newSlice = new Slice(t);
-                const currentSlicePairs: Array<{ q1: number; q2: number }> = [];
-                rawSlice.forEach((op) => {
-                    op.qubits.forEach((qid) =>
-                        newSlice.interacting_qubits.add(qid),
-                    );
-                    if (op.qubits.length === 2) {
-                        currentSlicePairs.push({
-                            q1: op.qubits[0],
-                            q2: op.qubits[1],
-                        });
-                    }
-                });
-                this.interactionPairsPerSlice.push(currentSlicePairs);
-                return newSlice;
-            });
-
-            if (this.slices.length > 0) {
-                this.current_slice_index = 0;
-                this.loadStateFromSlice(this.current_slice_index);
-                this.timeline.setSliceCount(this.slices.length);
-                if (this.onSlicesLoadedCallback) {
-                    this.onSlicesLoadedCallback(
-                        this.slices.length,
-                        this.current_slice_index,
-                    );
-                }
-            } else {
-                this.current_slice_index = -1;
-                if (this.onSlicesLoadedCallback) {
-                    this.onSlicesLoadedCallback(0, -1);
-                }
+            if (this.onSlicesLoadedCallback) {
+                this.onSlicesLoadedCallback(
+                    this.slices.length,
+                    this.current_slice_index,
+                );
             }
-
-            this.drawConnections();
-            this.updateQubitOpacities();
+            this.refreshLegend(); // Refresh legend after data is loaded
         } catch (error) {
-            console.error("Error loading or processing slice data:", error);
             this.handleLoadError(
-                error as Error,
+                error instanceof Error ? error : new Error(String(error)),
                 camera,
-                "Failed to load quantum circuit data.",
+                `Failed to load or parse data from ${url}`,
             );
         }
     }
@@ -618,7 +699,68 @@ export class QubitGrid {
     }
 
     drawConnections() {
-        this.clearConnectionCylinders();
+        this.clearConnectionCylinders(); // Always clear previous connections
+
+        const yAxis = new THREE.Vector3(0, 1, 0); // Define yAxis for cylinder orientation
+
+        if (this.visualizationMode === "logical") {
+            // In logical mode, draw connections for active 2-qubit gates in the current slice.
+            if (
+                this.current_slice_index >= 0 &&
+                this.current_slice_index < this.interactionPairsPerSlice.length
+            ) {
+                const currentSliceInteractionPairs =
+                    this.interactionPairsPerSlice[this.current_slice_index];
+                currentSliceInteractionPairs.forEach((pair) => {
+                    const posA = this.qubitPositions.get(pair.q1);
+                    const posB = this.qubitPositions.get(pair.q2);
+
+                    if (posA && posB) {
+                        const distance = posA.distanceTo(posB);
+                        if (distance === 0) return;
+
+                        const material = new THREE.ShaderMaterial({
+                            vertexShader: CYLINDER_VERTEX_SHADER,
+                            fragmentShader: CYLINDER_FRAGMENT_SHADER,
+                            uniforms: {
+                                uIntensity: { value: 0.5 }, // Bright yellow for active logical gate
+                                uInactiveAlpha: { value: 1.0 }, // Opaque
+                            },
+                            transparent: true, // Should be true if alpha can be < 1, though here it's fixed
+                        });
+
+                        const cylinderGeo = new THREE.CylinderGeometry(
+                            this.currentConnectionThickness,
+                            this.currentConnectionThickness,
+                            distance,
+                            8, // segmentsRadial
+                            1, // segmentsHeight
+                        );
+                        const cylinderMesh = new THREE.Mesh(
+                            cylinderGeo,
+                            material,
+                        );
+                        cylinderMesh.position
+                            .copy(posA)
+                            .add(posB)
+                            .multiplyScalar(0.5);
+                        const direction = new THREE.Vector3()
+                            .subVectors(posB, posA)
+                            .normalize();
+                        const quaternion =
+                            new THREE.Quaternion().setFromUnitVectors(
+                                yAxis,
+                                direction,
+                            );
+                        cylinderMesh.quaternion.copy(quaternion);
+                        this.connectionLines.add(cylinderMesh);
+                    }
+                });
+            }
+            return;
+        }
+
+        // Proceed to draw connections based on couplingMap for compiled mode (existing logic)
         if (
             !this.couplingMap ||
             this.couplingMap.length === 0 ||
@@ -629,7 +771,6 @@ export class QubitGrid {
             return;
         }
 
-        const yAxis = new THREE.Vector3(0, 1, 0);
         const weight_base = 1.3;
 
         const windowEndSlice = this.current_slice_index + 1;

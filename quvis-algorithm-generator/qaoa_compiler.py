@@ -127,7 +127,33 @@ def main():
             qaoa_qc.rx(2 * beta, i)
 
     print("Original QAOA circuit:")
-    print(qaoa_qc.draw(output="text"))
+    # print(qaoa_qc.draw(output="text")) # Keep this commented or use if needed for debugging
+
+    # --- Extract interactions from the original (logical) QAOA circuit ---
+    print("\nExtracting logical interactions from the original QAOA circuit...")
+    # The qaoa_qc is already built from relatively elementary gates, suitable for a logical view before device mapping.
+    # If a specific basis decomposition is desired here (e.g. strictly u3, cx), 
+    # one could add: decomposed_logical_qc = transpile(qaoa_qc, basis_gates=[...], optimization_level=0)
+    # And then use decomposed_logical_qc below. For now, we use qaoa_qc directly.
+    logical_dag = circuit_to_dag(qaoa_qc) 
+    logical_operations_per_slice = []
+    logical_qubit_indices = {qubit: i for i, qubit in enumerate(qaoa_qc.qubits)}
+
+    for i, layer in enumerate(logical_dag.layers()):
+        slice_ops = []
+        for node in layer['graph'].op_nodes():
+            op = node.op
+            op_name = op.name
+            op_qubit_indices = [logical_qubit_indices[q] for q in node.qargs]
+            slice_ops.append({"name": op_name, "qubits": op_qubit_indices})
+        if slice_ops:
+            logical_operations_per_slice.append(slice_ops)
+    
+    num_logical_qubits = qaoa_qc.num_qubits
+    print(f"  Number of logical qubits: {num_logical_qubits}")
+    print(f"  Number of time slices in logical circuit: {len(logical_operations_per_slice)}")
+    # --- End of logical interaction extraction ---
+
 
     # Transpile the QAOA circuit for the ring
     # Create CouplingMap object if the list is not empty, otherwise pass None
@@ -158,38 +184,48 @@ def main():
     )
 
     print("\nTranspiled QAOA circuit:")
-    print(transpiled_qc.draw(output="text"))
+    # print(transpiled_qc.draw(output="text")) # Keep this commented or use if needed for debugging
 
     print("\nQASM for the transpiled circuit:")
-    print(qasm3.dumps(transpiled_qc))
+    # print(qasm3.dumps(transpiled_qc)) # Keep this commented or use if needed for debugging
 
-    # --- Extract qubit interactions per time slice ---
-    print("\nExtracting qubit interactions for visualization...")
-    dag = circuit_to_dag(transpiled_qc)
-    slices_data_for_json = [] 
+    # --- Extract qubit interactions per time slice from transpiled circuit ---
+    print("\nExtracting compiled qubit interactions for visualization...") # Changed print message
+    compiled_dag = circuit_to_dag(transpiled_qc) # Renamed dag to compiled_dag
+    compiled_operations_per_slice = [] # Renamed slices_data_for_json
     
-    qubit_indices = {qubit: i for i, qubit in enumerate(transpiled_qc.qubits)}
+    compiled_qubit_indices = {qubit: i for i, qubit in enumerate(transpiled_qc.qubits)} # Renamed qubit_indices
 
-    for i, layer in enumerate(dag.layers()):
+    for i, layer in enumerate(compiled_dag.layers()): # Use compiled_dag
         slice_ops = []
-        # layer['graph'] is a DAGCircuit representing the current layer
-        for node in layer['graph'].op_nodes(): # Iterate over actual operation nodes
+        for node in layer['graph'].op_nodes(): 
             op = node.op
             op_name = op.name
-            # node.qargs contains the Qubit objects this operation acts on
-            # We need their integer indices
-            op_qubit_indices = [qubit_indices[q] for q in node.qargs]
+            op_qubit_indices = [compiled_qubit_indices[q] for q in node.qargs]
             slice_ops.append({"name": op_name, "qubits": op_qubit_indices})
         
-        if slice_ops: # Only add the slice if it contains operations
-            slices_data_for_json.append(slice_ops)
+        if slice_ops: 
+            compiled_operations_per_slice.append(slice_ops)
 
-    num_qubits_for_viz = transpiled_qc.num_qubits # This is the actual number of qubits in the circuit used
-    
+    num_compiled_qubits = transpiled_qc.num_qubits # Renamed num_qubits_for_viz
+    print(f"  Number of compiled qubits: {num_compiled_qubits}") # Added print for compiled info
+    print(f"  Number of time slices in compiled circuit: {len(compiled_operations_per_slice)}") # Added print for compiled info
+    # --- End of compiled interaction extraction ---
+
+    # Create the data structure for JSON
     output_data = {
-        "num_qubits": num_qubits_for_viz,
-        "operations_per_slice": slices_data_for_json,
-        "coupling_map": coupling_map_list
+        "logical_circuit_info": {
+            "num_qubits": num_logical_qubits,
+            "interaction_graph_ops_per_slice": logical_operations_per_slice
+        },
+        "compiled_circuit_info": {
+            "num_qubits": num_compiled_qubits,
+            "compiled_interaction_graph_ops_per_slice": compiled_operations_per_slice
+        },
+        "device_info": {
+            "num_qubits_on_device": num_device_qubits, 
+            "connectivity_graph_coupling_map": coupling_map_list
+        }
     }
 
     output_filename = "qaoa_viz_data.json" 
@@ -197,10 +233,11 @@ def main():
     with open(output_filename, 'w') as f:
         json.dump(output_data, f, indent=4)
 
-    print(f"Interaction data saved to {output_filename}")
-    print(f"  Number of qubits: {num_qubits_for_viz}")
-    print(f"  Number of time slices: {len(slices_data_for_json)}")
-    # --- End of interaction extraction ---
+    print(f"\nInteraction data saved to {output_filename}")
+    # Updated print statements to reflect both logical and compiled data
+    print(f"  Logical circuit: {num_logical_qubits} qubits, {len(logical_operations_per_slice)} slices.")
+    print(f"  Compiled circuit: {num_compiled_qubits} qubits, {len(compiled_operations_per_slice)} slices.")
+    print(f"  Device: {num_device_qubits} qubits on a ring topology.")
 
 
 if __name__ == "__main__":
