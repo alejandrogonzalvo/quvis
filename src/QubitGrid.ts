@@ -5,6 +5,7 @@ import { State } from "./State.js";
 import { Heatmap } from "./Heatmap.js";
 import { Slice } from "./Slice.js";
 import { BlochSphere } from "./BlochSphere.js";
+import { HeatmapLegend } from "./Legend.js";
 
 interface QubitOperation {
     name: string;
@@ -60,6 +61,8 @@ export class QubitGrid {
     private connectionLines: THREE.Group;
     private qubitPositions: Map<number, THREE.Vector3> = new Map();
     private lastCalculatedSlicesChangeIDs: Array<Set<number>> = [];
+    public lastMaxObservedRawHeatmapSum: number = 0;
+    public lastEffectiveSlicesForHeatmap: number = 0;
 
     public qubitInstances: Map<number, Qubit> = new Map();
     private current_slice_index: number = 0;
@@ -80,6 +83,12 @@ export class QubitGrid {
     private onSlicesLoadedCallback:
         | ((count: number, initialIndex: number) => void)
         | undefined;
+
+    private camera: THREE.PerspectiveCamera;
+    heatmapLegend!: HeatmapLegend;
+    private readonly heatmapLegendContainerId = "heatmap-legend-container";
+    private readonly heatmapYellowThreshold = 0.5;
+    private readonly heatmapWeightBase = 1.3;
 
     get current_slice_data(): Slice | null {
         if (
@@ -122,6 +131,8 @@ export class QubitGrid {
         this.currentInactiveElementAlpha = initialInactiveElementAlpha;
         this.onSlicesLoadedCallback = onSlicesLoadedCallback;
 
+        this.camera = camera;
+
         this.timeline = new Timeline((sliceIndex) =>
             this.loadStateFromSlice(sliceIndex),
         );
@@ -130,6 +141,33 @@ export class QubitGrid {
 
         this.heatmap = new Heatmap(camera, 1, this.maxSlicesForHeatmap);
         this.scene.add(this.heatmap.mesh);
+
+        this.heatmapLegend = new HeatmapLegend(
+            this.heatmapLegendContainerId,
+            this.heatmapYellowThreshold,
+        );
+        if (this.heatmapLegend) {
+            let initialEffectiveSlices = 0;
+            if (this.maxSlicesForHeatmap === -1) {
+                initialEffectiveSlices = Math.max(
+                    0,
+                    this.current_slice_index + 1,
+                );
+            } else {
+                initialEffectiveSlices = Math.max(
+                    0,
+                    Math.min(
+                        this.current_slice_index + 1,
+                        this.maxSlicesForHeatmap,
+                    ),
+                );
+            }
+            this.heatmapLegend.update(
+                this.maxSlicesForHeatmap,
+                initialEffectiveSlices,
+                0,
+            );
+        }
 
         this.loadSlicesFromJSON("/quvis/qft_viz_data.json", camera);
     }
@@ -286,6 +324,29 @@ export class QubitGrid {
             this.maxSlicesForHeatmap,
         );
         if (this.heatmap.mesh) this.scene.add(this.heatmap.mesh);
+
+        this.heatmap.updatePoints(new Map(), -1, []);
+
+        this.lastMaxObservedRawHeatmapSum = 0;
+        this.lastEffectiveSlicesForHeatmap =
+            this.maxSlicesForHeatmap === -1
+                ? this.current_slice_index + 1
+                : Math.min(
+                      this.current_slice_index + 1,
+                      this.maxSlicesForHeatmap,
+                  );
+        this.lastEffectiveSlicesForHeatmap = Math.max(
+            0,
+            this.lastEffectiveSlicesForHeatmap,
+        );
+
+        if (this.heatmapLegend) {
+            this.heatmapLegend.update(
+                this.maxSlicesForHeatmap,
+                this.lastEffectiveSlicesForHeatmap,
+                0,
+            );
+        }
         const errorAreaSize = 10;
         this.calculateQubitPositions(
             this._qubit_count,
@@ -312,6 +373,8 @@ export class QubitGrid {
         this.qubitInstances.forEach((qubit) => qubit.dispose());
         this.qubitInstances.clear();
         this.heatmap.clearPositionsCache();
+        this.lastMaxObservedRawHeatmapSum = 0;
+        this.lastEffectiveSlicesForHeatmap = 0;
 
         try {
             const response = await fetch(url);
@@ -336,6 +399,17 @@ export class QubitGrid {
                     this.maxSlicesForHeatmap,
                 );
                 this.scene.add(this.heatmap.mesh);
+                if (this.heatmapLegend) {
+                    const effectiveSlices =
+                        this.maxSlicesForHeatmap === -1
+                            ? 0
+                            : this.maxSlicesForHeatmap;
+                    this.heatmapLegend.update(
+                        this.maxSlicesForHeatmap,
+                        effectiveSlices,
+                        0,
+                    );
+                }
             }
 
             this.calculateQubitPositions(
@@ -399,10 +473,11 @@ export class QubitGrid {
             this.qubitInstances.size === 0 &&
             (this.slices.length === 0 || this.current_slice_index < 0)
         ) {
-            if (this.heatmap) this.heatmap.updatePoints(new Map(), [], -1, []);
+            if (this.heatmap) this.heatmap.updatePoints(new Map(), -1, []);
             this.lastCalculatedSlicesChangeIDs = [];
             this.updateQubitOpacities();
             this.drawConnections();
+            this.refreshLegend();
             return;
         }
         if (
@@ -440,23 +515,25 @@ export class QubitGrid {
         }
         this.lastCalculatedSlicesChangeIDs = slicesChangeIDs;
         if (this.heatmap) {
-            if (
-                this.qubitInstances.size > 0 &&
-                this.interactionPairsPerSlice &&
-                this.slices
-            ) {
-                this.heatmap.updatePoints(
+            if (this.qubitInstances.size > 0 && this.slices) {
+                const heatmapUpdateResults = this.heatmap.updatePoints(
                     this.qubitInstances,
-                    this.interactionPairsPerSlice,
                     this.current_slice_index,
                     this.slices,
                 );
+                this.lastMaxObservedRawHeatmapSum =
+                    heatmapUpdateResults.maxObservedRawWeightedSum;
+                this.lastEffectiveSlicesForHeatmap =
+                    heatmapUpdateResults.numSlicesEffectivelyUsed;
             } else {
-                this.heatmap.updatePoints(new Map(), [], -1, []);
+                this.heatmap.updatePoints(new Map(), -1, []);
+                this.lastMaxObservedRawHeatmapSum = 0;
+                this.lastEffectiveSlicesForHeatmap = 0;
             }
         }
         this.updateQubitOpacities();
         this.drawConnections();
+        this.refreshLegend();
     }
 
     private updateQubitOpacities() {
@@ -542,90 +619,171 @@ export class QubitGrid {
             !this.couplingMap ||
             this.couplingMap.length === 0 ||
             !this.qubitPositions ||
-            this.qubitPositions.size === 0
+            this.qubitPositions.size === 0 ||
+            !this.interactionPairsPerSlice
         ) {
             return;
         }
 
         const yAxis = new THREE.Vector3(0, 1, 0);
-        const currentSlicesChangeData = this.lastCalculatedSlicesChangeIDs;
+        const weight_base = 1.3;
 
-        this.couplingMap.forEach((pair) => {
+        const windowEndSlice = this.current_slice_index + 1;
+        let windowStartSlice;
+        if (this.maxSlicesForHeatmap === -1) {
+            windowStartSlice = 0;
+        } else {
+            windowStartSlice = Math.max(
+                0,
+                windowEndSlice - this.maxSlicesForHeatmap,
+            );
+        }
+        const numSlicesInWindow = windowEndSlice - windowStartSlice;
+
+        const relevantInteractionPairsForWindow =
+            this.interactionPairsPerSlice.slice(
+                windowStartSlice,
+                windowEndSlice,
+            );
+
+        const pairData: Array<{
+            idA: number;
+            idB: number;
+            rawSum: number;
+            posA?: THREE.Vector3;
+            posB?: THREE.Vector3;
+        }> = [];
+
+        // 1. Calculate all raw weighted sums for pairs
+        for (const pair of this.couplingMap) {
             if (pair.length === 2) {
                 const qubitIdA = pair[0];
                 const qubitIdB = pair[1];
                 const posA = this.qubitPositions.get(qubitIdA);
                 const posB = this.qubitPositions.get(qubitIdB);
 
-                if (posA && posB) {
-                    const distance = posA.distanceTo(posB);
-                    if (distance === 0) return;
-
-                    const activityA = this.getQubitInteractionIntensity(
-                        qubitIdA,
-                        currentSlicesChangeData,
-                    );
-                    const activityB = this.getQubitInteractionIntensity(
-                        qubitIdB,
-                        currentSlicesChangeData,
-                    );
-
-                    const bothHistoricallyActive =
-                        activityA > 0 && activityB > 0;
-
-                    let connectionIntensity;
-                    if (bothHistoricallyActive) {
-                        connectionIntensity = 1.0;
-                    } else {
-                        connectionIntensity = 0.0;
-                    }
-
-                    if (this.current_slice_index < 5) {
-                        console.log(
-                            `Slice ${this.current_slice_index}: Connection ${qubitIdA}-${qubitIdB} -> ActivityA: ${activityA.toFixed(2)}, ActivityB: ${activityB.toFixed(2)}, BothHistoricallyActive: ${bothHistoricallyActive}, Intensity: ${connectionIntensity}`,
-                        );
-                    }
-
-                    const material = new THREE.ShaderMaterial({
-                        vertexShader: CYLINDER_VERTEX_SHADER,
-                        fragmentShader: CYLINDER_FRAGMENT_SHADER,
-                        uniforms: {
-                            uIntensity: { value: connectionIntensity },
-                            uInactiveAlpha: {
-                                value: this.currentInactiveElementAlpha,
-                            },
-                        },
-                        transparent: true,
-                    });
-
-                    const cylinderGeo = new THREE.CylinderGeometry(
-                        this.currentConnectionThickness,
-                        this.currentConnectionThickness,
-                        distance,
-                        8,
-                        1,
-                    );
-                    const cylinderMesh = new THREE.Mesh(cylinderGeo, material);
-
-                    cylinderMesh.position
-                        .copy(posA)
-                        .add(posB)
-                        .multiplyScalar(0.5);
-
-                    const direction = new THREE.Vector3()
-                        .subVectors(posB, posA)
-                        .normalize();
-                    const quaternion =
-                        new THREE.Quaternion().setFromUnitVectors(
-                            yAxis,
-                            direction,
-                        );
-                    cylinderMesh.quaternion.copy(quaternion);
-
-                    this.connectionLines.add(cylinderMesh);
+                if (!posA || !posB || posA.distanceTo(posB) === 0) {
+                    pairData.push({ idA: qubitIdA, idB: qubitIdB, rawSum: 0 });
+                    continue;
                 }
+
+                let currentPairWeightedSum = 0;
+                if (
+                    numSlicesInWindow > 0 &&
+                    relevantInteractionPairsForWindow.length ===
+                        numSlicesInWindow
+                ) {
+                    for (let i = 0; i < numSlicesInWindow; i++) {
+                        const sliceInteractionPairs =
+                            relevantInteractionPairsForWindow[i];
+                        for (const interaction of sliceInteractionPairs) {
+                            if (
+                                (interaction.q1 === qubitIdA &&
+                                    interaction.q2 === qubitIdB) ||
+                                (interaction.q1 === qubitIdB &&
+                                    interaction.q2 === qubitIdA)
+                            ) {
+                                currentPairWeightedSum += Math.pow(
+                                    weight_base,
+                                    i,
+                                );
+                                break;
+                            }
+                        }
+                    }
+                } else if (
+                    this.maxSlicesForHeatmap === 0 &&
+                    this.current_slice_index >= 0 &&
+                    this.current_slice_index <
+                        this.interactionPairsPerSlice.length
+                ) {
+                    const currentSlicePairs =
+                        this.interactionPairsPerSlice[this.current_slice_index];
+                    for (const interaction of currentSlicePairs) {
+                        if (
+                            (interaction.q1 === qubitIdA &&
+                                interaction.q2 === qubitIdB) ||
+                            (interaction.q1 === qubitIdB &&
+                                interaction.q2 === qubitIdA)
+                        ) {
+                            currentPairWeightedSum = 1.0; // Special case: full intensity if active in current slice and 0 history window
+                            break;
+                        }
+                    }
+                }
+                pairData.push({
+                    idA: qubitIdA,
+                    idB: qubitIdB,
+                    rawSum: currentPairWeightedSum,
+                    posA,
+                    posB,
+                });
             }
-        });
+        }
+
+        // 2. Find max observed raw pair sum
+        const maxObservedRawPairSum = Math.max(
+            ...pairData.map((p) => p.rawSum),
+            0,
+        );
+
+        // 3. Create meshes with normalized intensity
+        for (const data of pairData) {
+            if (!data.posA || !data.posB) continue;
+
+            const distance = data.posA.distanceTo(data.posB);
+            if (distance === 0) continue;
+
+            let calculatedNormalizedIntensity = 0;
+            if (maxObservedRawPairSum > 0) {
+                calculatedNormalizedIntensity =
+                    data.rawSum / maxObservedRawPairSum;
+            } else if (this.maxSlicesForHeatmap === 0 && data.rawSum === 1.0) {
+                calculatedNormalizedIntensity = 1.0;
+            }
+
+            let finalConnectionIntensity = calculatedNormalizedIntensity;
+            if (data.rawSum > 0.0001) {
+                finalConnectionIntensity = Math.max(
+                    calculatedNormalizedIntensity,
+                    0.002,
+                );
+            } else {
+                finalConnectionIntensity = 0;
+            }
+
+            const material = new THREE.ShaderMaterial({
+                vertexShader: CYLINDER_VERTEX_SHADER,
+                fragmentShader: CYLINDER_FRAGMENT_SHADER,
+                uniforms: {
+                    uIntensity: { value: finalConnectionIntensity },
+                    uInactiveAlpha: { value: this.currentInactiveElementAlpha },
+                },
+                transparent: true,
+            });
+
+            const cylinderGeo = new THREE.CylinderGeometry(
+                this.currentConnectionThickness,
+                this.currentConnectionThickness,
+                distance,
+                8,
+                1,
+            );
+            const cylinderMesh = new THREE.Mesh(cylinderGeo, material);
+            cylinderMesh.position
+                .copy(data.posA)
+                .add(data.posB)
+                .multiplyScalar(0.5);
+            const direction = new THREE.Vector3()
+                .subVectors(data.posB, data.posA)
+                .normalize();
+            const quaternion = new THREE.Quaternion().setFromUnitVectors(
+                yAxis,
+                direction,
+            );
+            cylinderMesh.quaternion.copy(quaternion);
+            this.connectionLines.add(cylinderMesh);
+        }
     }
 
     private getQubitInteractionIntensity(
@@ -772,6 +930,36 @@ export class QubitGrid {
 
     public setCurrentSlice(sliceIndex: number): void {
         this.loadStateFromSlice(sliceIndex);
+    }
+
+    public updateMaxSlicesForHeatmap(newMaxSlices: number): void {
+        if (this.maxSlicesForHeatmap === newMaxSlices) return;
+        if (newMaxSlices < -1) return;
+
+        this.maxSlicesForHeatmap = newMaxSlices;
+
+        if (this.heatmap) {
+            this.heatmap.maxSlices = this.maxSlicesForHeatmap;
+        }
+
+        this.onCurrentSliceChange();
+    }
+
+    public refreshLegend(): void {
+        if (this.heatmapLegend) {
+            console.log(
+                `QubitGrid.refreshLegend: Updating legend with maxSlicesForHeatmap=${this.maxSlicesForHeatmap}, lastEffectiveSlicesForHeatmap=${this.lastEffectiveSlicesForHeatmap}, lastMaxObservedRawHeatmapSum=${this.lastMaxObservedRawHeatmapSum}`,
+            );
+            this.heatmapLegend.update(
+                this.maxSlicesForHeatmap,
+                this.lastEffectiveSlicesForHeatmap,
+                this.lastMaxObservedRawHeatmapSum,
+            );
+        } else {
+            console.warn(
+                "QubitGrid: refreshLegend called but heatmapLegend not initialized.",
+            );
+        }
     }
 
     public dispose(): void {

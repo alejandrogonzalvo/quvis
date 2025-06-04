@@ -4,7 +4,7 @@ import { Playground } from "../Playground.js";
 interface HeatmapControlsProps {
     playground: Playground | null;
     initialValues: {
-        maxSlices: number;
+        maxSlices: number; // This initialValue might be the special -1 if previously set
     };
 }
 
@@ -50,40 +50,82 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
     playground,
     initialValues,
 }) => {
-    const [maxSlices, setMaxSlices] = useState(initialValues.maxSlices);
+    // If initialValues.maxSlices is -1 (for "All"), map it to 0 for the slider's state
+    const [sliderValue, setSliderValue] = useState(
+        initialValues.maxSlices === -1 ? 0 : initialValues.maxSlices,
+    );
 
     useEffect(() => {
-        setMaxSlices(initialValues.maxSlices);
+        // Sync slider if initialValues change from outside
+        setSliderValue(
+            initialValues.maxSlices === -1 ? 0 : initialValues.maxSlices,
+        );
     }, [initialValues.maxSlices]);
+
+    useEffect(() => {
+        if (
+            playground &&
+            playground.grid &&
+            playground.grid.heatmapLegend &&
+            playground.grid.lastEffectiveSlicesForHeatmap !== undefined &&
+            playground.grid.lastMaxObservedRawHeatmapSum !== undefined
+        ) {
+            // The div with id "heatmap-legend-container" is rendered by this component.
+            // Calling update() on the legend will now try to re-acquire its container if needed.
+            playground.grid.heatmapLegend.update(
+                playground.grid.maxSlicesForHeatmap, // The setting (-1 for All, or X)
+                playground.grid.lastEffectiveSlicesForHeatmap, // Actual number of slices used in last heatmap calc
+                playground.grid.lastMaxObservedRawHeatmapSum, // Max raw sum observed for points in last heatmap calc
+            );
+        }
+    }, [
+        playground,
+        sliderValue,
+        playground?.grid?.lastEffectiveSlicesForHeatmap,
+        playground?.grid?.lastMaxObservedRawHeatmapSum,
+        playground?.currentSlice,
+    ]); // Rerun if these values change
 
     const handleMaxSlicesChange = (
         event: React.ChangeEvent<HTMLInputElement>,
     ) => {
-        const value = parseInt(event.target.value, 10);
-        setMaxSlices(value);
-        playground?.updateHeatmapSlices(value);
+        const currentSliderVal = parseInt(event.target.value, 10);
+        setSliderValue(currentSliderVal);
+
+        const actualMaxSlices = currentSliderVal === 0 ? -1 : currentSliderVal; // -1 signifies "all slices"
+        console.log(
+            `HeatmapControls: handleMaxSlicesChange called. currentSliderVal=${currentSliderVal}, actualMaxSlices=${actualMaxSlices}. Playground available: ${!!playground}`,
+        );
+        playground?.updateHeatmapSlices(actualMaxSlices);
     };
 
     if (!playground) {
         return null;
     }
 
+    const displayValue = sliderValue === 0 ? "All" : sliderValue.toString();
+
     return (
         <div style={panelStyle}>
             <label htmlFor="heatmap-slices" style={labelStyle}>
-                Heatmap Slices
+                Heatmap History (Slices)
             </label>
             <input
                 type="range"
                 id="heatmap-slices"
-                min="1"
-                max="10" // Default max from original HTML, can be dynamic
+                min="0" // Min is now 0
+                max="10"
                 step="1"
-                value={maxSlices}
+                value={sliderValue}
                 onChange={handleMaxSlicesChange}
                 style={sliderStyle}
             />
-            <span style={valueDisplayStyle}>{maxSlices}</span>
+            <span style={valueDisplayStyle}>{displayValue}</span>
+            {/* Container for the Heatmap Legend */}
+            <div
+                id="heatmap-legend-container"
+                style={{ marginTop: "20px", width: "100%" }}
+            ></div>
         </div>
     );
 };

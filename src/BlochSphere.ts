@@ -175,9 +175,6 @@ export class BlochSphere {
                 targetRotation.set(Math.PI / 2, 0, Math.PI / 2); // Point left
                 break;
             default:
-                console.log(
-                    `BlochSphere: Unhandled state for animation: ${state} (type: ${typeof state}), string rep: ${State[state as number] || state}`,
-                );
                 targetRotation.set(0, 0, 0); // Default to |0⟩ orientation
         }
 

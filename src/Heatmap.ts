@@ -35,7 +35,7 @@ export class Heatmap {
             uniforms: {
                 aspect: { value: window.innerWidth / window.innerHeight },
                 radius: { value: 1.0 },
-                baseSize: { value: 1000.0 },
+                baseSize: { value: 500.0 },
                 cameraPosition: { value: new THREE.Vector3() },
                 scaleFactor: { value: 1.0 },
             },
@@ -62,46 +62,23 @@ export class Heatmap {
             
             void main() {
                 vec2 coord = gl_PointCoord * 2.0 - vec2(1.0);
-                float distanceFromCenter = length(coord);
+                float distance = length(coord);
                 
-                float finalAlpha;
+                float alpha = smoothstep(radius, radius * 0.1, distance);
+                
                 vec3 colorValue;
+                // Clamp vIntensity to [0,1] just in case, though it should be already.
+                float clampedIntensity = clamp(vIntensity, 0.0, 1.0);
 
-                if (vIntensity <= 0.001) { // Check against a small epsilon for floating point
-                    finalAlpha = 0.0; // Make transparent for zero or very low intensity
-                    colorValue = vec3(0.0, 0.0, 0.0); // Color doesn't matter when alpha is 0
+                if (clampedIntensity <= 0.5) {
+                    // Transition from Green (0,1,0) at intensity 0 to Yellow (1,1,0) at intensity 0.5
+                    colorValue = vec3(clampedIntensity * 2.0, 1.0, 0.0);
                 } else {
-                    // For active points, calculate alpha based on distance from center (for soft edges)
-                    finalAlpha = smoothstep(radius, radius * 0.1, distanceFromCenter);
-                    
-                    // Determine color based on intensity
-                    float yellow_threshold = 0.3; // Highlights start becoming "redder" (from yellow) above this intensity
-                    float effective_vIntensity = clamp(vIntensity, 0.0, 1.0); // Ensure intensity is within [0,1]
-
-                    if (effective_vIntensity <= yellow_threshold) {
-                        // Intensity > 0.001 up to yellow_threshold: Greenish to Yellow
-                        // Normalize effective_vIntensity from 0 to yellow_threshold for this range
-                        float normalized_intensity_for_green_yellow;
-                        if (yellow_threshold > 0.001) { // Avoid division by zero or near-zero if threshold is tiny
-                           normalized_intensity_for_green_yellow = effective_vIntensity / yellow_threshold;
-                        } else {
-                           normalized_intensity_for_green_yellow = 1.0; // Effectively yellow if threshold is tiny and intensity is above it
-                        }
-                        colorValue = vec3(normalized_intensity_for_green_yellow, 1.0, 0.0); // Green (0,1,0) to Yellow (1,1,0)
-                    } else {
-                        // Intensity > yellow_threshold up to 1.0: Yellow to Red
-                        // Normalize effective_vIntensity from yellow_threshold to 1.0 for this range
-                        float normalized_intensity_for_yellow_red;
-                        if ((1.0 - yellow_threshold) > 0.001) { // Avoid division by zero or near-zero
-                            normalized_intensity_for_yellow_red = (effective_vIntensity - yellow_threshold) / (1.0 - yellow_threshold);
-                        } else {
-                            normalized_intensity_for_yellow_red = 1.0; // Effectively red if threshold is near 1.0 and intensity is above it
-                        }
-                        colorValue = vec3(1.0, 1.0 - normalized_intensity_for_yellow_red, 0.0); // Yellow (1,1,0) to Red (1,0,0)
-                    }
+                    // Transition from Yellow (1,1,0) at intensity 0.5 to Red (1,0,0) at intensity 1.0
+                    colorValue = vec3(1.0, 1.0 - (clampedIntensity - 0.5) * 2.0, 0.0);
                 }
                 
-                gl_FragColor = vec4(colorValue, finalAlpha);
+                gl_FragColor = vec4(colorValue, alpha);
             }
         `,
             transparent: true,
@@ -118,46 +95,36 @@ export class Heatmap {
 
     updatePoints(
         qubits: Map<number, Qubit>,
-        allInteractionPairsPerSlice: Array<Array<{ q1: number; q2: number }>>,
         currentSliceIndex: number,
         allSlicesData: Array<Slice>,
-    ) {
+    ): { maxObservedRawWeightedSum: number; numSlicesEffectivelyUsed: number } {
         let posIndex = 0;
-        let intIndex = 0;
 
-        // Determine the window of slices to consider for heatmap intensity
         const windowEndSlice = currentSliceIndex + 1;
-        const windowStartSlice = Math.max(0, windowEndSlice - this.maxSlices);
+        let windowStartSlice;
+        if (this.maxSlices === -1) {
+            // "All slices" mode
+            windowStartSlice = 0;
+        } else {
+            // Fixed window size mode
+            windowStartSlice = Math.max(0, windowEndSlice - this.maxSlices);
+        }
+        const numSlicesInWindow = windowEndSlice - windowStartSlice;
 
-        // Get the interaction pairs and slice data for the current window
-        const relevantSliceInteractionPairs = allInteractionPairsPerSlice.slice(
-            windowStartSlice,
-            windowEndSlice,
-        );
         const relevantSlicesData = allSlicesData.slice(
             windowStartSlice,
             windowEndSlice,
         );
-        const numSlicesInWindow = relevantSliceInteractionPairs.length;
 
-        // Calculate the maximum possible weighted sum for normalization
-        // Weights are exponential, increasing for more recent slices.
-        const weight_base = 1.5; // Base for exponential weighting
-        let maxPossibleWeightedSum = 0;
-        if (numSlicesInWindow > 0) {
-            for (let i = 0; i < numSlicesInWindow; i++) {
-                maxPossibleWeightedSum += Math.pow(weight_base, i); // Weight for slice i (0=oldest, numSlicesInWindow-1=newest)
-            }
-        }
+        const rawInteractionCounts: number[] = [];
+        let maxObservedRawInteractionCount = 0;
 
-        // Iterate over qubit IDs for which we have position data pre-calculated or can calculate
-        // Assuming this.positions and this.intensities are ordered by qubit ID from 0 to N-1
         for (
             let heatmapQubitId = 0;
             heatmapQubitId < this.positions.length / 3;
             heatmapQubitId++
         ) {
-            const qubitInfo = qubits.get(heatmapQubitId); // Get the qubit object for its Bloch sphere position
+            const qubitInfo = qubits.get(heatmapQubitId);
 
             if (!this.qubitPositions[heatmapQubitId] && qubitInfo) {
                 const posVec = new THREE.Vector3();
@@ -176,48 +143,61 @@ export class Heatmap {
                 this.positions[posIndex++] = 0;
             }
 
-            let currentQubitWeightedSum = 0;
+            let interactionCount = 0;
             if (
                 numSlicesInWindow > 0 &&
                 relevantSlicesData.length === numSlicesInWindow
             ) {
                 for (let i = 0; i < numSlicesInWindow; i++) {
-                    // i = 0 is oldest, i = numSlicesInWindow - 1 is newest
-                    const sliceInteractionPairs =
-                        relevantSliceInteractionPairs[i];
                     const sliceDataForWindow = relevantSlicesData[i];
-
-                    // Check if the current heatmapQubit was "active" in this specific historical slice
-                    const qubitWasActiveInWindowSlice =
+                    if (
                         sliceDataForWindow.interacting_qubits.has(
                             heatmapQubitId,
-                        );
-
-                    if (qubitWasActiveInWindowSlice) {
-                        // Now check if it was part of any 2-qubit interaction in that same slice
-                        for (const pair of sliceInteractionPairs) {
-                            if (
-                                pair.q1 === heatmapQubitId ||
-                                pair.q2 === heatmapQubitId
-                            ) {
-                                const weight = Math.pow(weight_base, i); // More recent slices (larger i) get higher exponential weight
-                                currentQubitWeightedSum += weight;
-                                break; // Count this slice with its weight and move to the next slice in the window
-                            }
-                        }
+                        )
+                    ) {
+                        interactionCount++;
                     }
                 }
             }
-
-            let intensity = 0;
-            if (maxPossibleWeightedSum > 0) {
-                // Use maxPossibleWeightedSum for normalization
-                intensity = currentQubitWeightedSum / maxPossibleWeightedSum;
+            rawInteractionCounts.push(interactionCount);
+            if (interactionCount > maxObservedRawInteractionCount) {
+                maxObservedRawInteractionCount = interactionCount;
             }
-            this.intensities[intIndex++] = intensity;
         }
 
-        // Ensure buffers are marked for update
+        let denominatorForPointNormalization: number;
+        if (this.maxSlices === -1) {
+            // "All slices" mode
+            denominatorForPointNormalization = 10.0; // Fixed typical window size for normalization
+        } else {
+            // Fixed window size mode
+            denominatorForPointNormalization = Math.max(
+                1.0,
+                parseFloat(this.maxSlices.toString()),
+            ); // Use configured maxSlices, ensure at least 1
+        }
+
+        for (let i = 0; i < rawInteractionCounts.length; i++) {
+            const currentRawCount = rawInteractionCounts[i];
+            let normalizedIntensity = 0;
+            if (denominatorForPointNormalization > 0) {
+                normalizedIntensity =
+                    currentRawCount / denominatorForPointNormalization;
+            }
+
+            // Clamp normalizedIntensity to [0,1] before applying floor
+            normalizedIntensity = Math.max(
+                0.0,
+                Math.min(1.0, normalizedIntensity),
+            );
+
+            if (currentRawCount > 0.0001) {
+                this.intensities[i] = Math.max(normalizedIntensity, 0.002); // Apply floor
+            } else {
+                this.intensities[i] = 0;
+            }
+        }
+
         const positionAttr = this.mesh.geometry.attributes
             .position as THREE.BufferAttribute;
         positionAttr.needsUpdate = true;
@@ -225,8 +205,10 @@ export class Heatmap {
             .intensity as THREE.BufferAttribute;
         intensityAttr.needsUpdate = true;
 
-        // Uniforms like cameraPosition and scaleFactor are updated in Playground's animate loop directly
-        // this.material.uniformsNeedUpdate = true; // This might not be needed if individual uniforms are updated
+        return {
+            maxObservedRawWeightedSum: maxObservedRawInteractionCount, // Return the max raw count
+            numSlicesEffectivelyUsed: numSlicesInWindow,
+        };
     }
 
     public dispose(): void {

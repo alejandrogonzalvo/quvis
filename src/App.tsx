@@ -190,6 +190,7 @@ const App: React.FC = () => {
                 x={tooltipX}
                 y={tooltipY}
             />
+            {/* The div for Heatmap Legend has been moved to HeatmapControls.tsx */}
         </div>
     );
 };

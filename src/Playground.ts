@@ -73,6 +73,7 @@ export class Playground {
         | undefined;
     private boundOnMouseMove: (event: MouseEvent) => void;
     private boundOnMouseLeave: () => void;
+    public readonly instanceId: string; // For debugging
 
     constructor(
         container?: HTMLElement,
@@ -85,130 +86,17 @@ export class Playground {
         this.scene = new THREE.Scene();
         this.mouse = new THREE.Vector2();
         this.scene.background = new THREE.Color(0x121212);
+        this.instanceId = `PlaygroundInstance_${Math.random().toString(36).substr(2, 9)}`; // Assign unique ID
+        console.log(
+            `Playground constructor called. Instance ID: ${this.instanceId}`,
+        ); // Log instance ID
 
         // Bind event handlers
         this.boundOnMouseMove = this.onMouseMove.bind(this);
         this.boundOnMouseLeave = this.onMouseLeave.bind(this);
 
-        // All direct DOM access for controls is commented out here.
         // Default values for parameters are set above as class properties.
-
-        // this.heatmapSlicesSlider = document.getElementById(
-        //     "heatmap-slices",
-        // ) as HTMLInputElement;
-        // this.heatmapSlicesValueDisplay = document.getElementById(
-        //     "heatmap-slices-value",
-        // ) as HTMLSpanElement;
-        // if (this.heatmapSlicesSlider) { // Check if element exists before accessing
-        //     this.maxHeatmapSlices = parseInt(this.heatmapSlicesSlider.value);
-        //     if (this.heatmapSlicesValueDisplay) {
-        //         this.heatmapSlicesValueDisplay.textContent =
-        //             this.heatmapSlicesSlider.value;
-        //     }
-        // } // else maxHeatmapSlices uses default from class property
-
-        // this.legendRedValue = document.getElementById(
-        //     "legend-red-value",
-        // ) as HTMLSpanElement;
-        // this.legendYellowValue = document.getElementById(
-        //     "legend-yellow-value",
-        // ) as HTMLSpanElement;
-        // this.legendGreenValue = document.getElementById(
-        //     "legend-green-value",
-        // ) as HTMLSpanElement;
-        // this.updateLegend(); // Relies on the above elements
-
-        // // Initialize layout control elements and parameters
-        // this.repelForceSlider = document.getElementById(
-        //     "repel-force",
-        // ) as HTMLInputElement;
-        // this.repelForceValueDisplay = document.getElementById(
-        //     "repel-force-value",
-        // ) as HTMLSpanElement;
-        // this.idealDistanceSlider = document.getElementById(
-        //     "ideal-distance",
-        // ) as HTMLInputElement;
-        // this.idealDistanceValueDisplay = document.getElementById(
-        //     "ideal-distance-value",
-        // ) as HTMLSpanElement;
-        // this.iterationsSlider = document.getElementById(
-        //     "iterations",
-        // ) as HTMLInputElement;
-        // this.iterationsValueDisplay = document.getElementById(
-        //     "iterations-value",
-        // ) as HTMLSpanElement;
-        // this.coolingFactorSlider = document.getElementById(
-        //     "cooling-factor",
-        // ) as HTMLInputElement;
-        // this.coolingFactorValueDisplay = document.getElementById(
-        //     "cooling-factor-value",
-        // ) as HTMLSpanElement;
-        // this.recompileLayoutButton = document.getElementById(
-        //     "recompile-layout-button",
-        // ) as HTMLButtonElement;
-
-        // // Set initial layout parameter values from sliders (which have defaults)
-        // if(this.repelForceSlider) this.currentRepelForce = parseFloat(this.repelForceSlider.value);
-        // if(this.idealDistanceSlider) this.currentIdealDistance = parseFloat(this.idealDistanceSlider.value);
-        // if(this.iterationsSlider) this.currentIterations = parseInt(this.iterationsSlider.value);
-        // if(this.coolingFactorSlider) this.currentCoolingFactor = parseFloat(this.coolingFactorSlider.value);
-
-        // // Update display spans to match initial slider values (though HTML should handle it, this is safer)
-        // if (this.repelForceValueDisplay && this.repelForceSlider)
-        //     this.repelForceValueDisplay.textContent =
-        //         this.repelForceSlider.value;
-        // if (this.idealDistanceValueDisplay && this.idealDistanceSlider)
-        //     this.idealDistanceValueDisplay.textContent =
-        //         this.idealDistanceSlider.value;
-        // if (this.iterationsValueDisplay && this.iterationsSlider)
-        //     this.iterationsValueDisplay.textContent =
-        //         this.iterationsSlider.value;
-        // if (this.coolingFactorValueDisplay && this.coolingFactorSlider)
-        //     this.coolingFactorValueDisplay.textContent =
-        //         this.coolingFactorSlider.value;
-
-        // // Get loading screen element
-        // this.loadingScreen = document.getElementById(
-        //     "loading-screen",
-        // ) as HTMLElement;
-
-        // // Initialize appearance control elements and parameters
-        // this.qubitSizeSlider = document.getElementById(
-        //     "qubit-size",
-        // ) as HTMLInputElement;
-        // this.qubitSizeValueDisplay = document.getElementById(
-        //     "qubit-size-value",
-        // ) as HTMLSpanElement;
-
-        // if(this.qubitSizeSlider) this.currentQubitSize = parseFloat(this.qubitSizeSlider.value);
-        // if (this.qubitSizeValueDisplay && this.qubitSizeSlider)
-        //     this.qubitSizeValueDisplay.textContent = this.qubitSizeSlider.value;
-
-        // // Get and initialize connection thickness slider
-        // this.connectionThicknessSlider = document.getElementById(
-        //     "connection-thickness",
-        // ) as HTMLInputElement;
-        // this.connectionThicknessValueDisplay = document.getElementById(
-        //     "connection-thickness-value",
-        // ) as HTMLSpanElement;
-        // if(this.connectionThicknessSlider) this.currentConnectionThickness = parseFloat(
-        //     this.connectionThicknessSlider.value,
-        // );
-        // if (this.connectionThicknessValueDisplay && this.connectionThicknessSlider)
-        //     this.connectionThicknessValueDisplay.textContent =
-        //         this.connectionThicknessSlider.value;
-
-        // // Get and initialize inactive alpha slider
-        // this.inactiveAlphaSlider = document.getElementById(
-        //     "inactive-alpha",
-        // ) as HTMLInputElement;
-        // this.inactiveAlphaValueDisplay = document.getElementById(
-        //     "inactive-alpha-value",
-        // ) as HTMLSpanElement;
-        // if(this.inactiveAlphaSlider) this.currentInactiveAlpha = parseFloat(this.inactiveAlphaSlider.value);
-        // if (this.inactiveAlphaValueDisplay && this.inactiveAlphaSlider)
-        //     this.inactiveAlphaValueDisplay.textContent =
-        //         this.inactiveAlphaSlider.value;
+        // All direct DOM access for controls is commented out.
 
         const renderWidth = this.containerElement
             ? this.containerElement.clientWidth
@@ -260,14 +148,14 @@ export class Playground {
             this.scene,
             this.mouse,
             this.camera,
-            this.maxHeatmapSlices, // Uses default or value set before controls were removed
+            this.maxHeatmapSlices,
             this.currentRepelForce,
             this.currentIdealDistance,
             this.currentIterations,
             this.currentCoolingFactor,
             this.currentConnectionThickness,
             this.currentInactiveAlpha,
-            this.onSlicesLoadedCallback, // Pass the callback to QubitGrid
+            this.onSlicesLoadedCallback,
         );
         this.grid.setQubitScale(this.currentQubitSize);
 
@@ -279,17 +167,6 @@ export class Playground {
                 "Heatmap not immediately available after QubitGrid construction.",
             );
         }
-
-        // Commented out event listeners and setup calls for HTML controls
-        // this.heatmapSlicesSlider.addEventListener("input", (event) => { ... });
-        // this.setupLayoutControlEvents();
-        // this.setupAppearanceControlEvents();
-
-        // The tooltip is also part of the old HTML structure, its direct manipulation needs to be handled differently or removed if tooltip is redone in React
-        // const instructionText = document.createElement("div");
-        // ... (instructionText code) ...
-        // document.body.appendChild(instructionText);
-        // instructionText.remove();
     }
 
     // updateLegend() { // This method relies on DOM elements that are being removed/commented out
@@ -469,7 +346,6 @@ export class Playground {
             // Pass the qubit instances, full slice interaction pair data, current slice index, and all slice data
             this.grid.heatmap.updatePoints(
                 this.grid.qubitInstances,
-                this.grid.interactionPairsPerSlice,
                 this.currentSlice,
                 this.grid.slices, // Pass all slice data for historical state checking
             );
@@ -525,18 +401,28 @@ export class Playground {
     }
 
     public updateHeatmapSlices(slices: number) {
+        console.log(
+            `Playground (${this.instanceId}): updateHeatmapSlices ENTERED with slices = ${slices}`,
+        ); // Modified log
         this.maxHeatmapSlices = slices;
         // this.updateLegend(); // Legend will be a React component
+        // console.log(`Playground.updateHeatmapSlices: new maxSlices = ${slices}`); // Original log, can be kept or removed
         if (this.grid) {
             this.grid.maxSlicesForHeatmap = this.maxHeatmapSlices;
             if (this.grid.heatmap) {
                 this.grid.heatmap.maxSlices = this.maxHeatmapSlices;
             }
+            // console.log(`Playground.updateHeatmapSlices: QubitGrid.maxSlicesForHeatmap set to ${this.grid.maxSlicesForHeatmap}`); // Original log
             this.grid.onCurrentSliceChange();
+        } else {
+            console.warn(
+                `Playground (${this.instanceId}): updateHeatmapSlices called, but this.grid is not available.`,
+            );
         }
     }
 
     public setCurrentSlice(sliceIndex: number) {
+        this.currentSlice = sliceIndex; // Update Playground's own currentSlice tracking
         if (this.grid) {
             this.grid.setCurrentSlice(sliceIndex);
         }
@@ -603,5 +489,20 @@ export class Playground {
             });
         }
         console.log("Playground disposed");
+    }
+
+    // New method to be called by React components to refresh the legend
+    public triggerLegendRefresh(): void {
+        if (this.grid) {
+            this.grid.refreshLegend();
+        } else {
+            console.warn(
+                "Playground: QubitGrid (this.grid) not ready for legend refresh.",
+            );
+        }
+    }
+
+    private loadInitialData(): void {
+        // ... existing code ...
     }
 }
