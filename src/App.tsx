@@ -7,23 +7,29 @@ import HeatmapControls from "./components/HeatmapControls.js"; // Import Heatmap
 import Tooltip from "./components/Tooltip.js"; // Import the Tooltip component
 import "./../style.css"; // Assuming global styles are still desired
 
-// Define initial values for appearance controls matching Playground defaults
-// const initialAppearanceValues = {
-//     qubitSize: 1.0,
-//     connectionThickness: 0.05,
-//     inactiveAlpha: 0.1,
-// };
+// Constants for panel height calculations (in pixels)
+const BASE_TOP_MARGIN_PX = 20;
+const INTER_PANEL_SPACING_PX = 20;
+const COLLAPSED_PANEL_HEADER_HEIGHT_PX = 50; // Approx height of title + toggle button + top/bottom padding of header div
+const PANEL_BOTTOM_PADDING_PX = 15; // From panelStyle
+const CONTROL_GROUP_APPROX_HEIGHT_PX = 65; // Approx height for one slider group including its margin
 
-// const initialLayoutValues = {
-//     repelForce: 0.3,
-//     idealDistance: 5.0,
-//     iterations: 300,
-//     coolingFactor: 0.95,
-// };
+const APPEARANCE_PANEL_SLIDER_COUNT = 4;
+const APPEARANCE_PANEL_EXPANDED_CONTENT_HEIGHT =
+    APPEARANCE_PANEL_SLIDER_COUNT * CONTROL_GROUP_APPROX_HEIGHT_PX;
+const APPEARANCE_PANEL_EXPANDED_HEIGHT_PX =
+    COLLAPSED_PANEL_HEADER_HEIGHT_PX +
+    APPEARANCE_PANEL_EXPANDED_CONTENT_HEIGHT +
+    PANEL_BOTTOM_PADDING_PX;
+const APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX =
+    COLLAPSED_PANEL_HEADER_HEIGHT_PX + PANEL_BOTTOM_PADDING_PX;
 
-// const initialHeatmapValues = {
-//     maxSlices: 5, // Default from Playground.ts
-// };
+// Layout panel also has a button at the end
+// const LAYOUT_PANEL_SLIDER_COUNT = 4;
+// const LAYOUT_PANEL_BUTTON_HEIGHT_PX = 45; // Approx height for the button + margin
+// const LAYOUT_PANEL_EXPANDED_CONTENT_HEIGHT = (LAYOUT_PANEL_SLIDER_COUNT * CONTROL_GROUP_APPROX_HEIGHT_PX) + LAYOUT_PANEL_BUTTON_HEIGHT_PX;
+// const LAYOUT_PANEL_EXPANDED_HEIGHT_PX = COLLAPSED_PANEL_HEADER_HEIGHT_PX + LAYOUT_PANEL_EXPANDED_CONTENT_HEIGHT + PANEL_BOTTOM_PADDING_PX;
+// const LAYOUT_PANEL_COLLAPSED_HEIGHT_PX = COLLAPSED_PANEL_HEADER_HEIGHT_PX + PANEL_BOTTOM_PADDING_PX;
 
 const App: React.FC = () => {
     const mountRef = useRef<HTMLDivElement>(null);
@@ -61,6 +67,18 @@ const App: React.FC = () => {
     const [tooltipContent, setTooltipContent] = useState("");
     const [tooltipX, setTooltipX] = useState(0);
     const [tooltipY, setTooltipY] = useState(0);
+
+    // State for panel collapse
+    const [isAppearanceCollapsed, setIsAppearanceCollapsed] = useState(false);
+    const [isLayoutCollapsed, setIsLayoutCollapsed] = useState(false);
+
+    const toggleAppearanceCollapse = () => {
+        setIsAppearanceCollapsed(!isAppearanceCollapsed);
+    };
+
+    const toggleLayoutCollapse = () => {
+        setIsLayoutCollapsed(!isLayoutCollapsed);
+    };
 
     // Callback for when QubitGrid has loaded slice data
     const handleSlicesLoaded = (
@@ -148,10 +166,15 @@ const App: React.FC = () => {
                     <AppearanceControls
                         playground={playgroundRef.current}
                         initialValues={initialAppearance}
+                        isCollapsed={isAppearanceCollapsed}
+                        onToggleCollapse={toggleAppearanceCollapse}
                     />
                     <LayoutControls
                         playground={playgroundRef.current}
                         initialValues={initialLayout}
+                        isCollapsed={isLayoutCollapsed}
+                        onToggleCollapse={toggleLayoutCollapse}
+                        topPosition={`${BASE_TOP_MARGIN_PX + (isAppearanceCollapsed ? APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX : APPEARANCE_PANEL_EXPANDED_HEIGHT_PX) + INTER_PANEL_SPACING_PX}px`}
                     />
                     <HeatmapControls
                         playground={playgroundRef.current}

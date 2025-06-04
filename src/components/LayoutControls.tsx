@@ -9,11 +9,13 @@ interface LayoutControlsProps {
         iterations: number;
         coolingFactor: number;
     };
+    isCollapsed: boolean;
+    onToggleCollapse: () => void;
+    topPosition: string; // e.g., "340px"
 }
 
-const panelStyle: React.CSSProperties = {
+const basePanelStyle: React.CSSProperties = {
     position: "fixed",
-    top: "340px", // Adjusted from 270px to account for increased height of AppearanceControls
     left: "20px",
     backgroundColor: "rgba(50, 50, 50, 0.8)",
     padding: "15px",
@@ -60,6 +62,9 @@ const buttonStyle: React.CSSProperties = {
 const LayoutControls: React.FC<LayoutControlsProps> = ({
     playground,
     initialValues,
+    isCollapsed,
+    onToggleCollapse,
+    topPosition,
 }) => {
     const [repelForce, setRepelForce] = useState(initialValues.repelForce);
     const [idealDistance, setIdealDistance] = useState(
@@ -117,89 +122,124 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
         return null;
     }
 
+    const panelStyle = { ...basePanelStyle, top: topPosition };
+
     return (
         <div style={panelStyle}>
-            <h4
+            <div
                 style={{
-                    marginTop: "0",
-                    marginBottom: "20px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
                     borderBottom: "1px solid #666",
                     paddingBottom: "10px",
+                    marginBottom: isCollapsed ? "0" : "20px",
                 }}
             >
-                Layout Simulation
-            </h4>
-
-            <div style={controlGroupStyle}>
-                <label htmlFor="repel-force" style={labelStyle}>
-                    Repel Force:{" "}
-                    <span style={valueStyle}>{repelForce.toFixed(2)}</span>
-                </label>
-                <input
-                    type="range"
-                    id="repel-force"
-                    min="0.01"
-                    max="1.0"
-                    step="0.01"
-                    value={repelForce}
-                    onChange={handleRepelForceChange}
-                    style={sliderStyle}
-                />
+                <h4
+                    style={{
+                        marginTop: "0",
+                        marginBottom: "0",
+                    }}
+                >
+                    Layout Simulation
+                </h4>
+                <button
+                    onClick={onToggleCollapse}
+                    style={{
+                        background: "none",
+                        border: "none",
+                        color: "white",
+                        cursor: "pointer",
+                        fontSize: "1.2em",
+                        padding: "0 5px",
+                    }}
+                >
+                    {isCollapsed ? "▶" : "▼"}
+                </button>
             </div>
 
-            <div style={controlGroupStyle}>
-                <label htmlFor="ideal-distance" style={labelStyle}>
-                    Ideal Distance:{" "}
-                    <span style={valueStyle}>{idealDistance.toFixed(1)}</span>
-                </label>
-                <input
-                    type="range"
-                    id="ideal-distance"
-                    min="0.5"
-                    max="100"
-                    step="0.1"
-                    value={idealDistance}
-                    onChange={handleIdealDistanceChange}
-                    style={sliderStyle}
-                />
-            </div>
+            {!isCollapsed && (
+                <>
+                    <div style={controlGroupStyle}>
+                        <label htmlFor="repel-force" style={labelStyle}>
+                            Repel Force:{" "}
+                            <span style={valueStyle}>
+                                {repelForce.toFixed(2)}
+                            </span>
+                        </label>
+                        <input
+                            type="range"
+                            id="repel-force"
+                            min="0.01"
+                            max="1.0"
+                            step="0.01"
+                            value={repelForce}
+                            onChange={handleRepelForceChange}
+                            style={sliderStyle}
+                        />
+                    </div>
 
-            <div style={controlGroupStyle}>
-                <label htmlFor="iterations" style={labelStyle}>
-                    Iterations: <span style={valueStyle}>{iterations}</span>
-                </label>
-                <input
-                    type="range"
-                    id="iterations"
-                    min="50"
-                    max="1000"
-                    step="10"
-                    value={iterations}
-                    onChange={handleIterationsChange}
-                    style={sliderStyle}
-                />
-            </div>
+                    <div style={controlGroupStyle}>
+                        <label htmlFor="ideal-distance" style={labelStyle}>
+                            Ideal Distance:{" "}
+                            <span style={valueStyle}>
+                                {idealDistance.toFixed(1)}
+                            </span>
+                        </label>
+                        <input
+                            type="range"
+                            id="ideal-distance"
+                            min="0.5"
+                            max="100"
+                            step="0.1"
+                            value={idealDistance}
+                            onChange={handleIdealDistanceChange}
+                            style={sliderStyle}
+                        />
+                    </div>
 
-            <div style={controlGroupStyle}>
-                <label htmlFor="cooling-factor" style={labelStyle}>
-                    Cooling Factor:{" "}
-                    <span style={valueStyle}>{coolingFactor.toFixed(3)}</span>
-                </label>
-                <input
-                    type="range"
-                    id="cooling-factor"
-                    min="0.8"
-                    max="1.0"
-                    step="0.001"
-                    value={coolingFactor}
-                    onChange={handleCoolingFactorChange}
-                    style={sliderStyle}
-                />
-            </div>
+                    <div style={controlGroupStyle}>
+                        <label htmlFor="iterations" style={labelStyle}>
+                            Iterations:{" "}
+                            <span style={valueStyle}>{iterations}</span>
+                        </label>
+                        <input
+                            type="range"
+                            id="iterations"
+                            min="50"
+                            max="1000"
+                            step="10"
+                            value={iterations}
+                            onChange={handleIterationsChange}
+                            style={sliderStyle}
+                        />
+                    </div>
 
-            <button onClick={handleRecompileLayout} style={buttonStyle}>
-                Recompile Layout
-            </button>
+                    <div style={controlGroupStyle}>
+                        <label htmlFor="cooling-factor" style={labelStyle}>
+                            Cooling Factor:{" "}
+                            <span style={valueStyle}>
+                                {coolingFactor.toFixed(3)}
+                            </span>
+                        </label>
+                        <input
+                            type="range"
+                            id="cooling-factor"
+                            min="0.8"
+                            max="1.0"
+                            step="0.001"
+                            value={coolingFactor}
+                            onChange={handleCoolingFactorChange}
+                            style={sliderStyle}
+                        />
+                    </div>
+
+                    <button onClick={handleRecompileLayout} style={buttonStyle}>
+                        Recompile Layout
+                    </button>
+                </>
+            )}
         </div>
     );
 };
