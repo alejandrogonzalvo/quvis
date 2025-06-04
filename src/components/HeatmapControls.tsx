@@ -54,7 +54,7 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
 
     useEffect(() => {
         setMaxSlices(initialValues.maxSlices);
-    }, [initialValues]);
+    }, [initialValues.maxSlices]);
 
     const handleMaxSlicesChange = (
         event: React.ChangeEvent<HTMLInputElement>,
