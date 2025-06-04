@@ -5,6 +5,7 @@ import AppearanceControls from "./components/AppearanceControls.js"; // Reverted
 import LayoutControls from "./components/LayoutControls.js"; // Import LayoutControls
 import HeatmapControls from "./components/HeatmapControls.js"; // Import HeatmapControls
 import Tooltip from "./components/Tooltip.js"; // Import the Tooltip component
+import DatasetSelection from "./components/DatasetSelection.js"; // Import the new component
 import "./../style.css"; // Assuming global styles are still desired
 
 // Constants for panel height calculations (in pixels)
@@ -34,6 +35,9 @@ const APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX =
 const App: React.FC = () => {
     const mountRef = useRef<HTMLDivElement>(null);
     const playgroundRef = useRef<Playground | null>(null);
+
+    // State for dataset selection
+    const [selectedDataset, setSelectedDataset] = useState<string | null>(null);
 
     // State for timeline
     const [totalSlices, setTotalSlices] = useState<number>(0);
@@ -80,6 +84,22 @@ const App: React.FC = () => {
         setIsLayoutCollapsed(!isLayoutCollapsed);
     };
 
+    // Callback for dataset selection
+    const handleDatasetSelect = (datasetName: string) => {
+        setSelectedDataset(datasetName);
+        // Reset playground and timeline related states if a new dataset is selected
+        // This ensures that if a user goes back and selects a different dataset,
+        // the old playground instance is properly disposed of and states are fresh.
+        if (playgroundRef.current) {
+            playgroundRef.current.dispose();
+            playgroundRef.current = null;
+        }
+        setIsPlaygroundInitialized(false);
+        setIsTimelineInitialized(false);
+        setTotalSlices(0);
+        setCurrentSliceValue(0);
+    };
+
     // Callback for when QubitGrid has loaded slice data
     const handleSlicesLoaded = (
         sliceCount: number,
@@ -105,11 +125,13 @@ const App: React.FC = () => {
     };
 
     useEffect(() => {
-        if (mountRef.current) {
+        if (mountRef.current && selectedDataset && !playgroundRef.current) {
+            // Check for selectedDataset and ensure playground isn't already initialized
             // Ensure Playground does not try to access DOM elements for controls during construction
             // as those have been removed from index.html and commented out in Playground.ts
             const playgroundInstance = new Playground(
                 mountRef.current,
+                selectedDataset, // Pass the selected dataset name
                 handleSlicesLoaded,
                 handleTooltipUpdate,
             );
@@ -135,15 +157,15 @@ const App: React.FC = () => {
         }
 
         return () => {
-            // Cleanup on component unmount
+            // Cleanup on component unmount or when selectedDataset changes
             if (playgroundRef.current) {
                 playgroundRef.current.dispose();
                 playgroundRef.current = null;
             }
-            setIsTimelineInitialized(false); // Reset on unmount
-            setIsPlaygroundInitialized(false); // Reset on unmount
+            setIsTimelineInitialized(false); // Reset on unmount or dataset change
+            setIsPlaygroundInitialized(false); // Reset on unmount or dataset change
         };
-    }, []); // Empty dependency array ensures this runs once on mount and cleans up on unmount
+    }, [selectedDataset]); // Add selectedDataset to dependency array
 
     const handleTimelineChange = (newSliceIndex: number) => {
         if (playgroundRef.current) {
@@ -154,68 +176,79 @@ const App: React.FC = () => {
 
     return (
         <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
-            {/* Container for the Three.js canvas */}
-            <div ref={mountRef} style={{ width: "100%", height: "100%" }} />
-            {/* Future React UI components will go here, likely overlaid or adjacent */}
-            {/* <div style={{ position: 'absolute', top: '10px', left: '10px', color: 'white' }}>
-                <h1>Quantum Grid Visualizer - React</h1>
-            </div> */}
-
-            {isPlaygroundInitialized && (
+            {!selectedDataset ? (
+                <DatasetSelection onSelect={handleDatasetSelect} />
+            ) : (
                 <>
-                    <AppearanceControls
-                        playground={playgroundRef.current}
-                        initialValues={initialAppearance}
-                        isCollapsed={isAppearanceCollapsed}
-                        onToggleCollapse={toggleAppearanceCollapse}
+                    {/* Container for the Three.js canvas */}
+                    <div
+                        ref={mountRef}
+                        style={{ width: "100%", height: "100%" }}
                     />
-                    <LayoutControls
-                        playground={playgroundRef.current}
-                        initialValues={initialLayout}
-                        isCollapsed={isLayoutCollapsed}
-                        onToggleCollapse={toggleLayoutCollapse}
-                        topPosition={`${BASE_TOP_MARGIN_PX + (isAppearanceCollapsed ? APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX : APPEARANCE_PANEL_EXPANDED_HEIGHT_PX) + INTER_PANEL_SPACING_PX}px`}
+                    {/* Future React UI components will go here, likely overlaid or adjacent */}
+                    {/* <div style={{ position: 'absolute', top: '10px', left: '10px', color: 'white' }}>
+                        <h1>Quantum Grid Visualizer - React</h1>
+                    </div> */}
+
+                    {isPlaygroundInitialized && (
+                        <>
+                            <AppearanceControls
+                                playground={playgroundRef.current}
+                                initialValues={initialAppearance}
+                                isCollapsed={isAppearanceCollapsed}
+                                onToggleCollapse={toggleAppearanceCollapse}
+                            />
+                            <LayoutControls
+                                playground={playgroundRef.current}
+                                initialValues={initialLayout}
+                                isCollapsed={isLayoutCollapsed}
+                                onToggleCollapse={toggleLayoutCollapse}
+                                topPosition={`${BASE_TOP_MARGIN_PX + (isAppearanceCollapsed ? APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX : APPEARANCE_PANEL_EXPANDED_HEIGHT_PX) + INTER_PANEL_SPACING_PX}px`}
+                            />
+                            <HeatmapControls
+                                playground={playgroundRef.current}
+                                initialValues={{
+                                    maxSlices: initialHeatmapSlices,
+                                }}
+                            />
+                        </>
+                    )}
+
+                    {isTimelineInitialized && totalSlices > 0 && (
+                        <TimelineSlider
+                            min={0}
+                            max={totalSlices}
+                            value={currentSliceValue}
+                            onChange={handleTimelineChange}
+                            disabled={totalSlices === 0}
+                            label="Time Slice"
+                        />
+                    )}
+                    {isTimelineInitialized && totalSlices === 0 && (
+                        <div
+                            style={{
+                                position: "fixed",
+                                bottom: "30px",
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                color: "white",
+                                background: "rgba(0,0,0,0.5)",
+                                padding: "10px",
+                                borderRadius: "5px",
+                            }}
+                        >
+                            Loading slice data or no slices found.
+                        </div>
+                    )}
+                    <Tooltip
+                        visible={tooltipVisible}
+                        content={tooltipContent}
+                        x={tooltipX}
+                        y={tooltipY}
                     />
-                    <HeatmapControls
-                        playground={playgroundRef.current}
-                        initialValues={{ maxSlices: initialHeatmapSlices }}
-                    />
+                    {/* The div for Heatmap Legend has been moved to HeatmapControls.tsx */}
                 </>
             )}
-
-            {isTimelineInitialized && totalSlices > 0 && (
-                <TimelineSlider
-                    min={0}
-                    max={totalSlices}
-                    value={currentSliceValue}
-                    onChange={handleTimelineChange}
-                    disabled={totalSlices === 0}
-                    label="Time Slice"
-                />
-            )}
-            {isTimelineInitialized && totalSlices === 0 && (
-                <div
-                    style={{
-                        position: "fixed",
-                        bottom: "30px",
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                        color: "white",
-                        background: "rgba(0,0,0,0.5)",
-                        padding: "10px",
-                        borderRadius: "5px",
-                    }}
-                >
-                    Loading slice data or no slices found.
-                </div>
-            )}
-            <Tooltip
-                visible={tooltipVisible}
-                content={tooltipContent}
-                x={tooltipX}
-                y={tooltipY}
-            />
-            {/* The div for Heatmap Legend has been moved to HeatmapControls.tsx */}
         </div>
     );
 };
