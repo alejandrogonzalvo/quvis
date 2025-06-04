@@ -7,7 +7,8 @@
     "outDir": "./dist", // Specify the output folder for compiled JavaScript
     "allowJs": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "jsx": "react-jsx"
   },
-  "include": ["./src/**/*.ts"] // Specify the path to your TypeScript files
+  "include": ["src/**/*"] // Modified to include all files in src, including .ts and .tsx
 }

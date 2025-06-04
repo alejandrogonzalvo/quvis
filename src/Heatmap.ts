@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { Qubit } from "./Qubit.js";
+import { Slice } from "./Slice.js";
 
 export class Heatmap {
     mesh: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
@@ -34,7 +35,7 @@ export class Heatmap {
             uniforms: {
                 aspect: { value: window.innerWidth / window.innerHeight },
                 radius: { value: 1.0 },
-                baseSize: { value: 1000.0 },
+                baseSize: { value: 500.0 },
                 cameraPosition: { value: new THREE.Vector3() },
                 scaleFactor: { value: 1.0 },
             },
@@ -61,29 +62,23 @@ export class Heatmap {
             
             void main() {
                 vec2 coord = gl_PointCoord * 2.0 - vec2(1.0);
-                float distanceFromCenter = length(coord);
+                float distance = length(coord);
                 
-                float finalAlpha;
+                float alpha = smoothstep(radius, radius * 0.1, distance);
+                
                 vec3 colorValue;
+                // Clamp vIntensity to [0,1] just in case, though it should be already.
+                float clampedIntensity = clamp(vIntensity, 0.0, 1.0);
 
-                if (vIntensity <= 0.001) { // Check against a small epsilon for floating point
-                    finalAlpha = 0.0; // Make transparent for zero or very low intensity
-                    colorValue = vec3(0.0, 0.0, 0.0); // Color doesn't matter when alpha is 0
+                if (clampedIntensity <= 0.5) {
+                    // Transition from Green (0,1,0) at intensity 0 to Yellow (1,1,0) at intensity 0.5
+                    colorValue = vec3(clampedIntensity * 2.0, 1.0, 0.0);
                 } else {
-                    // For active points, calculate alpha based on distance from center (for soft edges)
-                    finalAlpha = smoothstep(radius, radius * 0.1, distanceFromCenter);
-                    
-                    // Determine color based on intensity
-                    if (vIntensity <= 0.5) {
-                        // Intensity > 0.001 up to 0.5: Greenish to Yellow
-                        colorValue = vec3(vIntensity * 2.0, 1.0, 0.0);
-                    } else {
-                        // Intensity > 0.5 up to 1.0: Yellow to Red
-                        colorValue = vec3(1.0, 1.0 - (vIntensity - 0.5) * 2.0, 0.0);
-                    }
+                    // Transition from Yellow (1,1,0) at intensity 0.5 to Red (1,0,0) at intensity 1.0
+                    colorValue = vec3(1.0, 1.0 - (clampedIntensity - 0.5) * 2.0, 0.0);
                 }
                 
-                gl_FragColor = vec4(colorValue, finalAlpha);
+                gl_FragColor = vec4(colorValue, alpha);
             }
         `,
             transparent: true,
@@ -100,50 +95,130 @@ export class Heatmap {
 
     updatePoints(
         qubits: Map<number, Qubit>,
-        changedIdSlices: Array<Set<number>>,
-    ) {
+        currentSliceIndex: number,
+        allSlicesData: Array<Slice>,
+    ): { maxObservedRawWeightedSum: number; numSlicesEffectivelyUsed: number } {
         let posIndex = 0;
-        let intIndex = 0;
 
-        this.material.uniforms.cameraPosition.value.copy(this.camera.position);
-        this.material.uniforms.scaleFactor.value = this.camera.zoom;
-        this.material.uniformsNeedUpdate = true;
+        const windowEndSlice = currentSliceIndex + 1;
+        let windowStartSlice;
+        if (this.maxSlices === -1) {
+            // "All slices" mode
+            windowStartSlice = 0;
+        } else {
+            // Fixed window size mode
+            windowStartSlice = Math.max(0, windowEndSlice - this.maxSlices);
+        }
+        const numSlicesInWindow = windowEndSlice - windowStartSlice;
 
-        qubits.forEach((qubit, id) => {
-            if (!this.qubitPositions[id]) {
-                const pos = new THREE.Vector3();
-                qubit.blochSphere.blochSphere.getWorldPosition(pos);
-                this.qubitPositions[id] = pos;
+        const relevantSlicesData = allSlicesData.slice(
+            windowStartSlice,
+            windowEndSlice,
+        );
+
+        const rawInteractionCounts: number[] = [];
+        let maxObservedRawInteractionCount = 0;
+
+        for (
+            let heatmapQubitId = 0;
+            heatmapQubitId < this.positions.length / 3;
+            heatmapQubitId++
+        ) {
+            const qubitInfo = qubits.get(heatmapQubitId);
+
+            if (!this.qubitPositions[heatmapQubitId] && qubitInfo) {
+                const posVec = new THREE.Vector3();
+                qubitInfo.blochSphere.blochSphere.getWorldPosition(posVec);
+                this.qubitPositions[heatmapQubitId] = posVec;
             }
+            const pos = this.qubitPositions[heatmapQubitId];
 
-            const pos = this.qubitPositions[id];
-            this.positions[posIndex++] = pos.x;
-            this.positions[posIndex++] = pos.y;
-            this.positions[posIndex++] = pos.z;
+            if (pos) {
+                this.positions[posIndex++] = pos.x;
+                this.positions[posIndex++] = pos.y;
+                this.positions[posIndex++] = pos.z;
+            } else {
+                this.positions[posIndex++] = 0;
+                this.positions[posIndex++] = 0;
+                this.positions[posIndex++] = 0;
+            }
 
             let interactionCount = 0;
-            const slicesToConsider = changedIdSlices.slice(0, this.maxSlices);
-
-            slicesToConsider.forEach((slice) => {
-                if (slice.has(id)) {
-                    interactionCount++;
+            if (
+                numSlicesInWindow > 0 &&
+                relevantSlicesData.length === numSlicesInWindow
+            ) {
+                for (let i = 0; i < numSlicesInWindow; i++) {
+                    const sliceDataForWindow = relevantSlicesData[i];
+                    if (
+                        sliceDataForWindow.interacting_qubits.has(
+                            heatmapQubitId,
+                        )
+                    ) {
+                        interactionCount++;
+                    }
                 }
-            });
+            }
+            rawInteractionCounts.push(interactionCount);
+            if (interactionCount > maxObservedRawInteractionCount) {
+                maxObservedRawInteractionCount = interactionCount;
+            }
+        }
 
-            let intensity = 0;
-            if (slicesToConsider.length > 0) {
-                intensity = interactionCount / slicesToConsider.length;
+        let denominatorForPointNormalization: number;
+        if (this.maxSlices === -1) {
+            // "All slices" mode
+            denominatorForPointNormalization = 10.0; // Fixed typical window size for normalization
+        } else {
+            // Fixed window size mode
+            denominatorForPointNormalization = Math.max(
+                1.0,
+                parseFloat(this.maxSlices.toString()),
+            ); // Use configured maxSlices, ensure at least 1
+        }
+
+        for (let i = 0; i < rawInteractionCounts.length; i++) {
+            const currentRawCount = rawInteractionCounts[i];
+            let normalizedIntensity = 0;
+            if (denominatorForPointNormalization > 0) {
+                normalizedIntensity =
+                    currentRawCount / denominatorForPointNormalization;
             }
 
-            this.intensities[intIndex++] = intensity;
-        });
+            // Clamp normalizedIntensity to [0,1] before applying floor
+            normalizedIntensity = Math.max(
+                0.0,
+                Math.min(1.0, normalizedIntensity),
+            );
+
+            if (currentRawCount > 0.0001) {
+                this.intensities[i] = Math.max(normalizedIntensity, 0.002); // Apply floor
+            } else {
+                this.intensities[i] = 0;
+            }
+        }
 
         const positionAttr = this.mesh.geometry.attributes
             .position as THREE.BufferAttribute;
         positionAttr.needsUpdate = true;
-
         const intensityAttr = this.mesh.geometry.attributes
             .intensity as THREE.BufferAttribute;
         intensityAttr.needsUpdate = true;
+
+        return {
+            maxObservedRawWeightedSum: maxObservedRawInteractionCount, // Return the max raw count
+            numSlicesEffectivelyUsed: numSlicesInWindow,
+        };
+    }
+
+    public dispose(): void {
+        if (this.mesh.geometry) {
+            this.mesh.geometry.dispose();
+        }
+        if (this.mesh.material) {
+            this.mesh.material.dispose();
+        }
+        // this.mesh is removed from the scene by QubitGrid
+        console.log("Heatmap disposed");
     }
 }

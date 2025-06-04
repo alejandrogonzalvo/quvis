@@ -23,67 +23,7 @@
 <body>
     <div id="loading-screen"><div>Recalculating Layout... Please Wait.</div></div>
     <div id="qubit-tooltip" class="tooltip"></div>
-    <div id="timeline-container" style="position: fixed; bottom: 20px; width: 100%; text-align: center;">
-        <input type="range" id="timeline" min="0" max="100" value="0" style="width: 80%;">
-    </div>    
-    <div id="heatmap-controls-vertical-container">
-        <label for="heatmap-slices">Heatmap Slices</label>
-        <input type="range" id="heatmap-slices" min="1" max="10" value="5" orient="vertical">
-        <span id="heatmap-slices-value">5</span>
-    </div>
-    <div id="heatmap-legend" class="heatmap-legend-container">
-        <div class="legend-title">Heatmap Legend</div>
-        <div class="legend-color-bar"></div>
-        <div class="legend-labels">
-            <span id="legend-green-value">Min</span>
-            <span id="legend-yellow-value">Medium</span>
-            <span id="legend-red-value">Max</span>
-        </div>
-    </div>
-
-    <div id="layout-controls-container" style="position: fixed; top: 250px; left: 20px; background-color: rgba(50,50,50,0.8); padding: 10px; border-radius: 5px; color: white; font-family: Arial, sans-serif;">
-        <h4>Layout Controls</h4>
-        <div>
-            <label for="repel-force">Repel Force:</label>
-            <input type="range" id="repel-force" min="0.01" max="1.0" value="0.3" step="0.01">
-            <span id="repel-force-value">0.3</span>
-        </div>
-        <div>
-            <label for="ideal-distance">Ideal Distance:</label>
-            <input type="range" id="ideal-distance" min="0.5" max="100" value="5.0" step="0.1">
-            <span id="ideal-distance-value">5.0</span>
-        </div>
-        <div>
-            <label for="iterations">Iterations:</label>
-            <input type="range" id="iterations" min="50" max="1000" value="300" step="10">
-            <span id="iterations-value">300</span>
-        </div>
-        <div>
-            <label for="cooling-factor">Cooling Factor:</label>
-            <input type="range" id="cooling-factor" min="0.8" max="0.99" value="0.95" step="0.01">
-            <span id="cooling-factor-value">0.95</span>
-        </div>
-        <button id="recompile-layout-button" style="margin-top: 10px;">Recompile Layout</button>
-    </div>
-
-    <div id="appearance-controls-container" style="position: fixed; top: 470px; left: 20px; background-color: rgba(50,50,50,0.8); padding: 10px; border-radius: 5px; color: white; font-family: Arial, sans-serif;">
-        <h4>Appearance Controls</h4>
-        <div>
-            <label for="qubit-size">Qubit Size:</label>
-            <input type="range" id="qubit-size" min="0.2" max="2.0" value="1.0" step="0.05">
-            <span id="qubit-size-value">1.0</span>
-        </div>
-        <div>
-            <label for="connection-thickness">Connection Thickness:</label>
-            <input type="range" id="connection-thickness" min="0.01" max="0.25" value="0.05" step="0.005">
-            <span id="connection-thickness-value">0.05</span>
-        </div>
-        <div>
-            <label for="inactive-alpha">Inactive Alpha:</label>
-            <input type="range" id="inactive-alpha" min="0.0" max="1.0" value="0.1" step="0.01">
-            <span id="inactive-alpha-value">0.1</span>
-        </div>
-    </div>
+    <div id="root"></div>
 
     <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
 
