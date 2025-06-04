@@ -99,15 +99,15 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           # Add both package.json and the UI file
-          git add package.json src/components/DatasetSelection.tsx
+          git add package.json src/components/DatasetSelection.tsx index.html # Ensure index.html is also added if modified by previous steps, though it shouldn't be
           # Check if there are changes to commit to prevent empty commits
           if git diff --staged --quiet; then
-            echo "No changes to UI version or package.json to commit."
+            echo "No changes to UI version, package.json, or index.html to commit."
           else
             git commit -m "chore(release): sync UI and package.json to released version ${{ steps.get_tag_version.outputs.tag_version }} [skip ci]"
             # This push updates the main branch with package.json and UI reflecting the tagged version.
             git push
-            echo "Committed and pushed synchronized UI and package.json for version ${{ steps.get_tag_version.outputs.tag_version }}."
+            echo "Committed and pushed synchronized UI, package.json for version ${{ steps.get_tag_version.outputs.tag_version }}."
           fi
 
   build_and_deploy:
@@ -137,11 +137,26 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
+    - name: Show index.html before Vite build # DEBUGGING STEP
+      run: |
+        echo "Content of root index.html before Vite build:"
+        ls -la
+        cat index.html || echo "Root index.html not found"
+
     - name: Compile TypeScript
       run: npx tsc
 
     - name: Build Vite application
       run: npx vite build
+
+    - name: Show dist/index.html after Vite build # DEBUGGING STEP
+      run: |
+        echo "Content of dist/index.html after Vite build:"
+        ls -la dist
+        cat dist/index.html || echo "dist/index.html not found"
+        echo "-----"
+        echo "Content of dist/assets directory:"
+        ls -la dist/assets || echo "dist/assets directory not found"
 
     - name: Setup Pages
       uses: actions/configure-pages@v4
