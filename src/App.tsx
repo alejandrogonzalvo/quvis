@@ -57,10 +57,10 @@ const App: React.FC = () => {
 
     // State for LayoutControls initial values (matching Playground defaults)
     const [initialLayout, setInitialLayout] = useState({
-        repelForce: 0.3,
+        repelForce: 0.6,
         idealDistance: 5.0,
-        iterations: 300,
-        coolingFactor: 0.95,
+        iterations: 500,
+        coolingFactor: 1.0,
     });
 
     // State for HeatmapControls initial values (matching Playground defaults)

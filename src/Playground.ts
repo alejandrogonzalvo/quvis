@@ -40,10 +40,10 @@ export class Playground {
     // recompileLayoutButton: HTMLButtonElement;
 
     // Stored layout parameters - Using defaults defined here
-    currentRepelForce: number = 0.3;
+    currentRepelForce: number = 0.6;
     currentIdealDistance: number = 5.0;
-    currentIterations: number = 300;
-    currentCoolingFactor: number = 0.95;
+    currentIterations: number = 500;
+    currentCoolingFactor: number = 1.0;
 
     // Loading screen element
     // loadingScreen: HTMLElement; // Will be handled by React if needed
