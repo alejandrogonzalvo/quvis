@@ -75,13 +75,16 @@ export class Playground {
     private boundOnMouseMove: (event: MouseEvent) => void;
     private boundOnMouseLeave: () => void;
     public readonly instanceId: string; // For debugging
+    private readonly datasetName: string; // To store the selected dataset name
 
     constructor(
-        container?: HTMLElement,
+        container: HTMLElement | undefined, // Made container explicitly possibly undefined to match usage
+        datasetName: string, // New parameter for the dataset name
         onSlicesLoadedCallback?: (count: number, initialIndex: number) => void,
         onTooltipUpdate?: (data: TooltipData | null) => void, // Added callback for tooltip
     ) {
         this.containerElement = container || null;
+        this.datasetName = datasetName; // Store the dataset name
         this.onSlicesLoadedCallback = onSlicesLoadedCallback;
         this.onTooltipUpdateCallback = onTooltipUpdate; // Store the callback
         this.scene = new THREE.Scene();
@@ -149,6 +152,7 @@ export class Playground {
             this.scene,
             this.mouse,
             this.camera,
+            this.datasetName, // Pass datasetName to QubitGrid
             this.maxHeatmapSlices,
             this.currentRepelForce,
             this.currentIdealDistance,

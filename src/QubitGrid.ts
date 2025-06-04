@@ -89,6 +89,7 @@ export class QubitGrid {
     private readonly heatmapLegendContainerId = "heatmap-legend-container";
     private readonly heatmapYellowThreshold = 0.5;
     private readonly heatmapWeightBase = 1.3;
+    private readonly datasetName: string;
 
     get current_slice_data(): Slice | null {
         if (
@@ -105,6 +106,7 @@ export class QubitGrid {
         scene: THREE.Scene,
         mouse: THREE.Vector2,
         camera: THREE.PerspectiveCamera,
+        datasetName: string,
         initialMaxSlicesForHeatmap: number = 10,
         initialKRepel: number = 0.3,
         initialIdealDist: number = 5.0,
@@ -132,6 +134,7 @@ export class QubitGrid {
         this.onSlicesLoadedCallback = onSlicesLoadedCallback;
 
         this.camera = camera;
+        this.datasetName = datasetName;
 
         this.timeline = new Timeline((sliceIndex) =>
             this.loadStateFromSlice(sliceIndex),
@@ -169,7 +172,8 @@ export class QubitGrid {
             );
         }
 
-        this.loadSlicesFromJSON("/quvis/qft_viz_data.json", camera);
+        const dataUrl = `/quvis/${this.datasetName}_viz_data.json`;
+        this.loadSlicesFromJSON(dataUrl, camera);
     }
 
     private calculateQubitPositions(

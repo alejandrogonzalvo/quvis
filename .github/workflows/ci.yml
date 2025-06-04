@@ -35,6 +35,46 @@ jobs:
           # NPM_TOKEN: ${{ secrets.NPM_TOKEN }} # Uncomment if publishing to npm
         run: npx semantic-release
 
+      - name: Get package version
+        id: package_version
+        run: |
+          # Ensure package.json exists before trying to read it
+          if [ ! -f package.json ]; then
+            echo "package.json not found!"
+            exit 1
+          fi
+          echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Update version in UI
+        run: |
+          VERSION=${{ steps.package_version.outputs.version }}
+          if [ -z "$VERSION" ]; then
+            echo "Version could not be determined from package.json"
+            exit 1
+          fi
+          echo "New version from package.json: $VERSION"
+          echo "Attempting to update src/components/DatasetSelection.tsx"
+          # Regex targets "Version X.Y.Z <br />" and replaces X.Y.Z with the new version
+          # Using a temporary file for sed to avoid issues with -i on some systems/versions of sed
+          sed "s/Version [0-9]\+\.[0-9]\+\.[0-9][0-9a-zA-Z.-]* <br \/>/Version $VERSION <br \/>/" src/components/DatasetSelection.tsx > src/components/DatasetSelection.tsx.tmp
+          mv src/components/DatasetSelection.tsx.tmp src/components/DatasetSelection.tsx
+          echo "Content of src/components/DatasetSelection.tsx after update:"
+          cat src/components/DatasetSelection.tsx
+
+      - name: Commit and push UI version update
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add src/components/DatasetSelection.tsx
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to UI version to commit."
+          else
+            git commit -m "chore: update version in UI to ${{ steps.package_version.outputs.version }} [skip ci]"
+            git push
+            echo "Committed and pushed UI version update."
+          fi
+
   build_and_deploy:
     needs: release
     runs-on: ubuntu-latest
