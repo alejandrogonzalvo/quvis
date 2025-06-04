@@ -42,6 +42,7 @@ const App: React.FC = () => {
         qubitSize: 1.0,
         connectionThickness: 0.05,
         inactiveAlpha: 0.1,
+        baseSize: 500.0,
     });
 
     // State for LayoutControls initial values (matching Playground defaults)
@@ -104,6 +105,7 @@ const App: React.FC = () => {
                 connectionThickness:
                     playgroundInstance.currentConnectionThickness,
                 inactiveAlpha: playgroundInstance.currentInactiveAlpha,
+                baseSize: playgroundInstance.currentBaseSize,
             });
             setInitialLayout({
                 repelForce: playgroundInstance.currentRepelForce,

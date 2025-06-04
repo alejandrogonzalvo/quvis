@@ -13,7 +13,7 @@ interface LayoutControlsProps {
 
 const panelStyle: React.CSSProperties = {
     position: "fixed",
-    top: "270px", // Positioned below the AppearanceControls (approx 20px top + 230px height + 20px margin)
+    top: "340px", // Adjusted from 270px to account for increased height of AppearanceControls
     left: "20px",
     backgroundColor: "rgba(50, 50, 50, 0.8)",
     padding: "15px",

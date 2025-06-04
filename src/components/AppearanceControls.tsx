@@ -7,6 +7,7 @@ interface AppearanceControlsProps {
         qubitSize: number;
         connectionThickness: number;
         inactiveAlpha: number;
+        baseSize: number;
     };
 }
 
@@ -55,11 +56,13 @@ const AppearanceControls: React.FC<AppearanceControlsProps> = ({
     const [inactiveAlpha, setInactiveAlpha] = useState(
         initialValues.inactiveAlpha,
     );
+    const [baseSize, setBaseSize] = useState(initialValues.baseSize);
 
     useEffect(() => {
         setQubitSize(initialValues.qubitSize);
         setConnectionThickness(initialValues.connectionThickness);
         setInactiveAlpha(initialValues.inactiveAlpha);
+        setBaseSize(initialValues.baseSize);
     }, [initialValues]);
 
     const handleQubitSizeChange = (
@@ -84,6 +87,14 @@ const AppearanceControls: React.FC<AppearanceControlsProps> = ({
         const value = parseFloat(event.target.value);
         setInactiveAlpha(value);
         playground?.updateAppearanceParameters({ inactiveAlpha: value });
+    };
+
+    const handleBaseSizeChange = (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const value = parseFloat(event.target.value);
+        setBaseSize(value);
+        playground?.updateAppearanceParameters({ baseSize: value });
     };
 
     if (!playground) {
@@ -152,6 +163,23 @@ const AppearanceControls: React.FC<AppearanceControlsProps> = ({
                     step="0.01"
                     value={inactiveAlpha}
                     onChange={handleInactiveAlphaChange}
+                    style={sliderStyle}
+                />
+            </div>
+
+            <div style={controlGroupStyle}>
+                <label htmlFor="heatmap-base-size" style={labelStyle}>
+                    Heatmap Base Size:{" "}
+                    <span style={valueStyle}>{baseSize.toFixed(0)}</span>
+                </label>
+                <input
+                    type="range"
+                    id="heatmap-base-size"
+                    min="0"
+                    max="2000"
+                    step="10"
+                    value={baseSize}
+                    onChange={handleBaseSizeChange}
                     style={sliderStyle}
                 />
             </div>

@@ -60,6 +60,7 @@ export class Playground {
     currentQubitSize: number = 1.0;
     currentConnectionThickness: number = 0.05;
     currentInactiveAlpha: number = 0.1;
+    currentBaseSize: number = 500.0; // Default from Heatmap.ts shader
 
     currentSlice: number = 0; // Initialize currentSlice
 
@@ -383,20 +384,37 @@ export class Playground {
         qubitSize?: number;
         connectionThickness?: number;
         inactiveAlpha?: number;
+        baseSize?: number; // Added baseSize
     }) {
-        if (params.qubitSize !== undefined)
+        let gridUpdateNeeded = false;
+        if (params.qubitSize !== undefined) {
             this.currentQubitSize = params.qubitSize;
-        if (params.connectionThickness !== undefined)
+            // Actual update will be handled by grid.updateAppearanceParameters
+            gridUpdateNeeded = true;
+        }
+        if (params.connectionThickness !== undefined) {
             this.currentConnectionThickness = params.connectionThickness;
-        if (params.inactiveAlpha !== undefined)
+            gridUpdateNeeded = true;
+        }
+        if (params.inactiveAlpha !== undefined) {
             this.currentInactiveAlpha = params.inactiveAlpha;
+            gridUpdateNeeded = true;
+        }
 
-        if (this.grid) {
+        if (gridUpdateNeeded && this.grid) {
             this.grid.updateAppearanceParameters({
                 qubitSize: this.currentQubitSize,
                 connectionThickness: this.currentConnectionThickness,
                 inactiveAlpha: this.currentInactiveAlpha,
             });
+        }
+
+        if (params.baseSize !== undefined) {
+            this.currentBaseSize = params.baseSize;
+            if (this.grid && this.grid.heatmap) {
+                this.grid.heatmap.material.uniforms.baseSize.value =
+                    this.currentBaseSize;
+            }
         }
     }
 
