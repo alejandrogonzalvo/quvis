@@ -140,6 +140,22 @@ const App: React.FC = () => {
         setIsTimelineInitialized(true);
     };
 
+    // Callback for when visualization mode has switched and slice parameters might have changed
+    const handleModeSwitched = (
+        newSliceCount: number,
+        newCurrentSliceIndex: number,
+    ) => {
+        console.log(
+            `App.handleModeSwitched: newSliceCount=${newSliceCount}, newCurrentSliceIndex=${newCurrentSliceIndex}`,
+        );
+        setActualSliceCount(newSliceCount);
+        setMaxSliceIndex(newSliceCount > 0 ? newSliceCount - 1 : 0);
+        setCurrentSliceValue(newCurrentSliceIndex);
+        // Ensure timeline is marked as initialized if there are slices, otherwise not.
+        // This handles cases where a mode might have 0 slices.
+        setIsTimelineInitialized(newSliceCount > 0);
+    };
+
     const handleTooltipUpdate = (data: TooltipData | null) => {
         if (data) {
             let content = `Qubit ${data.id}\n`;
@@ -185,52 +201,89 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (mountRef.current && selectedDataset && !playgroundRef.current) {
-            // Check for selectedDataset and ensure playground isn't already initialized
-            const playgroundInstance = new Playground(
-                mountRef.current,
-                selectedDataset, // Pass the selected dataset name
-                visualizationMode, // Pass the current visualization mode
-                handleSlicesLoaded,
-                handleTooltipUpdate,
-            );
-            playgroundRef.current = playgroundInstance;
-            setIsPlaygroundInitialized(true); // Set playground as initialized
-            playgroundInstance.animate();
+        if (mountRef.current && selectedDataset) {
+            if (!playgroundRef.current) {
+                // Playground does not exist, create it (e.g., on initial load or dataset change)
+                const playgroundInstance = new Playground(
+                    mountRef.current,
+                    selectedDataset,
+                    visualizationMode,
+                    handleSlicesLoaded,
+                    handleTooltipUpdate,
+                    handleModeSwitched,
+                );
+                playgroundRef.current = playgroundInstance;
+                setIsPlaygroundInitialized(true);
+                playgroundInstance.animate();
 
-            // Set initial values for controls from the playground instance
-            setInitialAppearance({
-                qubitSize: playgroundInstance.currentQubitSize,
-                connectionThickness:
-                    playgroundInstance.currentConnectionThickness,
-                inactiveAlpha: playgroundInstance.currentInactiveAlpha,
-                baseSize: playgroundInstance.currentBaseSize,
-            });
-            setInitialLayout({
-                repelForce: playgroundInstance.currentRepelForce,
-                idealDistance: playgroundInstance.currentIdealDistance,
-                iterations: playgroundInstance.currentIterations,
-                coolingFactor: playgroundInstance.currentCoolingFactor,
-            });
-            setInitialHeatmapSlices(playgroundInstance.maxHeatmapSlices);
-            // Set initial values for FidelityControls from the playground instance
-            setInitialFidelitySettings({
-                oneQubitBase: playgroundInstance.currentOneQubitFidelityBase,
-                twoQubitBase: playgroundInstance.currentTwoQubitFidelityBase,
-            });
+                setInitialAppearance({
+                    qubitSize: playgroundInstance.currentQubitSize,
+                    connectionThickness:
+                        playgroundInstance.currentConnectionThickness,
+                    inactiveAlpha: playgroundInstance.currentInactiveAlpha,
+                    baseSize: playgroundInstance.currentBaseSize,
+                });
+                setInitialLayout({
+                    repelForce: playgroundInstance.currentRepelForce,
+                    idealDistance: playgroundInstance.currentIdealDistance,
+                    iterations: playgroundInstance.currentIterations,
+                    coolingFactor: playgroundInstance.currentCoolingFactor,
+                });
+                setInitialHeatmapSlices(playgroundInstance.maxHeatmapSlices);
+                setInitialFidelitySettings({
+                    oneQubitBase:
+                        playgroundInstance.currentOneQubitFidelityBase,
+                    twoQubitBase:
+                        playgroundInstance.currentTwoQubitFidelityBase,
+                });
+            } else {
+                // Playground exists, check if only visualizationMode changed
+                // Access the current visualization mode of the playground instance
+                // This requires Playground to expose its current mode or for us to track the 'last used mode for creation'
+                // For now, we assume if playgroundRef.current exists, and visualizationMode in state changes,
+                // it's a mode switch on the existing instance.
+                // This part of the logic might need refinement if dataset can change without playgroundRef being nullified first.
+                playgroundRef.current.setVisualizationMode(visualizationMode);
+            }
         }
 
+        // Cleanup logic for when selectedDataset changes OR component unmounts
         return () => {
-            // Cleanup on component unmount or when selectedDataset changes
+            if (selectedDataset && playgroundRef.current) {
+                // This cleanup should only run if the selectedDataset is about to change,
+                // or if the component is unmounting.
+                // We don't want to dispose if only visualizationMode changed.
+                // This is tricky. A simple way is to check if the new selectedDataset (from a potential future render) is different.
+                // However, a change in selectedDataset *will* nullify playgroundRef.current via handleDatasetSelect
+                // So, this cleanup as is, might be okay if handleDatasetSelect always runs first for dataset changes.
+            }
+            // If the effect is re-running due to selectedDataset changing, handleDatasetSelect should have already disposed.
+            // If the component is unmounting, this will dispose.
+            // If only visualizationMode changed, we DON'T want to dispose here.
+            // The current structure: handleDatasetSelect disposes and nulls playgroundRef.
+            // So, if selectedDataset changes, playgroundRef.current will be null when this effect runs for the new dataset.
+        };
+    }, [selectedDataset, visualizationMode]);
+
+    // Effect specifically for dataset changes to dispose the old playground
+    useEffect(() => {
+        return () => {
+            // This cleanup runs when selectedDataset is about to change OR on unmount.
             if (playgroundRef.current) {
+                console.log(
+                    "Disposing playground due to dataset change or unmount. Instance ID:",
+                    playgroundRef.current.instanceId,
+                );
                 playgroundRef.current.dispose();
                 playgroundRef.current = null;
+                setIsPlaygroundInitialized(false);
+                setIsTimelineInitialized(false);
+                // Reset other related states if necessary
+                setActualSliceCount(0);
+                setMaxSliceIndex(0);
             }
-            setIsTimelineInitialized(false); // Reset on unmount or dataset change
-            setActualSliceCount(0); // Also reset actualSliceCount
-            setIsPlaygroundInitialized(false); // Reset on unmount or dataset change
         };
-    }, [selectedDataset, visualizationMode]); // Add visualizationMode to dependency array
+    }, [selectedDataset]); // Only run this effect when selectedDataset changes
 
     const handleTimelineChange = (newSliceIndex: number) => {
         if (playgroundRef.current) {
