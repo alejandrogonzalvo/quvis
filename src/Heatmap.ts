@@ -58,27 +58,51 @@ export class Heatmap {
             fragmentShader: `
             uniform float radius;
             varying vec3 vPosition;
-            varying float vIntensity;
+            varying float vIntensity; // This is now correctly normalized: 0 to 1 based on max_in_window
             
             void main() {
-                vec2 coord = gl_PointCoord * 2.0 - vec2(1.0);
+                vec2 coord = gl_PointCoord * 2.0 - vec2(1.0); // For circular points
                 float distance = length(coord);
                 
-                float alpha = smoothstep(radius, radius * 0.1, distance);
-                
-                vec3 colorValue;
-                // Clamp vIntensity to [0,1] just in case, though it should be already.
+                // Alpha for particle shape (soft edges)
+                float particleAlpha = smoothstep(radius, radius * 0.1, distance);
+                if (particleAlpha < 0.001) discard; // Optimization: discard fully transparent fragments
+
+                // Clamp vIntensity to [0,1] as good practice, though it should be already.
                 float clampedIntensity = clamp(vIntensity, 0.0, 1.0);
 
-                if (clampedIntensity <= 0.5) {
-                    // Transition from Green (0,1,0) at intensity 0 to Yellow (1,1,0) at intensity 0.5
-                    colorValue = vec3(clampedIntensity * 2.0, 1.0, 0.0);
+                float intensityBasedAlpha;
+                vec3 colorValue;
+
+                // Threshold for an interaction to be considered \\"zero\\" for display
+                const float zeroThreshold = 0.001; 
+                // Threshold below which alpha ramps up (e.g., 10% of max interactions)
+                // This means intensities from 0 to 0.1 of max will ramp up their alpha.
+                const float alphaRampUpThreshold = 0.1; 
+
+                if (clampedIntensity < zeroThreshold) {
+                    intensityBasedAlpha = 0.0; // Fully transparent for zero interactions
+                    // colorValue is irrelevant if alpha is 0, but set it to avoid undefined behavior
+                    colorValue = vec3(0.0, 1.0, 0.0); // Default to Green
                 } else {
-                    // Transition from Yellow (1,1,0) at intensity 0.5 to Red (1,0,0) at intensity 1.0
-                    colorValue = vec3(1.0, 1.0 - (clampedIntensity - 0.5) * 2.0, 0.0);
+                    // Ramp up alpha for low intensities, then solid alpha for higher intensities
+                    intensityBasedAlpha = smoothstep(0.0, alphaRampUpThreshold, clampedIntensity);
+                    
+                    // Color transitions: Green -> Yellow -> Red based on clampedIntensity
+                    if (clampedIntensity <= 0.5) {
+                        // Transition from Green (0,1,0) towards Yellow (1,1,0) as intensity goes from 0 to 0.5
+                        // At intensity 0 (or very near it), color is (0,1,0) -> Green
+                        // At intensity 0.5, color is (1,1,0) -> Yellow
+                        colorValue = vec3(clampedIntensity * 2.0, 1.0, 0.0);
+                    } else {
+                        // Transition from Yellow (1,1,0) towards Red (1,0,0) as intensity goes from 0.5 to 1.0
+                        // At intensity 0.5, color is (1,1,0) -> Yellow
+                        // At intensity 1.0, color is (1,0,0) -> Red
+                        colorValue = vec3(1.0, 1.0 - (clampedIntensity - 0.5) * 2.0, 0.0);
+                    }
                 }
                 
-                gl_FragColor = vec4(colorValue, alpha);
+                gl_FragColor = vec4(colorValue, particleAlpha * intensityBasedAlpha);
             }
         `,
             transparent: true,
@@ -165,36 +189,25 @@ export class Heatmap {
             }
         }
 
-        let denominatorForPointNormalization: number;
-        if (this.maxSlices === -1) {
-            // "All slices" mode
-            denominatorForPointNormalization = 10.0; // Fixed typical window size for normalization
-        } else {
-            // Fixed window size mode
-            denominatorForPointNormalization = Math.max(
-                1.0,
-                parseFloat(this.maxSlices.toString()),
-            ); // Use configured maxSlices, ensure at least 1
-        }
+        // Normalize intensities based on the maximum observed interaction count in the current window.
+        const denominator =
+            maxObservedRawInteractionCount > 0
+                ? maxObservedRawInteractionCount
+                : 1.0;
 
         for (let i = 0; i < rawInteractionCounts.length; i++) {
             const currentRawCount = rawInteractionCounts[i];
-            let normalizedIntensity = 0;
-            if (denominatorForPointNormalization > 0) {
-                normalizedIntensity =
-                    currentRawCount / denominatorForPointNormalization;
-            }
-
-            // Clamp normalizedIntensity to [0,1] before applying floor
-            normalizedIntensity = Math.max(
-                0.0,
-                Math.min(1.0, normalizedIntensity),
-            );
-
-            if (currentRawCount > 0.0001) {
-                this.intensities[i] = Math.max(normalizedIntensity, 0.002); // Apply floor
+            if (maxObservedRawInteractionCount === 0) {
+                // If no interactions anywhere, all intensities are 0
+                this.intensities[i] = 0.0;
             } else {
-                this.intensities[i] = 0;
+                // Normalize intensity based on the max observed in the current set of slices.
+                const normalizedIntensity = currentRawCount / denominator;
+                // Ensure intensity is strictly within [0,1]
+                this.intensities[i] = Math.max(
+                    0.0,
+                    Math.min(1.0, normalizedIntensity),
+                );
             }
         }
 
