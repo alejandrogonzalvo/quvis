@@ -1,13 +1,16 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { QubitGrid } from "./QubitGrid.js";
-import { State } from "./State.js";
 
 export interface TooltipData {
     id: number;
-    stateName: string; // e.g., "ZERO", "ONE"
+    stateName?: string; // e.g., "ZERO", "ONE" - now optional
     x: number; // screen X
     y: number; // screen Y
+    oneQubitGatesInWindow?: number; // Renamed from oneQubitGateCount
+    twoQubitGatesInWindow?: number; // Renamed from twoQubitGateCount
+    sliceWindowForGateCount?: number; // Will map to windowForCountsInWindow
+    fidelity?: number; // New: for fidelity placeholder
 }
 
 export class Playground {
@@ -63,6 +66,8 @@ export class Playground {
     currentBaseSize: number = 500.0; // Default from Heatmap.ts shader
 
     currentSlice: number = 0; // Initialize currentSlice
+    currentOneQubitFidelityBase: number = 0.99; // Default base fidelity for 1-qubit gates
+    currentTwoQubitFidelityBase: number = 0.98; // Default base fidelity for 2-qubit gates
 
     private containerElement: HTMLElement | null = null;
     private animationFrameId: number | null = null;
@@ -72,11 +77,14 @@ export class Playground {
     private onTooltipUpdateCallback:
         | ((data: TooltipData | null) => void)
         | undefined;
+    private onModeSwitchedCallback:
+        | ((newSliceCount: number, newCurrentSliceIndex: number) => void)
+        | undefined;
     private boundOnMouseMove: (event: MouseEvent) => void;
     private boundOnMouseLeave: () => void;
     public readonly instanceId: string; // For debugging
     private readonly datasetName: string; // To store the selected dataset name
-    private readonly visualizationMode: "compiled" | "logical"; // Added to store the mode
+    private visualizationMode: "compiled" | "logical"; // Changed from readonly to allow update
 
     constructor(
         container: HTMLElement | undefined, // Made container explicitly possibly undefined to match usage
@@ -84,12 +92,17 @@ export class Playground {
         visualizationMode: "compiled" | "logical", // New parameter for visualization mode
         onSlicesLoadedCallback?: (count: number, initialIndex: number) => void,
         onTooltipUpdate?: (data: TooltipData | null) => void, // Added callback for tooltip
+        onModeSwitchedCallback?: (
+            newSliceCount: number,
+            newCurrentSliceIndex: number,
+        ) => void, // New callback
     ) {
         this.containerElement = container || null;
         this.datasetName = datasetName; // Store the dataset name
         this.visualizationMode = visualizationMode; // Store the visualization mode
         this.onSlicesLoadedCallback = onSlicesLoadedCallback;
         this.onTooltipUpdateCallback = onTooltipUpdate; // Store the callback
+        this.onModeSwitchedCallback = onModeSwitchedCallback; // Store the new callback
         this.scene = new THREE.Scene();
         this.mouse = new THREE.Vector2();
         this.scene.background = new THREE.Color(0x121212);
@@ -309,15 +322,39 @@ export class Playground {
             if (targetBlochSphereGroup) {
                 const qubitId = targetBlochSphereGroup.userData
                     .qubitId as number;
-                const qubitStateNumeric = targetBlochSphereGroup.userData
-                    .qubitState as State; // This is the numeric enum value
-                const stateName = State[qubitStateNumeric] || "Unknown"; // Convert numeric enum to string name
+
+                let gateInfo = {
+                    oneQubitGatesInWindow: 0,
+                    twoQubitGatesInWindow: 0,
+                    totalOneQubitGates: 0,
+                    totalTwoQubitGates: 0,
+                    windowForCountsInWindow: 0,
+                };
+                let finalFidelity = 0;
+
+                if (this.grid) {
+                    gateInfo = this.grid.getGateCountForQubit(qubitId);
+
+                    const fidelity1Q = Math.pow(
+                        this.currentOneQubitFidelityBase,
+                        gateInfo.totalOneQubitGates,
+                    );
+                    const fidelity2Q = Math.pow(
+                        this.currentTwoQubitFidelityBase,
+                        gateInfo.totalTwoQubitGates,
+                    );
+                    const calculatedFidelity = fidelity1Q * fidelity2Q;
+                    finalFidelity = Math.min(1.0, calculatedFidelity);
+                }
 
                 hoveredQubitData = {
                     id: qubitId,
-                    stateName: stateName,
                     x: event.clientX,
                     y: event.clientY,
+                    oneQubitGatesInWindow: gateInfo.oneQubitGatesInWindow,
+                    twoQubitGatesInWindow: gateInfo.twoQubitGatesInWindow,
+                    sliceWindowForGateCount: gateInfo.windowForCountsInWindow,
+                    fidelity: finalFidelity,
                 };
             }
         }
@@ -530,5 +567,41 @@ export class Playground {
 
     private loadInitialData(): void {
         // ... existing code ...
+    }
+
+    public updateFidelityParameters(params: {
+        oneQubitBase?: number;
+        twoQubitBase?: number;
+    }) {
+        if (params.oneQubitBase !== undefined) {
+            this.currentOneQubitFidelityBase = params.oneQubitBase;
+        }
+        if (params.twoQubitBase !== undefined) {
+            this.currentTwoQubitFidelityBase = params.twoQubitBase;
+        }
+        // Potentially, you might want to trigger an update in QubitGrid if fidelity affects visuals directly
+        // For example, if qubit appearance changes based on its calculated fidelity.
+        // this.grid.updateFidelityDisplay(); // Assuming such a method exists or is needed in QubitGrid
+        console.log(
+            "Fidelity parameters updated in Playground:",
+            this.currentOneQubitFidelityBase,
+            this.currentTwoQubitFidelityBase,
+        );
+    }
+
+    public setVisualizationMode(mode: "compiled" | "logical"): void {
+        if (this.visualizationMode === mode) {
+            return; // No change needed
+        }
+        this.visualizationMode = mode;
+        if (this.grid) {
+            this.grid.setVisualizationMode(mode);
+            // After the grid has switched mode and updated its internal state (slice count, current index),
+            // invoke the callback to notify App.tsx or other listeners.
+            const newSliceCount = this.grid.getActiveSliceCount();
+            const newCurrentSliceIndex = this.grid.getActiveCurrentSliceIndex();
+            this.onModeSwitchedCallback?.(newSliceCount, newCurrentSliceIndex);
+        }
+        console.log(`Playground visualization mode set to: ${mode}`);
     }
 }

@@ -158,10 +158,10 @@ export class HeatmapLegend {
             <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 5px;">
                 <div style="width: 100px; height: 15px; background: linear-gradient(to right, #00FF00, #FFFF00, #FF0000); border: 1px solid #999;"></div>
             </div>
-            <div style="font-size: 11px; line-height: 1.4;">
-                <span id="${textLowId}"></span><br>
-                <span id="${textMedId}"></span><br>
-                <span id="${textHighId}"></span>
+            <div style="font-size: 11px; line-height: 1.4; text-align: center;">
+                <span id="${textLowId}" style="font-size: 1.2em;"></span><br>
+                <span id="${textMedId}" style="font-size: 1.2em;"></span><br>
+                <span id="${textHighId}" style="font-size: 1.2em;"></span>
             </div>
             <div id="${subtitleId}" style="font-size: 9px; color: #ccc; margin-top: 5px; text-align: center;"></div>
         `;

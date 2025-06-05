@@ -24,7 +24,7 @@ const Tooltip: React.FC<TooltipProps> = ({ visible, content, x, y }) => {
         fontFamily: "Arial, sans-serif",
         zIndex: 1000, // Ensure it's on top
         pointerEvents: "none", // So it doesn't interfere with mouse events on other elements
-        whiteSpace: "nowrap",
+        whiteSpace: "pre-line",
         boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
     };
 

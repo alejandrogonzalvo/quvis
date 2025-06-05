@@ -4,39 +4,11 @@ from qiskit import qasm3
 from qiskit.converters import circuit_to_dag
 import json
 import argparse
-import numpy as np # For pi
-
-def create_ring_coupling_map(num_device_qubits: int) -> list[list[int]]:
-    """
-    Generates a coupling map for a ring topology of num_device_qubits.
-    The coupling map is a list of lists, e.g., [[0,1], [1,2], ..., [N-1,0]].
-    """
-    if num_device_qubits <= 0:
-        raise ValueError("num_device_qubits must be a positive integer")
-    if num_device_qubits == 1:
-        return []  # A single qubit has no connections
-    
-    coupling_map = []
-    for i in range(num_device_qubits):
-        # Edge from i to (i+1) mod N
-        coupling_map.append([i, (i + 1) % num_device_qubits])
-    # For Qiskit's transpile function, providing these directed edges for a ring
-    # is sufficient for it to understand the connectivity.
-    # If both directions were needed explicitly for some reason:
-    # temp_map = []
-    # for i in range(num_device_qubits):
-    #     qubit1 = i
-    #     qubit2 = (i + 1) % num_device_qubits
-    #     temp_map.append([qubit1, qubit2])
-    #     temp_map.append([qubit2, qubit1])
-    # unique_couplings_set = {frozenset(pair) for pair in temp_map}
-    # return [list(pair) for pair in unique_couplings_set]
-    return coupling_map
-
+import numpy as np
 
 def main():
     # --- Argument Parsing --- 
-    parser = argparse.ArgumentParser(description="Compile a QAOA circuit for a ring topology and extract interactions.")
+    parser = argparse.ArgumentParser(description="Compile a QAOA circuit for a given device topology (from file) and extract interactions.")
     parser.add_argument(
         "-q", "--qaoa_qubits", 
         type=int, 
@@ -44,10 +16,10 @@ def main():
         help="Number of qubits for the QAOA circuit (default: 4)"
     )
     parser.add_argument(
-        "-d", "--num_ring_qubits", # Changed from -g, --grid_size
-        type=int,
-        default=5, # Default ring size
-        help="Number of qubits in the ring topology of the device (default: 5)"
+        "--coupling_map_file",
+        type=str,
+        required=True,
+        help="Path to the JSON file containing the device coupling map and info."
     )
     parser.add_argument(
         "-p", "--qaoa_reps",
@@ -58,12 +30,35 @@ def main():
     args = parser.parse_args()
 
     # --- Configuration from args ---
-    num_device_qubits = args.num_ring_qubits # Changed from n_grid_size
     m_qaoa_qubits = args.qaoa_qubits
     qaoa_p = args.qaoa_reps
+    coupling_map_filepath = args.coupling_map_file
     # ---------------------
 
-    print(f"Config: QAOA qubits = {m_qaoa_qubits}, Ring device qubits = {num_device_qubits}, QAOA reps (p) = {qaoa_p}")
+    # --- Load Coupling Map from File ---
+    print(f"Loading coupling map from: {coupling_map_filepath}")
+    try:
+        with open(coupling_map_filepath, 'r') as f:
+            device_data = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: Coupling map file not found at {coupling_map_filepath}")
+        return
+    except json.JSONDecodeError:
+        print(f"Error: Could not decode JSON from {coupling_map_filepath}")
+        return
+
+    coupling_map_list = device_data.get("coupling_map")
+    num_device_qubits = device_data.get("num_qubits")
+    topology_type = device_data.get("topology_type", "unknown")
+
+    if coupling_map_list is None or num_device_qubits is None:
+        print("Error: The coupling map file must contain 'coupling_map' (list) and 'num_qubits' (int).")
+        return
+    
+    print(f"Successfully loaded device data: Topology='{topology_type}', Device Qubits='{num_device_qubits}'")
+    # --- End Load Coupling Map ---
+
+    print(f"Config: QAOA qubits = {m_qaoa_qubits}, Device Qubits (from file) = {num_device_qubits}, QAOA reps (p) = {qaoa_p}")
 
     if m_qaoa_qubits <= 0:
         print("Error: Number of QAOA qubits must be positive.")
@@ -71,26 +66,23 @@ def main():
     if qaoa_p <= 0:
         print("Error: Number of QAOA repetitions (p) must be positive.")
         return
-    if num_device_qubits <= 0: # Added check for num_ring_qubits
-        print("Error: Number of ring device qubits must be positive.")
+    if not isinstance(num_device_qubits, int) or num_device_qubits <= 0:
+        print(f"Error: 'num_qubits' in {coupling_map_filepath} must be a positive integer. Found: {num_device_qubits}")
         return
 
     if m_qaoa_qubits > num_device_qubits:
         print(
-            f"Error: QAOA circuit requires {m_qaoa_qubits} qubits, but the ring device only has {num_device_qubits} qubits."
+            f"Error: QAOA circuit requires {m_qaoa_qubits} qubits, but the device (from {coupling_map_filepath}) only has {num_device_qubits} qubits."
         )
         print("Number of device qubits in the ring must be greater than or equal to QAOA qubits.")
         return
 
-    print(f"Defining a quantum processor with a ring topology of {num_device_qubits} qubits.")
-    coupling_map_list = create_ring_coupling_map(num_device_qubits)
-
     if not coupling_map_list and num_device_qubits > 1: 
         print(
-            f"Warning: Generated an empty coupling map for num_ring_qubits={num_device_qubits}. This might be an issue if num_ring_qubits > 1."
+            f"Warning: Loaded an empty coupling map for a device with {num_device_qubits} qubits from {coupling_map_filepath}. This might be an issue if num_device_qubits > 1."
         )
     elif coupling_map_list: # Print if not empty
-        print(f"Generated ring coupling map: {coupling_map_list}")
+        print(f"Using coupling map (loaded from file): {coupling_map_list}")
 
     # Create QAOA circuit
     print(
@@ -165,7 +157,7 @@ def main():
     # If m_qaoa_qubits > 1 and num_device_qubits is 1, we've already errored out.
 
     print(
-        f"\nTranspiling QAOA circuit for the ring topology with {num_device_qubits} physical qubits..."
+        f"\nTranspiling QAOA circuit for the device topology (from {coupling_map_filepath}) with {num_device_qubits} physical qubits..."
     )
     
     transpile_options = {
@@ -183,20 +175,14 @@ def main():
         **transpile_options
     )
 
-    print("\nTranspiled QAOA circuit:")
-    # print(transpiled_qc.draw(output="text")) # Keep this commented or use if needed for debugging
-
-    print("\nQASM for the transpiled circuit:")
-    # print(qasm3.dumps(transpiled_qc)) # Keep this commented or use if needed for debugging
-
     # --- Extract qubit interactions per time slice from transpiled circuit ---
-    print("\nExtracting compiled qubit interactions for visualization...") # Changed print message
-    compiled_dag = circuit_to_dag(transpiled_qc) # Renamed dag to compiled_dag
+    print("\nExtracting compiled qubit interactions for visualization...")
+    compiled_dag = circuit_to_dag(transpiled_qc)
     compiled_operations_per_slice = [] # Renamed slices_data_for_json
     
-    compiled_qubit_indices = {qubit: i for i, qubit in enumerate(transpiled_qc.qubits)} # Renamed qubit_indices
+    compiled_qubit_indices = {qubit: i for i, qubit in enumerate(transpiled_qc.qubits)}
 
-    for i, layer in enumerate(compiled_dag.layers()): # Use compiled_dag
+    for i, layer in enumerate(compiled_dag.layers()):
         slice_ops = []
         for node in layer['graph'].op_nodes(): 
             op = node.op
@@ -207,9 +193,9 @@ def main():
         if slice_ops: 
             compiled_operations_per_slice.append(slice_ops)
 
-    num_compiled_qubits = transpiled_qc.num_qubits # Renamed num_qubits_for_viz
-    print(f"  Number of compiled qubits: {num_compiled_qubits}") # Added print for compiled info
-    print(f"  Number of time slices in compiled circuit: {len(compiled_operations_per_slice)}") # Added print for compiled info
+    num_compiled_qubits = transpiled_qc.num_qubits
+    print(f"  Number of compiled qubits: {num_compiled_qubits}") 
+    print(f"  Number of time slices in compiled circuit: {len(compiled_operations_per_slice)}")
     # --- End of compiled interaction extraction ---
 
     # Create the data structure for JSON
@@ -223,6 +209,8 @@ def main():
             "compiled_interaction_graph_ops_per_slice": compiled_operations_per_slice
         },
         "device_info": {
+            "source_coupling_map_file": coupling_map_filepath,
+            "topology_type": topology_type,
             "num_qubits_on_device": num_device_qubits, 
             "connectivity_graph_coupling_map": coupling_map_list
         }
@@ -234,10 +222,9 @@ def main():
         json.dump(output_data, f, indent=4)
 
     print(f"\nInteraction data saved to {output_filename}")
-    # Updated print statements to reflect both logical and compiled data
     print(f"  Logical circuit: {num_logical_qubits} qubits, {len(logical_operations_per_slice)} slices.")
     print(f"  Compiled circuit: {num_compiled_qubits} qubits, {len(compiled_operations_per_slice)} slices.")
-    print(f"  Device: {num_device_qubits} qubits on a ring topology.")
+    print(f"  Device: {num_device_qubits} qubits, topology '{topology_type}' (loaded from {coupling_map_filepath}).")
 
 
 if __name__ == "__main__":
