@@ -1,10 +1,12 @@
 import React from "react";
 
 interface DatasetSelectionProps {
-    onSelect: (datasetName: string) => void;
+    onSelect: (datasetName: string | File) => void;
 }
 
 const DatasetSelection: React.FC<DatasetSelectionProps> = ({ onSelect }) => {
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
     const buttonStyle: React.CSSProperties = {
         padding: "20px 40px",
         margin: "20px",
@@ -67,6 +69,17 @@ const DatasetSelection: React.FC<DatasetSelectionProps> = ({ onSelect }) => {
         e.currentTarget.style.transform = "scale(1)";
     };
 
+    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            onSelect(file);
+        }
+    };
+
+    const triggerFileInput = () => {
+        fileInputRef.current?.click();
+    };
+
     return (
         <div style={containerStyle}>
             <h1 style={mainTitleStyle}>QuViS</h1>
@@ -100,6 +113,21 @@ const DatasetSelection: React.FC<DatasetSelectionProps> = ({ onSelect }) => {
                 >
                     Quantum Approximate Optimization Algorithm (QAOA)
                 </button>
+                <button
+                    style={buttonStyle}
+                    onMouseOver={handleMouseOver}
+                    onMouseOut={handleMouseOut}
+                    onClick={triggerFileInput}
+                >
+                    Upload Custom JSON
+                </button>
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    style={{ display: "none" }}
+                    accept=".json"
+                    onChange={handleFileUpload}
+                />
             </div>
         </div>
     );

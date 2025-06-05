@@ -1,20 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Playground, TooltipData } from "./Playground.js"; // Ensure Playground is exported and path is correct
-import TimelineSlider from "./components/TimelineSlider.js"; // Import the slider
-import AppearanceControls from "./components/AppearanceControls.js"; // Reverted to .js extension
-import LayoutControls from "./components/LayoutControls.js"; // Import LayoutControls
-import HeatmapControls from "./components/HeatmapControls.js"; // Import HeatmapControls
-import Tooltip from "./components/Tooltip.js"; // Import the Tooltip component
-import DatasetSelection from "./components/DatasetSelection.js"; // Import the new component
-import VisualizationModeSwitcher from "./components/VisualizationModeSwitcher.js"; // Import the new switcher
-import "./../style.css"; // Assuming global styles are still desired
+import { Playground, TooltipData } from "./Playground.js";
+import TimelineSlider from "./components/TimelineSlider.js";
+import AppearanceControls from "./components/AppearanceControls.js";
+import LayoutControls from "./components/LayoutControls.js";
+import HeatmapControls from "./components/HeatmapControls.js";
+import Tooltip from "./components/Tooltip.js";
+import DatasetSelection from "./components/DatasetSelection.js";
+import VisualizationModeSwitcher from "./components/VisualizationModeSwitcher.js";
+import "./../style.css";
 
-// Constants for panel height calculations (in pixels)
 const BASE_TOP_MARGIN_PX = 20;
 const INTER_PANEL_SPACING_PX = 20;
-const COLLAPSED_PANEL_HEADER_HEIGHT_PX = 50; // Approx height of title + toggle button + top/bottom padding of header div
-const PANEL_BOTTOM_PADDING_PX = 15; // From panelStyle
-const CONTROL_GROUP_APPROX_HEIGHT_PX = 65; // Approx height for one slider group including its margin
+const COLLAPSED_PANEL_HEADER_HEIGHT_PX = 50;
+const PANEL_BOTTOM_PADDING_PX = 15;
+const CONTROL_GROUP_APPROX_HEIGHT_PX = 65;
 
 const APPEARANCE_PANEL_SLIDER_COUNT = 4;
 const APPEARANCE_PANEL_EXPANDED_CONTENT_HEIGHT =
@@ -25,13 +24,6 @@ const APPEARANCE_PANEL_EXPANDED_HEIGHT_PX =
     PANEL_BOTTOM_PADDING_PX;
 const APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX =
     COLLAPSED_PANEL_HEADER_HEIGHT_PX + PANEL_BOTTOM_PADDING_PX;
-
-// Layout panel also has a button at the end
-// const LAYOUT_PANEL_SLIDER_COUNT = 4;
-// const LAYOUT_PANEL_BUTTON_HEIGHT_PX = 45; // Approx height for the button + margin
-// const LAYOUT_PANEL_EXPANDED_CONTENT_HEIGHT = (LAYOUT_PANEL_SLIDER_COUNT * CONTROL_GROUP_APPROX_HEIGHT_PX) + LAYOUT_PANEL_BUTTON_HEIGHT_PX;
-// const LAYOUT_PANEL_EXPANDED_HEIGHT_PX = COLLAPSED_PANEL_HEADER_HEIGHT_PX + LAYOUT_PANEL_EXPANDED_CONTENT_HEIGHT + PANEL_BOTTOM_PADDING_PX;
-// const LAYOUT_PANEL_COLLAPSED_HEIGHT_PX = COLLAPSED_PANEL_HEADER_HEIGHT_PX + PANEL_BOTTOM_PADDING_PX;
 
 const App: React.FC = () => {
     const mountRef = useRef<HTMLDivElement>(null);
@@ -46,8 +38,8 @@ const App: React.FC = () => {
     >("compiled");
 
     // State for timeline
-    const [maxSliceIndex, setMaxSliceIndex] = useState<number>(0); // Renamed from totalSlices, represents max slider index
-    const [actualSliceCount, setActualSliceCount] = useState<number>(0); // New state for the actual number of slices
+    const [maxSliceIndex, setMaxSliceIndex] = useState<number>(0);
+    const [actualSliceCount, setActualSliceCount] = useState<number>(0);
     const [currentSliceValue, setCurrentSliceValue] = useState<number>(0);
     const [isTimelineInitialized, setIsTimelineInitialized] =
         useState<boolean>(false);
@@ -104,17 +96,13 @@ const App: React.FC = () => {
         setMaxSliceIndex(0); // Reset max index
         setActualSliceCount(0); // Reset actual count
         setCurrentSliceValue(0);
-        // setVisualizationMode("compiled"); // Optionally reset mode on new dataset
     };
 
     // Callback for when QubitGrid has loaded slice data
     const handleSlicesLoaded = (
-        sliceCount: number, // This is the actual number of slices from QubitGrid
+        sliceCount: number,
         initialSliceIndex: number,
     ) => {
-        console.log(
-            `App: Slices loaded. Count: ${sliceCount}, Initial Index: ${initialSliceIndex}`,
-        );
         setActualSliceCount(sliceCount); // Store the raw slice count
         setMaxSliceIndex(sliceCount > 0 ? sliceCount - 1 : 0); // Max index for slider
         setCurrentSliceValue(initialSliceIndex);
@@ -123,7 +111,24 @@ const App: React.FC = () => {
 
     const handleTooltipUpdate = (data: TooltipData | null) => {
         if (data) {
-            setTooltipContent(`Qubit ${data.id}: |${data.stateName}⟩`);
+            let content = `Qubit ${data.id}\n`;
+            if (
+                data.oneQubitGateCount !== undefined &&
+                data.twoQubitGateCount !== undefined &&
+                data.sliceWindowForGateCount !== undefined
+            ) {
+                const plural1Q = data.oneQubitGateCount === 1 ? "" : "s";
+                content += `1-Qubit Gate${plural1Q}: ${data.oneQubitGateCount}`;
+
+                content += `\n`; // Newline between 1-qubit and 2-qubit counts
+
+                const plural2Q = data.twoQubitGateCount === 1 ? "" : "s";
+                content += `2-Qubit Gate${plural2Q}: ${data.twoQubitGateCount}`;
+            } else if (data.stateName) {
+                // Fallback, though should ideally not be reached if counts are always provided
+                content += `|${data.stateName}⟩`;
+            }
+            setTooltipContent(content);
             setTooltipX(data.x);
             setTooltipY(data.y);
             setTooltipVisible(true);

@@ -1,13 +1,15 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { QubitGrid } from "./QubitGrid.js";
-import { State } from "./State.js";
 
 export interface TooltipData {
     id: number;
-    stateName: string; // e.g., "ZERO", "ONE"
+    stateName?: string; // e.g., "ZERO", "ONE" - now optional
     x: number; // screen X
     y: number; // screen Y
+    oneQubitGateCount?: number; // New: count for 1-qubit gates
+    twoQubitGateCount?: number; // New: count for 2-qubit gates
+    sliceWindowForGateCount?: number; // New: number of slices considered for gate count
 }
 
 export class Playground {
@@ -309,15 +311,24 @@ export class Playground {
             if (targetBlochSphereGroup) {
                 const qubitId = targetBlochSphereGroup.userData
                     .qubitId as number;
-                const qubitStateNumeric = targetBlochSphereGroup.userData
-                    .qubitState as State; // This is the numeric enum value
-                const stateName = State[qubitStateNumeric] || "Unknown"; // Convert numeric enum to string name
+
+                let gateInfo = {
+                    oneQubitGateCount: 0,
+                    twoQubitGateCount: 0,
+                    window: 0,
+                };
+                if (this.grid) {
+                    // Ensure grid is available
+                    gateInfo = this.grid.getGateCountForQubit(qubitId);
+                }
 
                 hoveredQubitData = {
                     id: qubitId,
-                    stateName: stateName,
                     x: event.clientX,
                     y: event.clientY,
+                    oneQubitGateCount: gateInfo.oneQubitGateCount,
+                    twoQubitGateCount: gateInfo.twoQubitGateCount,
+                    sliceWindowForGateCount: gateInfo.window,
                 };
             }
         }

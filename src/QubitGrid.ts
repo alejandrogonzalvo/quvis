@@ -78,6 +78,7 @@ export class QubitGrid {
     private lastCalculatedSlicesChangeIDs: Array<Set<number>> = [];
     public lastMaxObservedRawHeatmapSum: number = 0;
     public lastEffectiveSlicesForHeatmap: number = 0;
+    private allOperationsPerSlice: QubitOperation[][] = [];
 
     public qubitInstances: Map<number, Qubit> = new Map();
     private current_slice_index: number = 0;
@@ -104,7 +105,6 @@ export class QubitGrid {
     private readonly heatmapLegendContainerId = "heatmap-legend-container";
     private readonly heatmapYellowThreshold = 0.5;
     private readonly heatmapWeightBase = 1.3;
-    private readonly datasetName: string;
     private readonly visualizationMode: "compiled" | "logical";
 
     get current_slice_data(): Slice | null {
@@ -122,7 +122,7 @@ export class QubitGrid {
         scene: THREE.Scene,
         mouse: THREE.Vector2,
         camera: THREE.PerspectiveCamera,
-        datasetName: string,
+        datasetNameOrData: string | object,
         visualizationMode: "compiled" | "logical",
         initialMaxSlicesForHeatmap: number = 10,
         initialKRepel: number = 0.3,
@@ -151,7 +151,6 @@ export class QubitGrid {
         this.onSlicesLoadedCallback = onSlicesLoadedCallback;
 
         this.camera = camera;
-        this.datasetName = datasetName;
         this.visualizationMode = visualizationMode;
 
         this.timeline = new Timeline((sliceIndex) =>
@@ -190,8 +189,40 @@ export class QubitGrid {
             );
         }
 
-        const dataUrl = `/quvis/${this.datasetName}_viz_data.json`;
-        this.loadSlicesFromJSON(dataUrl, camera);
+        if (typeof datasetNameOrData === "string") {
+            const dataUrl = `/quvis/${datasetNameOrData}_viz_data.json`;
+            this.loadSlicesFromJSON(dataUrl, camera);
+        } else if (datasetNameOrData && typeof datasetNameOrData === "object") {
+            if (
+                "logical_circuit_info" in datasetNameOrData ||
+                "compiled_circuit_info" in datasetNameOrData
+            ) {
+                this._processCircuitData(
+                    datasetNameOrData as QFTVizData,
+                    camera,
+                );
+            } else {
+                console.error(
+                    "Invalid custom data object passed to QubitGrid constructor:",
+                    datasetNameOrData,
+                );
+                this.handleLoadError(
+                    new Error("Invalid custom data object"),
+                    camera,
+                    "Invalid custom data format",
+                );
+            }
+        } else {
+            console.error(
+                "Invalid datasetNameOrData provided to QubitGrid constructor:",
+                datasetNameOrData,
+            );
+            this.handleLoadError(
+                new Error("No dataset provided"),
+                camera,
+                "No dataset provided",
+            );
+        }
     }
 
     private calculateQubitPositions(
@@ -338,6 +369,7 @@ export class QubitGrid {
         console.error(message, error);
         this._qubit_count = 9;
         this.couplingMap = null;
+        this.allOperationsPerSlice = [];
         if (this.heatmap && this.heatmap.mesh)
             this.scene.remove(this.heatmap.mesh);
         this.heatmap = new Heatmap(
@@ -390,14 +422,6 @@ export class QubitGrid {
     }
 
     async loadSlicesFromJSON(url: string, camera: THREE.PerspectiveCamera) {
-        this.slices = [];
-        this.interactionPairsPerSlice = [];
-        this.qubitInstances.forEach((qubit) => qubit.dispose());
-        this.qubitInstances.clear();
-        this.heatmap.clearPositionsCache();
-        this.lastMaxObservedRawHeatmapSum = 0;
-        this.lastEffectiveSlicesForHeatmap = 0;
-
         try {
             console.log(`Fetching data from: ${url}`);
             const response = await fetch(url);
@@ -405,55 +429,72 @@ export class QubitGrid {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const jsonData: QFTVizData = await response.json();
-            console.log("Successfully fetched and parsed JSON data:", jsonData);
+            console.log("Successfully fetched and parsed JSON data from URL.");
+            this._processCircuitData(jsonData, camera);
+        } catch (error) {
+            console.error(
+                "Failed to load or parse slices from JSON URL:",
+                error,
+            );
+            this.handleLoadError(
+                error instanceof Error ? error : new Error(String(error)),
+                camera,
+                `Failed to load data from ${url}`,
+            );
+        }
+    }
+
+    private _processCircuitData(
+        data: QFTVizData,
+        camera: THREE.PerspectiveCamera,
+    ) {
+        this.slices = [];
+        this.interactionPairsPerSlice = [];
+        this.allOperationsPerSlice = [];
+        this.qubitInstances.forEach((qubit) => qubit.dispose());
+        this.qubitInstances.clear();
+        if (this.heatmap) {
+            this.heatmap.clearPositionsCache();
+        }
+        this.lastMaxObservedRawHeatmapSum = 0;
+        this.lastEffectiveSlicesForHeatmap = 0;
+
+        try {
+            console.log("Processing circuit data:", data);
 
             let num_qubits_for_mode: number;
             let operations_list_for_mode: QubitOperation[][];
 
             if (this.visualizationMode === "logical") {
-                console.log("LOGICAL MODE SELECTED");
-                console.log(
-                    "jsonData.logical_circuit_info:",
-                    jsonData.logical_circuit_info,
-                );
-                if (jsonData.logical_circuit_info) {
-                    num_qubits_for_mode =
-                        jsonData.logical_circuit_info.num_qubits;
-                    operations_list_for_mode =
-                        jsonData.logical_circuit_info
-                            .interaction_graph_ops_per_slice;
-                    console.log("Logical num_qubits:", num_qubits_for_mode);
-                    console.log(
-                        "Logical operations_list_for_mode:",
-                        operations_list_for_mode,
+                if (
+                    !data.logical_circuit_info ||
+                    !data.logical_circuit_info.interaction_graph_ops_per_slice
+                ) {
+                    throw new Error(
+                        "Logical circuit info or its operations per slice is missing.",
                     );
-                    if (!operations_list_for_mode) {
-                        console.error(
-                            "ERROR: Logical operations_list_for_mode is undefined/null AFTER assignment!",
-                        );
-                    } else if (!Array.isArray(operations_list_for_mode)) {
-                        console.error(
-                            "ERROR: Logical operations_list_for_mode is NOT AN ARRAY!",
-                        );
-                    }
-                } else {
-                    console.error(
-                        "ERROR: jsonData.logical_circuit_info IS UNDEFINED!",
-                    );
-                    // Fallback to prevent further errors, though this indicates a major issue
-                    num_qubits_for_mode = 0;
-                    operations_list_for_mode = [];
                 }
-            } else {
-                // "compiled"
-                console.log("COMPILED MODE SELECTED");
-                console.log(
-                    "jsonData.compiled_circuit_info:",
-                    jsonData.compiled_circuit_info,
-                );
-                num_qubits_for_mode = jsonData.compiled_circuit_info.num_qubits;
+                num_qubits_for_mode = data.logical_circuit_info.num_qubits;
                 operations_list_for_mode =
-                    jsonData.compiled_circuit_info
+                    data.logical_circuit_info.interaction_graph_ops_per_slice;
+            } else {
+                console.log("COMPILED MODE SELECTED (Corrected log)");
+                if (
+                    !data.compiled_circuit_info ||
+                    !data.compiled_circuit_info
+                        .compiled_interaction_graph_ops_per_slice
+                ) {
+                    throw new Error(
+                        "Compiled circuit info or its operations per slice is missing.",
+                    );
+                }
+                console.log(
+                    "data.compiled_circuit_info:",
+                    data.compiled_circuit_info,
+                );
+                num_qubits_for_mode = data.compiled_circuit_info.num_qubits;
+                operations_list_for_mode =
+                    data.compiled_circuit_info
                         .compiled_interaction_graph_ops_per_slice;
                 console.log("Compiled num_qubits:", num_qubits_for_mode);
                 console.log(
@@ -463,25 +504,23 @@ export class QubitGrid {
             }
 
             this._qubit_count = num_qubits_for_mode;
-            // Always load the coupling map from device_info if available.
-            // Positioning will use it. Drawing connections will be mode-dependent.
-            this.couplingMap =
-                jsonData.device_info.connectivity_graph_coupling_map;
+            this.couplingMap = data.device_info.connectivity_graph_coupling_map;
 
-            // Determine grid dimensions based on the number of qubits in the selected view
+            this.allOperationsPerSlice = operations_list_for_mode;
+
             this._grid_cols = Math.ceil(Math.sqrt(this._qubit_count));
             this._grid_rows = Math.ceil(this._qubit_count / this._grid_cols);
 
             this.slices = operations_list_for_mode.map(
                 (ops_in_slice, sliceIdx) => {
-                    const slice = new Slice(sliceIdx); // Correct constructor call
+                    const slice = new Slice(sliceIdx);
                     const interactionPairs: Array<{ q1: number; q2: number }> =
                         [];
 
                     ops_in_slice.forEach((op) => {
                         op.qubits.forEach((qid) =>
                             slice.interacting_qubits.add(qid),
-                        ); // Populate interacting_qubits
+                        );
                         if (op.qubits.length === 2) {
                             interactionPairs.push({
                                 q1: op.qubits[0],
@@ -499,16 +538,15 @@ export class QubitGrid {
             );
 
             if (this.slices.length > 0) {
-                this.current_slice_index = 0; // Start at the first slice
-                this.timeline.setSliceCount(this.slices.length); // Corrected Timeline method
-                this.timeline.setSlice(this.current_slice_index); // Corrected Timeline method
-                this.loadStateFromSlice(this.current_slice_index); // Load initial state
+                this.current_slice_index = 0;
+                this.timeline.setSliceCount(this.slices.length);
+                this.timeline.setSlice(this.current_slice_index);
+                this.loadStateFromSlice(this.current_slice_index);
             } else {
                 this.current_slice_index = -1;
-                this.timeline.setSliceCount(0); // Corrected Timeline method
+                this.timeline.setSliceCount(0);
             }
 
-            // Re-create heatmap if qubit count changed for the new mode
             if (
                 this.heatmap &&
                 this.heatmap.mesh.geometry.attributes.position.count !==
@@ -522,10 +560,8 @@ export class QubitGrid {
                     this.maxSlicesForHeatmap,
                 );
                 this.scene.add(this.heatmap.mesh);
-                // Legend update is handled by refreshLegend below
             }
 
-            // Pass the potentially nulled-out couplingMap for logical mode
             this.calculateQubitPositions(
                 this._qubit_count,
                 this.couplingMap,
@@ -534,8 +570,8 @@ export class QubitGrid {
                 10,
             );
             this.createGrid();
-            this.drawConnections(); // Initial drawing of connections
-            this.updateQubitOpacities(); // Update opacities based on the initial slice
+            this.drawConnections();
+            this.updateQubitOpacities();
 
             if (this.onSlicesLoadedCallback) {
                 this.onSlicesLoadedCallback(
@@ -543,12 +579,12 @@ export class QubitGrid {
                     this.current_slice_index,
                 );
             }
-            this.refreshLegend(); // Refresh legend after data is loaded
+            this.refreshLegend();
         } catch (error) {
             this.handleLoadError(
                 error instanceof Error ? error : new Error(String(error)),
                 camera,
-                `Failed to load or parse data from ${url}`,
+                "Failed to process circuit data.",
             );
         }
     }
@@ -1107,6 +1143,57 @@ export class QubitGrid {
         }
     }
 
+    public getGateCountForQubit(qubitId: number): {
+        oneQubitGateCount: number;
+        twoQubitGateCount: number;
+        window: number;
+    } {
+        let oneQubitGateCount = 0;
+        let twoQubitGateCount = 0;
+        const windowSize = Math.max(0, this.lastEffectiveSlicesForHeatmap);
+
+        if (
+            this.allOperationsPerSlice.length === 0 ||
+            this.current_slice_index < 0
+        ) {
+            return {
+                oneQubitGateCount: 0,
+                twoQubitGateCount: 0,
+                window: windowSize,
+            };
+        }
+
+        let actualSlicesToIterate = windowSize;
+        if (this.maxSlicesForHeatmap === 0 && windowSize === 0) {
+            actualSlicesToIterate = 1;
+        }
+
+        const startSliceIndex = Math.max(
+            0,
+            this.current_slice_index - actualSlicesToIterate + 1,
+        );
+        const endSliceIndex = this.current_slice_index;
+
+        for (let i = startSliceIndex; i <= endSliceIndex; i++) {
+            if (i >= 0 && i < this.allOperationsPerSlice.length) {
+                const sliceOps = this.allOperationsPerSlice[i];
+                if (sliceOps) {
+                    for (const op of sliceOps) {
+                        if (op.qubits.includes(qubitId)) {
+                            if (op.qubits.length === 1) {
+                                oneQubitGateCount++;
+                            } else if (op.qubits.length === 2) {
+                                twoQubitGateCount++;
+                            } // Operations on >2 qubits are not counted here for simplicity, or assumed not to exist in this context
+                        }
+                    }
+                }
+            }
+        }
+        const reportedWindow = this.maxSlicesForHeatmap === 0 ? 1 : windowSize;
+        return { oneQubitGateCount, twoQubitGateCount, window: reportedWindow };
+    }
+
     public dispose(): void {
         console.log("QubitGrid dispose called");
         this.qubitInstances.forEach((qubit) => {
@@ -1143,6 +1230,7 @@ export class QubitGrid {
 
         this.qubitPositions.clear();
         this.slices = [];
+        this.allOperationsPerSlice = [];
         console.log("QubitGrid resources cleaned up");
     }
 }
