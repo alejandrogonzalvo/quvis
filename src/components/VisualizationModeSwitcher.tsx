@@ -11,59 +11,56 @@ const VisualizationModeSwitcher: React.FC<VisualizationModeSwitcherProps> = ({
     onModeChange,
     disabled = false,
 }) => {
-    const buttonStyle = (isActive: boolean) => ({
+    const getButtonStyle = (isActive: boolean): React.CSSProperties => ({
         padding: "8px 12px",
         margin: "0 5px",
-        border: "1px solid #ccc",
+        border: isActive
+            ? "1px solid #007bff"
+            : "1px solid rgba(255, 255, 255, 0.3)",
         borderRadius: "4px",
         cursor: disabled ? "not-allowed" : "pointer",
-        backgroundColor: isActive
-            ? "#007bff"
-            : disabled
-              ? "#e9ecef"
-              : "#f8f9fa",
-        color: isActive ? "white" : disabled ? "#6c757d" : "black",
+        backgroundColor: isActive ? "#007bff" : "rgba(255, 255, 255, 0.1)",
+        color: "white", // Always white text for buttons
         fontWeight: isActive ? "bold" : "normal",
-        opacity: disabled ? 0.65 : 1,
+        opacity: disabled ? 0.5 : 1, // Dimmed when component is disabled
     });
 
+    const containerStyle: React.CSSProperties = {
+        position: "fixed",
+        top: "15px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 1001,
+        backgroundColor: "rgba(50, 50, 50, 0.8)", // Dark panel background
+        padding: "8px",
+        borderRadius: "8px",
+        boxShadow: "0 2px 10px rgba(0,0,0,0.3)", // Consistent shadow
+        display: "flex",
+        alignItems: "center",
+        fontFamily: "Arial, sans-serif", // Consistent font
+    };
+
+    const labelStyle: React.CSSProperties = {
+        marginRight: "10px",
+        fontWeight: "bold",
+        fontSize: "0.9em",
+        color: "white", // White text for label
+    };
+
     return (
-        <div
-            style={{
-                position: "fixed",
-                top: "15px",
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 1001, // Ensure it's above other elements like tooltips or control panels
-                backgroundColor: "rgba(255, 255, 255, 0.9)",
-                padding: "8px",
-                borderRadius: "8px",
-                boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-                display: "flex",
-                alignItems: "center",
-            }}
-        >
-            <span
-                style={{
-                    marginRight: "10px",
-                    fontWeight: "bold",
-                    fontSize: "0.9em",
-                    color: "#333",
-                }}
-            >
-                View Mode:
-            </span>
+        <div style={containerStyle}>
+            <span style={labelStyle}>View Mode:</span>
             <button
-                style={buttonStyle(currentMode === "logical")}
+                style={getButtonStyle(currentMode === "logical")}
                 onClick={() => !disabled && onModeChange("logical")}
-                disabled={disabled}
+                disabled={disabled} // HTML disabled attribute handles interaction blocking
             >
                 Logical
             </button>
             <button
-                style={buttonStyle(currentMode === "compiled")}
+                style={getButtonStyle(currentMode === "compiled")}
                 onClick={() => !disabled && onModeChange("compiled")}
-                disabled={disabled}
+                disabled={disabled} // HTML disabled attribute handles interaction blocking
             >
                 Compiled
             </button>

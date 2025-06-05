@@ -47,7 +47,7 @@ const TimelineSlider: React.FC<TimelineSliderProps> = ({
         display: "block",
         textAlign: "center",
         marginBottom: "10px",
-        fontSize: "0.9em",
+        fontSize: "1.2em",
     };
 
     const controlsRowStyle: React.CSSProperties = {
@@ -65,7 +65,7 @@ const TimelineSlider: React.FC<TimelineSliderProps> = ({
         padding: "5px 10px",
         margin: "0 10px",
         cursor: "pointer",
-        fontSize: "1em",
+        fontSize: "1.5em",
         lineHeight: "1",
     };
 
@@ -76,7 +76,7 @@ const TimelineSlider: React.FC<TimelineSliderProps> = ({
     };
 
     const valueDisplayStyle: React.CSSProperties = {
-        fontSize: "0.9em",
+        fontSize: "1.2em",
         textAlign: "center",
         minWidth: "100px", // Ensure space for "Slice: X / Y"
     };
