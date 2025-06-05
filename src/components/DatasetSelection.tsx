@@ -84,7 +84,7 @@ const DatasetSelection: React.FC<DatasetSelectionProps> = ({ onSelect }) => {
         <div style={containerStyle}>
             <h1 style={mainTitleStyle}>QuViS</h1>
             <p style={infoTextStyle}>
-                Version 0.9.0 <br />
+                Version 0.10.0 <br />
                 Made by{" "}
                 <a
                     href="https://github.com/alejandrogonzalvo/quvis"
