@@ -31,6 +31,12 @@ const arrowStyle: React.CSSProperties = {
     marginRight: "5px",
 };
 
+const HStyle: React.CSSProperties = {
+    fontSize: "1.2em",
+    marginRight: "10px",
+    marginLeft: "5px",
+};
+
 const KeyboardControlsGuide: React.FC = () => {
     return (
         <div style={embeddedContainerStyle}>
@@ -40,6 +46,9 @@ const KeyboardControlsGuide: React.FC = () => {
             </div>
             <div style={controlTextStyle}>
                 <span style={arrowStyle}>→</span> : Next Slice
+            </div>
+            <div style={controlTextStyle}>
+                <span style={HStyle}>H</span> : Toggle UI
             </div>
         </div>
     );

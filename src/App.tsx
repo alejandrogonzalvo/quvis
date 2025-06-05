@@ -98,8 +98,12 @@ const App: React.FC = () => {
     const [isLayoutCollapsed, setIsLayoutCollapsed] = useState(false);
     const [isFidelityCollapsed, setIsFidelityCollapsed] = useState(false);
 
+    // State for UI visibility
+    const [isUiVisible, setIsUiVisible] = useState(true);
+
     const toggleAppearanceCollapse = () => {
         setIsAppearanceCollapsed(!isAppearanceCollapsed);
+        setTooltipVisible(false);
     };
 
     const toggleLayoutCollapse = () => {
@@ -166,6 +170,19 @@ const App: React.FC = () => {
             setTooltipVisible(false);
         }
     };
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key.toLowerCase() === "h") {
+                setIsUiVisible((prev) => !prev);
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, []);
 
     useEffect(() => {
         if (mountRef.current && selectedDataset && !playgroundRef.current) {
@@ -236,95 +253,104 @@ const App: React.FC = () => {
                 <DatasetSelection onSelect={handleDatasetSelect} />
             ) : (
                 <>
-                    <VisualizationModeSwitcher
-                        currentMode={visualizationMode}
-                        onModeChange={handleModeChange}
-                        disabled={!isPlaygroundInitialized} // Disable while playground is loading/initializing
-                    />
                     {/* Container for the Three.js canvas */}
                     <div
                         ref={mountRef}
                         style={{ width: "100%", height: "100%" }}
                     />
-                    {/* Future React UI components will go here, likely overlaid or adjacent */}
-                    {/* <div style={{ position: 'absolute', top: '10px', left: '10px', color: 'white' }}>
-                        <h1>Quantum Grid Visualizer - React</h1>
-                    </div> */}
-
-                    {isPlaygroundInitialized && (
+                    {isUiVisible && (
                         <>
-                            <AppearanceControls
-                                playground={playgroundRef.current}
-                                initialValues={initialAppearance}
-                                isCollapsed={isAppearanceCollapsed}
-                                onToggleCollapse={toggleAppearanceCollapse}
+                            <VisualizationModeSwitcher
+                                currentMode={visualizationMode}
+                                onModeChange={handleModeChange}
+                                disabled={!isPlaygroundInitialized} // Disable while playground is loading/initializing
                             />
-                            <FidelityControls
-                                playground={playgroundRef.current}
-                                initialValues={initialFidelitySettings}
-                                isCollapsed={isFidelityCollapsed}
-                                onToggleCollapse={toggleFidelityCollapse}
-                                topPosition={`${BASE_TOP_MARGIN_PX + (isAppearanceCollapsed ? APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX : APPEARANCE_PANEL_EXPANDED_HEIGHT_PX) + INTER_PANEL_SPACING_PX}px`}
+                            {/* Future React UI components will go here, likely overlaid or adjacent */}
+                            {/* <div style={{ position: 'absolute', top: '10px', left: '10px', color: 'white' }}>
+                                <h1>Quantum Grid Visualizer - React</h1>
+                            </div> */}
+
+                            {isPlaygroundInitialized && (
+                                <>
+                                    <AppearanceControls
+                                        playground={playgroundRef.current}
+                                        initialValues={initialAppearance}
+                                        isCollapsed={isAppearanceCollapsed}
+                                        onToggleCollapse={
+                                            toggleAppearanceCollapse
+                                        }
+                                    />
+                                    <FidelityControls
+                                        playground={playgroundRef.current}
+                                        initialValues={initialFidelitySettings}
+                                        isCollapsed={isFidelityCollapsed}
+                                        onToggleCollapse={
+                                            toggleFidelityCollapse
+                                        }
+                                        topPosition={`${BASE_TOP_MARGIN_PX + (isAppearanceCollapsed ? APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX : APPEARANCE_PANEL_EXPANDED_HEIGHT_PX) + INTER_PANEL_SPACING_PX}px`}
+                                    />
+                                    <LayoutControls
+                                        playground={playgroundRef.current}
+                                        initialValues={initialLayout}
+                                        isCollapsed={isLayoutCollapsed}
+                                        onToggleCollapse={toggleLayoutCollapse}
+                                        topPosition={`${
+                                            BASE_TOP_MARGIN_PX +
+                                            (isAppearanceCollapsed
+                                                ? APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX
+                                                : APPEARANCE_PANEL_EXPANDED_HEIGHT_PX) +
+                                            INTER_PANEL_SPACING_PX +
+                                            (isFidelityCollapsed
+                                                ? FIDELITY_PANEL_COLLAPSED_HEIGHT_PX
+                                                : FIDELITY_PANEL_EXPANDED_HEIGHT_PX) +
+                                            INTER_PANEL_SPACING_PX
+                                        }px`}
+                                    />
+                                    <HeatmapControls
+                                        playground={playgroundRef.current}
+                                        initialValues={{
+                                            maxSlices: initialHeatmapSlices,
+                                        }}
+                                    />
+                                </>
+                            )}
+
+                            {isTimelineInitialized && actualSliceCount > 0 && (
+                                <TimelineSlider
+                                    min={0}
+                                    max={maxSliceIndex} // Use maxSliceIndex for the slider's max prop
+                                    value={currentSliceValue}
+                                    onChange={handleTimelineChange}
+                                    disabled={actualSliceCount === 0} // Or simply actualSliceCount <= 1 for single slice no-slide
+                                    label="Time Slice"
+                                />
+                            )}
+                            {isTimelineInitialized &&
+                                actualSliceCount === 0 && (
+                                    <div
+                                        style={{
+                                            position: "fixed",
+                                            bottom: "30px",
+                                            left: "50%",
+                                            transform: "translateX(-50%)",
+                                            color: "white",
+                                            background: "rgba(0,0,0,0.5)",
+                                            padding: "10px",
+                                            borderRadius: "5px",
+                                        }}
+                                    >
+                                        Loading slice data or no slices found.
+                                    </div>
+                                )}
+                            <Tooltip
+                                visible={tooltipVisible}
+                                content={tooltipContent}
+                                x={tooltipX}
+                                y={tooltipY}
                             />
-                            <LayoutControls
-                                playground={playgroundRef.current}
-                                initialValues={initialLayout}
-                                isCollapsed={isLayoutCollapsed}
-                                onToggleCollapse={toggleLayoutCollapse}
-                                topPosition={`${
-                                    BASE_TOP_MARGIN_PX +
-                                    (isAppearanceCollapsed
-                                        ? APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX
-                                        : APPEARANCE_PANEL_EXPANDED_HEIGHT_PX) +
-                                    INTER_PANEL_SPACING_PX +
-                                    (isFidelityCollapsed
-                                        ? FIDELITY_PANEL_COLLAPSED_HEIGHT_PX
-                                        : FIDELITY_PANEL_EXPANDED_HEIGHT_PX) +
-                                    INTER_PANEL_SPACING_PX
-                                }px`}
-                            />
-                            <HeatmapControls
-                                playground={playgroundRef.current}
-                                initialValues={{
-                                    maxSlices: initialHeatmapSlices,
-                                }}
-                            />
+                            {/* The div for Heatmap Legend has been moved to HeatmapControls.tsx */}
                         </>
                     )}
-
-                    {isTimelineInitialized && actualSliceCount > 0 && (
-                        <TimelineSlider
-                            min={0}
-                            max={maxSliceIndex} // Use maxSliceIndex for the slider's max prop
-                            value={currentSliceValue}
-                            onChange={handleTimelineChange}
-                            disabled={actualSliceCount === 0} // Or simply actualSliceCount <= 1 for single slice no-slide
-                            label="Time Slice"
-                        />
-                    )}
-                    {isTimelineInitialized && actualSliceCount === 0 && (
-                        <div
-                            style={{
-                                position: "fixed",
-                                bottom: "30px",
-                                left: "50%",
-                                transform: "translateX(-50%)",
-                                color: "white",
-                                background: "rgba(0,0,0,0.5)",
-                                padding: "10px",
-                                borderRadius: "5px",
-                            }}
-                        >
-                            Loading slice data or no slices found.
-                        </div>
-                    )}
-                    <Tooltip
-                        visible={tooltipVisible}
-                        content={tooltipContent}
-                        x={tooltipX}
-                        y={tooltipY}
-                    />
-                    {/* The div for Heatmap Legend has been moved to HeatmapControls.tsx */}
                 </>
             )}
         </div>
