@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useCallback } from "react";
 import * as RCSlider from "rc-slider"; // Import as namespace
 import "rc-slider/assets/index.css";
 
@@ -26,7 +26,6 @@ const TimelineSlider: React.FC<TimelineSliderProps> = ({
     disabled,
     label,
 }) => {
-    // The main container style remains the same
     const containerStyle: React.CSSProperties = {
         position: "fixed",
         bottom: "30px",
@@ -34,25 +33,52 @@ const TimelineSlider: React.FC<TimelineSliderProps> = ({
         transform: "translateX(-50%)",
         width: "80%",
         maxWidth: "800px",
-        padding: "10px 20px", // Added a bit more horizontal padding for the slider handles
+        padding: "15px", // Matched AppearanceControls
         boxSizing: "border-box",
         zIndex: 10,
+        backgroundColor: "rgba(50, 50, 50, 0.8)", // Matched AppearanceControls
+        borderRadius: "8px", // Matched AppearanceControls
+        boxShadow: "0 2px 10px rgba(0,0,0,0.3)", // Matched AppearanceControls
+        color: "white", // Matched AppearanceControls (for text color inheritance)
+        fontFamily: "Arial, sans-serif", // Matched AppearanceControls
     };
 
-    const labelStyle: React.CSSProperties = {
-        color: "white",
-        marginRight: "10px",
+    const topLabelStyle: React.CSSProperties = {
         display: "block",
         textAlign: "center",
         marginBottom: "10px",
         fontSize: "0.9em",
     };
 
-    const valueDisplayStyle: React.CSSProperties = {
+    const controlsRowStyle: React.CSSProperties = {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: "10px", // Space between this row and the slider
+    };
+
+    const arrowButtonStyle: React.CSSProperties = {
+        background: "rgba(255, 255, 255, 0.1)",
         color: "white",
-        marginTop: "0px",
+        border: "1px solid rgba(255, 255, 255, 0.3)",
+        borderRadius: "4px",
+        padding: "5px 10px",
+        margin: "0 10px",
+        cursor: "pointer",
+        fontSize: "1em",
+        lineHeight: "1",
+    };
+
+    const disabledArrowButtonStyle: React.CSSProperties = {
+        ...arrowButtonStyle,
+        opacity: 0.5,
+        cursor: "not-allowed",
+    };
+
+    const valueDisplayStyle: React.CSSProperties = {
         fontSize: "0.9em",
         textAlign: "center",
+        minWidth: "100px", // Ensure space for "Slice: X / Y"
     };
 
     // Custom styles for rc-slider to better fit a dark theme
@@ -75,37 +101,100 @@ const TimelineSlider: React.FC<TimelineSliderProps> = ({
         height: 4, // Thinner rail
     };
 
-    const handleRcSliderChange = (newValue: number | number[]) => {
-        // Assuming single value slider, so newValue should be number
-        if (typeof newValue === "number") {
-            onChange(newValue);
+    const isOverallDisabled = disabled || max < min;
+
+    const handleRcSliderChange = useCallback(
+        (newValue: number | number[]) => {
+            if (typeof newValue === "number" && !isOverallDisabled) {
+                onChange(newValue);
+            }
+        },
+        [onChange, isOverallDisabled],
+    );
+
+    const handleLeftArrowClick = useCallback(() => {
+        if (!isOverallDisabled && value > min) {
+            onChange(value - 1);
         }
-        // If it could be a range, you might need to handle newValue as number[]
-    };
+    }, [value, min, onChange, isOverallDisabled]);
+
+    const handleRightArrowClick = useCallback(() => {
+        if (!isOverallDisabled && value < max) {
+            onChange(value + 1);
+        }
+    }, [value, max, onChange, isOverallDisabled]);
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (isOverallDisabled) return;
+
+            if (event.key === "ArrowLeft") {
+                event.preventDefault(); // Prevent browser scroll or other default actions
+                handleLeftArrowClick();
+            } else if (event.key === "ArrowRight") {
+                event.preventDefault(); // Prevent browser scroll or other default actions
+                handleRightArrowClick();
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [handleLeftArrowClick, handleRightArrowClick, isOverallDisabled]); // Dependencies for the keydown handler
 
     if (!ActualSlider) {
         // Fallback or error if Slider component could not be resolved
         return <div>Error loading slider component.</div>;
     }
 
+    const isLeftDisabled = isOverallDisabled || value <= min;
+    const isRightDisabled = isOverallDisabled || value >= max;
+
     return (
         <div style={containerStyle}>
-            {label && <span style={labelStyle}>{label}</span>}
+            {label && <span style={topLabelStyle}>{label}</span>}
+
+            {max >= min && (
+                <div style={controlsRowStyle}>
+                    <button
+                        onClick={handleLeftArrowClick}
+                        disabled={isLeftDisabled}
+                        style={
+                            isLeftDisabled
+                                ? disabledArrowButtonStyle
+                                : arrowButtonStyle
+                        }
+                    >
+                        ‹
+                    </button>
+                    <div style={valueDisplayStyle}>
+                        Slice: {value} / {max}
+                    </div>
+                    <button
+                        onClick={handleRightArrowClick}
+                        disabled={isRightDisabled}
+                        style={
+                            isRightDisabled
+                                ? disabledArrowButtonStyle
+                                : arrowButtonStyle
+                        }
+                    >
+                        ›
+                    </button>
+                </div>
+            )}
+
             <ActualSlider
                 min={min}
                 max={max}
                 value={value}
                 onChange={handleRcSliderChange}
-                disabled={disabled || max < min}
+                disabled={isOverallDisabled}
                 handleStyle={handleStyle}
                 trackStyle={trackStyle}
                 railStyle={railStyle}
             />
-            {max >= min && (
-                <div style={valueDisplayStyle}>
-                    Slice: {value} / {max}
-                </div>
-            )}
         </div>
     );
 };

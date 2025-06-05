@@ -7,9 +7,10 @@ export interface TooltipData {
     stateName?: string; // e.g., "ZERO", "ONE" - now optional
     x: number; // screen X
     y: number; // screen Y
-    oneQubitGateCount?: number; // New: count for 1-qubit gates
-    twoQubitGateCount?: number; // New: count for 2-qubit gates
-    sliceWindowForGateCount?: number; // New: number of slices considered for gate count
+    oneQubitGatesInWindow?: number; // Renamed from oneQubitGateCount
+    twoQubitGatesInWindow?: number; // Renamed from twoQubitGateCount
+    sliceWindowForGateCount?: number; // Will map to windowForCountsInWindow
+    fidelity?: number; // New: for fidelity placeholder
 }
 
 export class Playground {
@@ -65,6 +66,8 @@ export class Playground {
     currentBaseSize: number = 500.0; // Default from Heatmap.ts shader
 
     currentSlice: number = 0; // Initialize currentSlice
+    currentOneQubitFidelityBase: number = 0.99; // Default base fidelity for 1-qubit gates
+    currentTwoQubitFidelityBase: number = 0.98; // Default base fidelity for 2-qubit gates
 
     private containerElement: HTMLElement | null = null;
     private animationFrameId: number | null = null;
@@ -313,22 +316,37 @@ export class Playground {
                     .qubitId as number;
 
                 let gateInfo = {
-                    oneQubitGateCount: 0,
-                    twoQubitGateCount: 0,
-                    window: 0,
+                    oneQubitGatesInWindow: 0,
+                    twoQubitGatesInWindow: 0,
+                    totalOneQubitGates: 0,
+                    totalTwoQubitGates: 0,
+                    windowForCountsInWindow: 0,
                 };
+                let finalFidelity = 0;
+
                 if (this.grid) {
-                    // Ensure grid is available
                     gateInfo = this.grid.getGateCountForQubit(qubitId);
+
+                    const fidelity1Q = Math.pow(
+                        this.currentOneQubitFidelityBase,
+                        gateInfo.totalOneQubitGates,
+                    );
+                    const fidelity2Q = Math.pow(
+                        this.currentTwoQubitFidelityBase,
+                        gateInfo.totalTwoQubitGates,
+                    );
+                    const calculatedFidelity = fidelity1Q * fidelity2Q;
+                    finalFidelity = Math.min(1.0, calculatedFidelity);
                 }
 
                 hoveredQubitData = {
                     id: qubitId,
                     x: event.clientX,
                     y: event.clientY,
-                    oneQubitGateCount: gateInfo.oneQubitGateCount,
-                    twoQubitGateCount: gateInfo.twoQubitGateCount,
-                    sliceWindowForGateCount: gateInfo.window,
+                    oneQubitGatesInWindow: gateInfo.oneQubitGatesInWindow,
+                    twoQubitGatesInWindow: gateInfo.twoQubitGatesInWindow,
+                    sliceWindowForGateCount: gateInfo.windowForCountsInWindow,
+                    fidelity: finalFidelity,
                 };
             }
         }
@@ -541,5 +559,18 @@ export class Playground {
 
     private loadInitialData(): void {
         // ... existing code ...
+    }
+
+    public updateFidelityParameters(params: {
+        oneQubitBase?: number;
+        twoQubitBase?: number;
+    }) {
+        if (params.oneQubitBase !== undefined) {
+            this.currentOneQubitFidelityBase = params.oneQubitBase;
+        }
+        if (params.twoQubitBase !== undefined) {
+            this.currentTwoQubitFidelityBase = params.twoQubitBase;
+        }
+        // No immediate redraw needed as tooltip updates on mouse move
     }
 }

@@ -1144,54 +1144,92 @@ export class QubitGrid {
     }
 
     public getGateCountForQubit(qubitId: number): {
-        oneQubitGateCount: number;
-        twoQubitGateCount: number;
-        window: number;
+        oneQubitGatesInWindow: number;
+        twoQubitGatesInWindow: number;
+        totalOneQubitGates: number;
+        totalTwoQubitGates: number;
+        windowForCountsInWindow: number;
     } {
-        let oneQubitGateCount = 0;
-        let twoQubitGateCount = 0;
-        const windowSize = Math.max(0, this.lastEffectiveSlicesForHeatmap);
+        let oneQubitGatesInWindow = 0;
+        let twoQubitGatesInWindow = 0;
+        let totalOneQubitGates = 0;
+        let totalTwoQubitGates = 0;
+
+        const windowForCountsInWindow = Math.max(
+            0,
+            this.lastEffectiveSlicesForHeatmap,
+        );
 
         if (
             this.allOperationsPerSlice.length === 0 ||
             this.current_slice_index < 0
         ) {
             return {
-                oneQubitGateCount: 0,
-                twoQubitGateCount: 0,
-                window: windowSize,
+                oneQubitGatesInWindow: 0,
+                twoQubitGatesInWindow: 0,
+                totalOneQubitGates: 0,
+                totalTwoQubitGates: 0,
+                windowForCountsInWindow: windowForCountsInWindow,
             };
         }
 
-        let actualSlicesToIterate = windowSize;
-        if (this.maxSlicesForHeatmap === 0 && windowSize === 0) {
-            actualSlicesToIterate = 1;
+        // Calculate counts for the window ("last X slices")
+        let actualSlicesToIterateForWindow = windowForCountsInWindow;
+        if (this.maxSlicesForHeatmap === 0 && windowForCountsInWindow === 0) {
+            actualSlicesToIterateForWindow = 1; // Check current slice only
         }
 
-        const startSliceIndex = Math.max(
+        const windowStartSliceIndex = Math.max(
             0,
-            this.current_slice_index - actualSlicesToIterate + 1,
+            this.current_slice_index - actualSlicesToIterateForWindow + 1,
         );
-        const endSliceIndex = this.current_slice_index;
+        const currentSliceEndIndex = this.current_slice_index;
 
-        for (let i = startSliceIndex; i <= endSliceIndex; i++) {
+        for (let i = windowStartSliceIndex; i <= currentSliceEndIndex; i++) {
             if (i >= 0 && i < this.allOperationsPerSlice.length) {
                 const sliceOps = this.allOperationsPerSlice[i];
                 if (sliceOps) {
                     for (const op of sliceOps) {
                         if (op.qubits.includes(qubitId)) {
                             if (op.qubits.length === 1) {
-                                oneQubitGateCount++;
+                                oneQubitGatesInWindow++;
                             } else if (op.qubits.length === 2) {
-                                twoQubitGateCount++;
-                            } // Operations on >2 qubits are not counted here for simplicity, or assumed not to exist in this context
+                                twoQubitGatesInWindow++;
+                            }
                         }
                     }
                 }
             }
         }
-        const reportedWindow = this.maxSlicesForHeatmap === 0 ? 1 : windowSize;
-        return { oneQubitGateCount, twoQubitGateCount, window: reportedWindow };
+
+        // Calculate total counts from slice 0 up to current_slice_index
+        for (let i = 0; i <= currentSliceEndIndex; i++) {
+            if (i >= 0 && i < this.allOperationsPerSlice.length) {
+                const sliceOps = this.allOperationsPerSlice[i];
+                if (sliceOps) {
+                    for (const op of sliceOps) {
+                        if (op.qubits.includes(qubitId)) {
+                            if (op.qubits.length === 1) {
+                                totalOneQubitGates++;
+                            } else if (op.qubits.length === 2) {
+                                totalTwoQubitGates++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        const reportedWindowForInWindowCounts =
+            this.maxSlicesForHeatmap === 0 ? 1 : windowForCountsInWindow;
+
+        return {
+            oneQubitGatesInWindow,
+            twoQubitGatesInWindow,
+            totalOneQubitGates,
+            totalTwoQubitGates,
+            windowForCountsInWindow: reportedWindowForInWindowCounts,
+        };
     }
 
     public dispose(): void {

@@ -7,6 +7,7 @@ import HeatmapControls from "./components/HeatmapControls.js";
 import Tooltip from "./components/Tooltip.js";
 import DatasetSelection from "./components/DatasetSelection.js";
 import VisualizationModeSwitcher from "./components/VisualizationModeSwitcher.js";
+import FidelityControls from "./components/FidelityControls.js";
 import "./../style.css";
 
 const BASE_TOP_MARGIN_PX = 20;
@@ -18,11 +19,26 @@ const CONTROL_GROUP_APPROX_HEIGHT_PX = 65;
 const APPEARANCE_PANEL_SLIDER_COUNT = 4;
 const APPEARANCE_PANEL_EXPANDED_CONTENT_HEIGHT =
     APPEARANCE_PANEL_SLIDER_COUNT * CONTROL_GROUP_APPROX_HEIGHT_PX;
+const APPEARANCE_HEADER_ADJUSTMENT_PX = 20;
 const APPEARANCE_PANEL_EXPANDED_HEIGHT_PX =
     COLLAPSED_PANEL_HEADER_HEIGHT_PX +
     APPEARANCE_PANEL_EXPANDED_CONTENT_HEIGHT +
-    PANEL_BOTTOM_PADDING_PX;
+    PANEL_BOTTOM_PADDING_PX +
+    APPEARANCE_HEADER_ADJUSTMENT_PX;
 const APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX =
+    COLLAPSED_PANEL_HEADER_HEIGHT_PX + PANEL_BOTTOM_PADDING_PX;
+
+// Constants for FidelityControls panel
+const FIDELITY_PANEL_SLIDER_COUNT = 2;
+const FIDELITY_PANEL_EXPANDED_CONTENT_HEIGHT =
+    FIDELITY_PANEL_SLIDER_COUNT * CONTROL_GROUP_APPROX_HEIGHT_PX;
+const FIDELITY_HEADER_ADJUSTMENT_PX = 10;
+const FIDELITY_PANEL_EXPANDED_HEIGHT_PX =
+    COLLAPSED_PANEL_HEADER_HEIGHT_PX +
+    FIDELITY_PANEL_EXPANDED_CONTENT_HEIGHT +
+    PANEL_BOTTOM_PADDING_PX +
+    FIDELITY_HEADER_ADJUSTMENT_PX;
+const FIDELITY_PANEL_COLLAPSED_HEIGHT_PX =
     COLLAPSED_PANEL_HEADER_HEIGHT_PX + PANEL_BOTTOM_PADDING_PX;
 
 const App: React.FC = () => {
@@ -65,6 +81,12 @@ const App: React.FC = () => {
     // State for HeatmapControls initial values (matching Playground defaults)
     const [initialHeatmapSlices, setInitialHeatmapSlices] = useState(5);
 
+    // State for FidelityControls initial values
+    const [initialFidelitySettings, setInitialFidelitySettings] = useState({
+        oneQubitBase: 0.99,
+        twoQubitBase: 0.98,
+    });
+
     // State for Tooltip
     const [tooltipVisible, setTooltipVisible] = useState(false);
     const [tooltipContent, setTooltipContent] = useState("");
@@ -74,6 +96,7 @@ const App: React.FC = () => {
     // State for panel collapse
     const [isAppearanceCollapsed, setIsAppearanceCollapsed] = useState(false);
     const [isLayoutCollapsed, setIsLayoutCollapsed] = useState(false);
+    const [isFidelityCollapsed, setIsFidelityCollapsed] = useState(false);
 
     const toggleAppearanceCollapse = () => {
         setIsAppearanceCollapsed(!isAppearanceCollapsed);
@@ -81,6 +104,10 @@ const App: React.FC = () => {
 
     const toggleLayoutCollapse = () => {
         setIsLayoutCollapsed(!isLayoutCollapsed);
+    };
+
+    const toggleFidelityCollapse = () => {
+        setIsFidelityCollapsed(!isFidelityCollapsed);
     };
 
     // Callback for dataset selection
@@ -113,19 +140,22 @@ const App: React.FC = () => {
         if (data) {
             let content = `Qubit ${data.id}\n`;
             if (
-                data.oneQubitGateCount !== undefined &&
-                data.twoQubitGateCount !== undefined &&
+                data.oneQubitGatesInWindow !== undefined &&
+                data.twoQubitGatesInWindow !== undefined &&
                 data.sliceWindowForGateCount !== undefined
             ) {
-                const plural1Q = data.oneQubitGateCount === 1 ? "" : "s";
-                content += `1-Qubit Gate${plural1Q}: ${data.oneQubitGateCount}`;
+                const plural1Q = data.oneQubitGatesInWindow === 1 ? "" : "s";
+                content += `1-Qubit Gate${plural1Q}: ${data.oneQubitGatesInWindow}`;
 
-                content += `\n`; // Newline between 1-qubit and 2-qubit counts
+                content += `\n`;
 
-                const plural2Q = data.twoQubitGateCount === 1 ? "" : "s";
-                content += `2-Qubit Gate${plural2Q}: ${data.twoQubitGateCount}`;
+                const plural2Q = data.twoQubitGatesInWindow === 1 ? "" : "s";
+                content += `2-Qubit Gate${plural2Q}: ${data.twoQubitGatesInWindow}`;
+
+                if (data.fidelity !== undefined) {
+                    content += `\nFidelity: ${data.fidelity.toFixed(4)}`;
+                }
             } else if (data.stateName) {
-                // Fallback, though should ideally not be reached if counts are always provided
                 content += `|${data.stateName}⟩`;
             }
             setTooltipContent(content);
@@ -166,6 +196,11 @@ const App: React.FC = () => {
                 coolingFactor: playgroundInstance.currentCoolingFactor,
             });
             setInitialHeatmapSlices(playgroundInstance.maxHeatmapSlices);
+            // Set initial values for FidelityControls from the playground instance
+            setInitialFidelitySettings({
+                oneQubitBase: playgroundInstance.currentOneQubitFidelityBase,
+                twoQubitBase: playgroundInstance.currentTwoQubitFidelityBase,
+            });
         }
 
         return () => {
@@ -224,12 +259,29 @@ const App: React.FC = () => {
                                 isCollapsed={isAppearanceCollapsed}
                                 onToggleCollapse={toggleAppearanceCollapse}
                             />
+                            <FidelityControls
+                                playground={playgroundRef.current}
+                                initialValues={initialFidelitySettings}
+                                isCollapsed={isFidelityCollapsed}
+                                onToggleCollapse={toggleFidelityCollapse}
+                                topPosition={`${BASE_TOP_MARGIN_PX + (isAppearanceCollapsed ? APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX : APPEARANCE_PANEL_EXPANDED_HEIGHT_PX) + INTER_PANEL_SPACING_PX}px`}
+                            />
                             <LayoutControls
                                 playground={playgroundRef.current}
                                 initialValues={initialLayout}
                                 isCollapsed={isLayoutCollapsed}
                                 onToggleCollapse={toggleLayoutCollapse}
-                                topPosition={`${BASE_TOP_MARGIN_PX + (isAppearanceCollapsed ? APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX : APPEARANCE_PANEL_EXPANDED_HEIGHT_PX) + INTER_PANEL_SPACING_PX}px`}
+                                topPosition={`${
+                                    BASE_TOP_MARGIN_PX +
+                                    (isAppearanceCollapsed
+                                        ? APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX
+                                        : APPEARANCE_PANEL_EXPANDED_HEIGHT_PX) +
+                                    INTER_PANEL_SPACING_PX +
+                                    (isFidelityCollapsed
+                                        ? FIDELITY_PANEL_COLLAPSED_HEIGHT_PX
+                                        : FIDELITY_PANEL_EXPANDED_HEIGHT_PX) +
+                                    INTER_PANEL_SPACING_PX
+                                }px`}
                             />
                             <HeatmapControls
                                 playground={playgroundRef.current}
