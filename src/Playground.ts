@@ -372,6 +372,11 @@ export class Playground {
 
         this.controls.update(); // For damping or other controls-related updates
 
+        if (this.grid) {
+            const distance = this.controls.getDistance();
+            this.grid.updateLOD(distance);
+        }
+
         // Update camera position for heatmap shader
         if (this.grid && this.grid.heatmap) {
             this.grid.heatmap.material.uniforms.cameraPosition.value.copy(
@@ -400,12 +405,15 @@ export class Playground {
         this.renderer.render(this.scene, this.camera);
     }
 
-    public updateLayoutParameters(params: {
-        repelForce?: number;
-        idealDistance?: number;
-        iterations?: number;
-        coolingFactor?: number;
-    }) {
+    public updateLayoutParameters(
+        params: {
+            repelForce?: number;
+            idealDistance?: number;
+            iterations?: number;
+            coolingFactor?: number;
+        },
+        onLayoutComplete?: () => void,
+    ) {
         if (params.repelForce !== undefined)
             this.currentRepelForce = params.repelForce;
         if (params.idealDistance !== undefined)
@@ -416,12 +424,15 @@ export class Playground {
             this.currentCoolingFactor = params.coolingFactor;
 
         if (this.grid) {
-            this.grid.updateLayoutParameters({
-                repelForce: this.currentRepelForce,
-                idealDistance: this.currentIdealDistance,
-                iterations: this.currentIterations,
-                coolingFactor: this.currentCoolingFactor,
-            });
+            this.grid.updateLayoutParameters(
+                {
+                    repelForce: this.currentRepelForce,
+                    idealDistance: this.currentIdealDistance,
+                    iterations: this.currentIterations,
+                    coolingFactor: this.currentCoolingFactor,
+                },
+                onLayoutComplete,
+            );
         }
     }
 
@@ -457,8 +468,7 @@ export class Playground {
         if (params.baseSize !== undefined) {
             this.currentBaseSize = params.baseSize;
             if (this.grid && this.grid.heatmap) {
-                this.grid.heatmap.material.uniforms.baseSize.value =
-                    this.currentBaseSize;
+                this.grid.heatmap.updateBaseSize(this.currentBaseSize);
             }
         }
     }
@@ -491,17 +501,23 @@ export class Playground {
         }
     }
 
-    public recompileLayout() {
-        // Add showLoadingScreen and hideLoadingScreen if implemented in React via callbacks or state management
-        // For now, directly call the grid method.
+    public recompileLayout(onLayoutComplete?: () => void) {
         if (this.grid) {
-            // Consider if loading screen logic should be triggered here or in the React component calling this
+            console.log("Recompiling layout with new parameters.");
             this.grid.recalculateLayoutAndRedraw(
                 this.currentRepelForce,
                 this.currentIdealDistance,
                 this.currentIterations,
                 this.currentCoolingFactor,
+                () => {
+                    // This callback ensures that any follow-up action
+                    // happens only after the layout and redraw are complete.
+                    console.log("Layout recompile finished.");
+                    onLayoutComplete?.();
+                },
             );
+        } else {
+            onLayoutComplete?.();
         }
     }
 
