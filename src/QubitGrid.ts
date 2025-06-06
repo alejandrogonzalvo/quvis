@@ -94,6 +94,9 @@ export class QubitGrid {
     // Active data based on _visualizationMode
     private allOperationsPerSlice: QubitOperation[][] = [];
     private _qubit_count: number; // Number of qubits for the *active* mode (logical/compiled)
+    private cumulativeQubitInteractions: number[][] = [];
+    private cumulativeWeightedPairInteractions: Map<string, number[]> =
+        new Map();
 
     public qubitInstances: Map<number, Qubit> = new Map(); // Stores all qubits based on num_qubits_on_device
     private current_slice_index: number = 0;
@@ -532,22 +535,44 @@ export class QubitGrid {
         const previousQubitCount = this._qubit_count;
         this._qubit_count = newQubitCount;
 
+        this.interactionPairsPerSlice = [];
+
+        // Initialize cumulative interactions array
+        this.cumulativeQubitInteractions = new Array(this._qubit_count)
+            .fill(0)
+            .map(() => new Array(this.allOperationsPerSlice.length).fill(0));
+
         this.slices = this.allOperationsPerSlice.map(
             (ops_in_slice, sliceIdx) => {
                 const slice = new Slice(sliceIdx);
-                const interactionPairs: Array<{ q1: number; q2: number }> = [];
+                const currentSlicePairs: Array<{ q1: number; q2: number }> = [];
                 ops_in_slice.forEach((op) => {
                     op.qubits.forEach((qid) =>
                         slice.interacting_qubits.add(qid),
                     );
                     if (op.qubits.length === 2) {
-                        interactionPairs.push({
+                        currentSlicePairs.push({
                             q1: op.qubits[0],
                             q2: op.qubits[1],
                         });
                     }
                 });
-                this.interactionPairsPerSlice.push(interactionPairs);
+                this.interactionPairsPerSlice.push(currentSlicePairs);
+
+                for (let qid = 0; qid < this._qubit_count; qid++) {
+                    const hadInteraction = slice.interacting_qubits.has(qid)
+                        ? 1
+                        : 0;
+                    if (sliceIdx === 0) {
+                        this.cumulativeQubitInteractions[qid][sliceIdx] =
+                            hadInteraction;
+                    } else {
+                        this.cumulativeQubitInteractions[qid][sliceIdx] =
+                            this.cumulativeQubitInteractions[qid][
+                                sliceIdx - 1
+                            ] + hadInteraction;
+                    }
+                }
                 return slice;
             },
         );
@@ -572,6 +597,8 @@ export class QubitGrid {
                 return slice;
             },
         );
+
+        this.calculateCumulativePairInteractions();
 
         if (this.slices.length > 0) {
             if (
@@ -696,7 +723,7 @@ export class QubitGrid {
                 const heatmapUpdateResults = this.heatmap.updatePoints(
                     this.qubitInstances,
                     this.current_slice_index,
-                    this.slices,
+                    this.cumulativeQubitInteractions,
                 );
                 this.lastMaxObservedRawHeatmapSum =
                     heatmapUpdateResults.maxObservedRawWeightedSum;
@@ -881,12 +908,6 @@ export class QubitGrid {
         }
         const numSlicesInWindow = windowEndSlice - windowStartSlice;
 
-        const relevantInteractionPairsForWindow =
-            this.interactionPairsPerSlice.slice(
-                windowStartSlice,
-                windowEndSlice,
-            );
-
         const pairData: Array<{
             idA: number;
             idB: number;
@@ -907,50 +928,30 @@ export class QubitGrid {
                     continue;
                 }
 
+                const q1 = Math.min(qubitIdA, qubitIdB);
+                const q2 = Math.max(qubitIdA, qubitIdB);
+                const key = `${q1}-${q2}`;
+
                 let currentPairWeightedSum = 0;
                 if (
                     numSlicesInWindow > 0 &&
-                    relevantInteractionPairsForWindow.length ===
-                        numSlicesInWindow
+                    this.cumulativeWeightedPairInteractions.has(key)
                 ) {
-                    for (let i = 0; i < numSlicesInWindow; i++) {
-                        const sliceInteractionPairs =
-                            relevantInteractionPairsForWindow[i];
-                        for (const interaction of sliceInteractionPairs) {
-                            if (
-                                (interaction.q1 === qubitIdA &&
-                                    interaction.q2 === qubitIdB) ||
-                                (interaction.q1 === qubitIdB &&
-                                    interaction.q2 === qubitIdA)
-                            ) {
-                                currentPairWeightedSum += Math.pow(
-                                    weight_base,
-                                    i,
-                                );
-                                break;
-                            }
-                        }
-                    }
-                } else if (
-                    this.maxSlicesForHeatmap === 0 &&
-                    this.current_slice_index >= 0 &&
-                    this.current_slice_index <
-                        this.interactionPairsPerSlice.length
-                ) {
-                    const currentSlicePairs =
-                        this.interactionPairsPerSlice[this.current_slice_index];
-                    for (const interaction of currentSlicePairs) {
-                        if (
-                            (interaction.q1 === qubitIdA &&
-                                interaction.q2 === qubitIdB) ||
-                            (interaction.q1 === qubitIdB &&
-                                interaction.q2 === qubitIdA)
-                        ) {
-                            currentPairWeightedSum = 1.0;
-                            break;
-                        }
-                    }
+                    const cumulativeWeights =
+                        this.cumulativeWeightedPairInteractions.get(key)!;
+
+                    const C = windowEndSlice - 1;
+                    const S_C = cumulativeWeights[C];
+                    const S_Start_minus_1 =
+                        windowStartSlice > 0
+                            ? cumulativeWeights[windowStartSlice - 1]
+                            : 0;
+
+                    currentPairWeightedSum =
+                        Math.pow(weight_base, -windowStartSlice) *
+                        (S_C - S_Start_minus_1);
                 }
+
                 pairData.push({
                     idA: qubitIdA,
                     idB: qubitIdB,
@@ -1055,6 +1056,45 @@ export class QubitGrid {
         if (slicesToConsider.length === 0) return 0;
 
         return interactionCount / slicesToConsider.length;
+    }
+
+    private calculateCumulativePairInteractions() {
+        this.cumulativeWeightedPairInteractions = new Map<string, number[]>();
+        if (!this.couplingMap || this.slices.length === 0) {
+            return;
+        }
+
+        const weight_base = this.heatmapWeightBase;
+
+        for (const pair of this.couplingMap) {
+            const q1 = Math.min(pair[0], pair[1]);
+            const q2 = Math.max(pair[0], pair[1]);
+            const key = `${q1}-${q2}`;
+            const cumulativeWeights = new Array(this.slices.length).fill(0);
+
+            for (let i = 0; i < this.slices.length; i++) {
+                const sliceInteractionPairs = this.interactionPairsPerSlice[i];
+                let hadInteraction = 0;
+                for (const interaction of sliceInteractionPairs) {
+                    if (
+                        (interaction.q1 === q1 && interaction.q2 === q2) ||
+                        (interaction.q1 === q2 && interaction.q2 === q1)
+                    ) {
+                        hadInteraction = 1;
+                        break;
+                    }
+                }
+
+                const currentWeight = hadInteraction * Math.pow(weight_base, i);
+                if (i === 0) {
+                    cumulativeWeights[i] = currentWeight;
+                } else {
+                    cumulativeWeights[i] =
+                        cumulativeWeights[i - 1] + currentWeight;
+                }
+            }
+            this.cumulativeWeightedPairInteractions.set(key, cumulativeWeights);
+        }
     }
 
     public recalculateLayoutAndRedraw(

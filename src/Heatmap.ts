@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import { Qubit } from "./Qubit.js";
-import { Slice } from "./Slice.js";
 
 export class Heatmap {
     mesh: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
@@ -247,7 +246,7 @@ export class Heatmap {
     updatePoints(
         qubits: Map<number, Qubit>,
         currentSliceIndex: number,
-        allSlicesData: Array<Slice>,
+        cumulativeInteractions: number[][],
     ): { maxObservedRawWeightedSum: number; numSlicesEffectivelyUsed: number } {
         let posIndex = 0;
 
@@ -262,57 +261,82 @@ export class Heatmap {
         }
         const numSlicesInWindow = windowEndSlice - windowStartSlice;
 
-        const relevantSlicesData = allSlicesData.slice(
-            windowStartSlice,
-            windowEndSlice,
-        );
-
         const rawInteractionCounts: number[] = [];
         let maxObservedRawInteractionCount = 0;
 
-        for (
-            let heatmapQubitId = 0;
-            heatmapQubitId < this.positions.length / 3;
-            heatmapQubitId++
+        const numHeatmapPoints = this.positions.length / 3;
+
+        if (
+            cumulativeInteractions.length === 0 ||
+            (cumulativeInteractions[0] &&
+                cumulativeInteractions[0].length === 0) ||
+            currentSliceIndex < 0
         ) {
-            const qubitInfo = qubits.get(heatmapQubitId);
-
-            if (!this.qubitPositions[heatmapQubitId] && qubitInfo) {
-                const posVec = new THREE.Vector3();
-                qubitInfo.blochSphere.blochSphere.getWorldPosition(posVec);
-                this.qubitPositions[heatmapQubitId] = posVec;
-            }
-            const pos = this.qubitPositions[heatmapQubitId];
-
-            if (pos) {
-                this.positions[posIndex++] = pos.x;
-                this.positions[posIndex++] = pos.y;
-                this.positions[posIndex++] = pos.z;
-            } else {
-                this.positions[posIndex++] = 0;
-                this.positions[posIndex++] = 0;
-                this.positions[posIndex++] = 0;
-            }
-
-            let interactionCount = 0;
-            if (
-                numSlicesInWindow > 0 &&
-                relevantSlicesData.length === numSlicesInWindow
-            ) {
-                for (let i = 0; i < numSlicesInWindow; i++) {
-                    const sliceDataForWindow = relevantSlicesData[i];
-                    if (
-                        sliceDataForWindow.interacting_qubits.has(
-                            heatmapQubitId,
-                        )
-                    ) {
-                        interactionCount++;
-                    }
+            // Handle case with no data
+            for (let i = 0; i < numHeatmapPoints; i++) {
+                this.intensities[i] = 0;
+                const qubitInfo = qubits.get(i);
+                if (!this.qubitPositions[i] && qubitInfo) {
+                    const posVec = new THREE.Vector3();
+                    qubitInfo.blochSphere.blochSphere.getWorldPosition(posVec);
+                    this.qubitPositions[i] = posVec;
+                }
+                const pos = this.qubitPositions[i];
+                if (pos) {
+                    this.positions[posIndex++] = pos.x;
+                    this.positions[posIndex++] = pos.y;
+                    this.positions[posIndex++] = pos.z;
+                } else {
+                    posIndex += 3;
                 }
             }
-            rawInteractionCounts.push(interactionCount);
-            if (interactionCount > maxObservedRawInteractionCount) {
-                maxObservedRawInteractionCount = interactionCount;
+        } else {
+            for (
+                let heatmapQubitId = 0;
+                heatmapQubitId < numHeatmapPoints;
+                heatmapQubitId++
+            ) {
+                const qubitInfo = qubits.get(heatmapQubitId);
+
+                if (!this.qubitPositions[heatmapQubitId] && qubitInfo) {
+                    const posVec = new THREE.Vector3();
+                    qubitInfo.blochSphere.blochSphere.getWorldPosition(posVec);
+                    this.qubitPositions[heatmapQubitId] = posVec;
+                }
+                const pos = this.qubitPositions[heatmapQubitId];
+
+                if (pos) {
+                    this.positions[posIndex++] = pos.x;
+                    this.positions[posIndex++] = pos.y;
+                    this.positions[posIndex++] = pos.z;
+                } else {
+                    this.positions[posIndex++] = 0;
+                    this.positions[posIndex++] = 0;
+                    this.positions[posIndex++] = 0;
+                }
+
+                let interactionCount = 0;
+                if (
+                    numSlicesInWindow > 0 &&
+                    heatmapQubitId < cumulativeInteractions.length
+                ) {
+                    const cumulativeAtEnd =
+                        cumulativeInteractions[heatmapQubitId][
+                            windowEndSlice - 1
+                        ];
+                    const cumulativeAtStart =
+                        windowStartSlice > 0
+                            ? cumulativeInteractions[heatmapQubitId][
+                                  windowStartSlice - 1
+                              ]
+                            : 0;
+                    interactionCount = cumulativeAtEnd - cumulativeAtStart;
+                }
+
+                rawInteractionCounts.push(interactionCount);
+                if (interactionCount > maxObservedRawInteractionCount) {
+                    maxObservedRawInteractionCount = interactionCount;
+                }
             }
         }
 
