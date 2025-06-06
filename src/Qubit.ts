@@ -26,20 +26,6 @@ export class Qubit {
         // console.log(`Qubit ${this.id} SET state: current _state BEFORE: ${this._state}, typeof _state: ${typeof this._state}. (Enum string: ${State[this._state]})`);
         this._state = newState;
         // console.log(`Qubit ${this.id} SET state: _state AFTER: ${this._state}, typeof _state: ${typeof this._state}. (Enum string: ${State[this._state]})`);
-        try {
-            this.animate();
-        } catch (error) {
-            console.error(
-                `Qubit ${this.id} Error during animate() in state setter:`,
-                error,
-            );
-        }
-    }
-
-    animate() {
-        if (this.blochSphere) {
-            this.blochSphere.animateStateVector(this.state);
-        }
     }
 
     dispose() {

@@ -1,6 +1,4 @@
 import * as THREE from "three";
-import { State } from "./State.js";
-import { gsap } from "gsap";
 
 export class BlochSphere {
     blochSphere: THREE.Group;
@@ -69,10 +67,6 @@ export class BlochSphere {
         });
         const meridian = new THREE.Mesh(meridianGeometry, meridianMaterial);
         this.blochSphere.add(meridian);
-
-        // Then replace the ArrowHelper creation with:
-        const stateVector = this.createArrow(new THREE.Vector3(1, 0, 0));
-        this.blochSphere.add(stateVector);
     }
 
     public setOpacity(opacity: number): void {
@@ -105,86 +99,6 @@ export class BlochSphere {
         if (this.blochSphere) {
             this.blochSphere.scale.set(scale, scale, scale);
         }
-    }
-
-    createArrow(direction) {
-        const arrowGroup = new THREE.Group();
-        const color = 0xffffff;
-
-        // Create the shaft
-        const shaftGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.35);
-        const shaftMaterial = new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: 1,
-            side: THREE.DoubleSide,
-            depthTest: false,
-        });
-        const shaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
-        shaft.position.y = 0.175; // Half of the shaft length
-
-        // Create the arrow head (cone)
-        const headGeometry = new THREE.ConeGeometry(0.05, 0.1);
-        const headMaterial = new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: 1,
-            side: THREE.DoubleSide,
-            depthTest: false,
-        });
-        const head = new THREE.Mesh(headGeometry, headMaterial);
-        head.position.y = 0.35; // Position at the end of the shaft
-
-        arrowGroup.add(shaft);
-        arrowGroup.add(head);
-
-        // Orient the arrow in the specified direction
-        arrowGroup.lookAt(direction.multiplyScalar(0.4));
-
-        return arrowGroup;
-    }
-
-    animateStateVector(state: State) {
-        const stateVector = this.blochSphere.children.find(
-            (child) => child instanceof THREE.Group,
-        );
-
-        if (!stateVector) {
-            console.warn(
-                "BlochSphere: State vector arrow group not found for animation.",
-            );
-            return;
-        }
-
-        const targetRotation = new THREE.Euler();
-        // console.log(`BlochSphere: Animating to state: ${state} (numeric), string key: ${State[state]}`); // For debugging
-
-        switch (
-            state // Switch directly on the state value (which can be number or string)
-        ) {
-            case State.ZERO: // Compares with numeric 0 if state is 0
-                targetRotation.set(0, 0, 0); // Point up
-                break;
-            case State.ONE: // Compares with numeric 1 if state is 1
-                targetRotation.set(Math.PI, 0, 0); // Point down
-                break;
-            case State.PLUS: // Compares with string "+" if state is "+"
-                targetRotation.set(Math.PI / 2, 0, -Math.PI / 2); // Point right
-                break;
-            case State.MINUS: // Compares with string "-" if state is "-"
-                targetRotation.set(Math.PI / 2, 0, Math.PI / 2); // Point left
-                break;
-            default:
-                targetRotation.set(0, 0, 0); // Default to |0⟩ orientation
-        }
-
-        gsap.to(stateVector.rotation, {
-            x: targetRotation.x,
-            y: targetRotation.y,
-            z: targetRotation.z,
-            duration: 1,
-            ease: "power1.inOut",
-        });
     }
 
     dispose() {
