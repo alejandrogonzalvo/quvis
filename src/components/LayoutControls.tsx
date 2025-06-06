@@ -12,6 +12,7 @@ interface LayoutControlsProps {
     isCollapsed: boolean;
     onToggleCollapse: () => void;
     topPosition: string; // e.g., "340px"
+    setIsLoading: (isLoading: boolean) => void;
 }
 
 const basePanelStyle: React.CSSProperties = {
@@ -65,6 +66,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
     isCollapsed,
     onToggleCollapse,
     topPosition,
+    setIsLoading,
 }) => {
     const [repelForce, setRepelForce] = useState(initialValues.repelForce);
     const [idealDistance, setIdealDistance] = useState(
@@ -82,12 +84,37 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
         setCoolingFactor(initialValues.coolingFactor);
     }, [initialValues]);
 
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setIsLoading(true);
+            setTimeout(() => {
+                playground?.updateLayoutParameters({
+                    repelForce,
+                    idealDistance,
+                    iterations,
+                    coolingFactor,
+                });
+                setIsLoading(false);
+            }, 10); // Small delay to allow UI update
+        }, 500); // Debounce for 500ms
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [
+        repelForce,
+        idealDistance,
+        iterations,
+        coolingFactor,
+        playground,
+        setIsLoading,
+    ]);
+
     const handleRepelForceChange = (
         event: React.ChangeEvent<HTMLInputElement>,
     ) => {
         const value = parseFloat(event.target.value);
         setRepelForce(value);
-        playground?.updateLayoutParameters({ repelForce: value });
     };
 
     const handleIdealDistanceChange = (
@@ -95,7 +122,6 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
     ) => {
         const value = parseFloat(event.target.value);
         setIdealDistance(value);
-        playground?.updateLayoutParameters({ idealDistance: value });
     };
 
     const handleIterationsChange = (
@@ -103,7 +129,6 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
     ) => {
         const value = parseInt(event.target.value, 10);
         setIterations(value);
-        playground?.updateLayoutParameters({ iterations: value });
     };
 
     const handleCoolingFactorChange = (
@@ -111,11 +136,14 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
     ) => {
         const value = parseFloat(event.target.value);
         setCoolingFactor(value);
-        playground?.updateLayoutParameters({ coolingFactor: value });
     };
 
     const handleRecompileLayout = () => {
-        playground?.recompileLayout();
+        setIsLoading(true);
+        setTimeout(() => {
+            playground?.recompileLayout();
+            setIsLoading(false);
+        }, 10); // Small delay to allow UI update
     };
 
     if (!playground) {

@@ -6,8 +6,9 @@ import LayoutControls from "./components/LayoutControls.js";
 import HeatmapControls from "./components/HeatmapControls.js";
 import Tooltip from "./components/Tooltip.js";
 import DatasetSelection from "./components/DatasetSelection.js";
-import VisualizationModeSwitcher from "./components/VisualizationModeSwitcher.js";
 import FidelityControls from "./components/FidelityControls.js";
+import LoadingIndicator from "./components/LoadingIndicator.js";
+import VisualizationModeSwitcher from "./components/VisualizationModeSwitcher.js";
 import "./../style.css";
 
 const BASE_TOP_MARGIN_PX = 20;
@@ -45,10 +46,12 @@ const App: React.FC = () => {
     const mountRef = useRef<HTMLDivElement>(null);
     const playgroundRef = useRef<Playground | null>(null);
 
+    // State for loading indicator
+    const [isLoading, setIsLoading] = useState(false);
+
     // State for dataset selection
     const [selectedDataset, setSelectedDataset] = useState<string | null>(null);
 
-    // State for visualization mode
     const [visualizationMode, setVisualizationMode] = useState<
         "compiled" | "logical"
     >("compiled");
@@ -260,7 +263,7 @@ const App: React.FC = () => {
             // If the effect is re-running due to selectedDataset changing, handleDatasetSelect should have already disposed.
             // If the component is unmounting, this will dispose.
             // If only visualizationMode changed, we DON'T want to dispose here.
-            // The current structure: handleDatasetSelect disposes and nulls playgroundRef.
+            // The current structure: handleDatasetSelect disposes and nulls playgroundRef.current.
             // So, if selectedDataset changes, playgroundRef.current will be null when this effect runs for the new dataset.
         };
     }, [selectedDataset, visualizationMode]);
@@ -286,95 +289,75 @@ const App: React.FC = () => {
     }, [selectedDataset]); // Only run this effect when selectedDataset changes
 
     const handleTimelineChange = (newSliceIndex: number) => {
+        setCurrentSliceValue(newSliceIndex);
         if (playgroundRef.current) {
             playgroundRef.current.setCurrentSlice(newSliceIndex);
-            setCurrentSliceValue(newSliceIndex);
         }
     };
 
     const handleModeChange = (mode: "compiled" | "logical") => {
-        if (visualizationMode !== mode) {
-            setVisualizationMode(mode);
-            // The useEffect hook watching selectedDataset and visualizationMode
-            // will handle disposing and re-creating the Playground instance.
-        }
+        setVisualizationMode(mode);
     };
 
+    const fidelityPanelTop = isAppearanceCollapsed
+        ? `${BASE_TOP_MARGIN_PX + APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX + INTER_PANEL_SPACING_PX}px`
+        : `${BASE_TOP_MARGIN_PX + APPEARANCE_PANEL_EXPANDED_HEIGHT_PX + INTER_PANEL_SPACING_PX}px`;
+    const layoutPanelTop = isFidelityCollapsed
+        ? `${parseInt(fidelityPanelTop) + FIDELITY_PANEL_COLLAPSED_HEIGHT_PX + INTER_PANEL_SPACING_PX}px`
+        : `${parseInt(fidelityPanelTop) + FIDELITY_PANEL_EXPANDED_HEIGHT_PX + INTER_PANEL_SPACING_PX}px`;
+
     return (
-        <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
+        <div className="App">
+            {isLoading && <LoadingIndicator />}
             {!selectedDataset ? (
                 <DatasetSelection onSelect={handleDatasetSelect} />
             ) : (
                 <>
-                    {/* Container for the Three.js canvas */}
                     <div
                         ref={mountRef}
-                        style={{ width: "100%", height: "100%" }}
+                        style={{ width: "100vw", height: "100vh" }}
                     />
                     {isUiVisible && (
                         <>
                             <VisualizationModeSwitcher
                                 currentMode={visualizationMode}
                                 onModeChange={handleModeChange}
-                                disabled={!isPlaygroundInitialized} // Disable while playground is loading/initializing
+                                disabled={!isPlaygroundInitialized}
                             />
-                            {/* Future React UI components will go here, likely overlaid or adjacent */}
-                            {/* <div style={{ position: 'absolute', top: '10px', left: '10px', color: 'white' }}>
-                                <h1>Quantum Grid Visualizer - React</h1>
-                            </div> */}
-
-                            {isPlaygroundInitialized && (
-                                <>
-                                    <AppearanceControls
-                                        playground={playgroundRef.current}
-                                        initialValues={initialAppearance}
-                                        isCollapsed={isAppearanceCollapsed}
-                                        onToggleCollapse={
-                                            toggleAppearanceCollapse
-                                        }
-                                    />
-                                    <FidelityControls
-                                        playground={playgroundRef.current}
-                                        initialValues={initialFidelitySettings}
-                                        isCollapsed={isFidelityCollapsed}
-                                        onToggleCollapse={
-                                            toggleFidelityCollapse
-                                        }
-                                        topPosition={`${BASE_TOP_MARGIN_PX + (isAppearanceCollapsed ? APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX : APPEARANCE_PANEL_EXPANDED_HEIGHT_PX) + INTER_PANEL_SPACING_PX}px`}
-                                    />
-                                    <LayoutControls
-                                        playground={playgroundRef.current}
-                                        initialValues={initialLayout}
-                                        isCollapsed={isLayoutCollapsed}
-                                        onToggleCollapse={toggleLayoutCollapse}
-                                        topPosition={`${
-                                            BASE_TOP_MARGIN_PX +
-                                            (isAppearanceCollapsed
-                                                ? APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX
-                                                : APPEARANCE_PANEL_EXPANDED_HEIGHT_PX) +
-                                            INTER_PANEL_SPACING_PX +
-                                            (isFidelityCollapsed
-                                                ? FIDELITY_PANEL_COLLAPSED_HEIGHT_PX
-                                                : FIDELITY_PANEL_EXPANDED_HEIGHT_PX) +
-                                            INTER_PANEL_SPACING_PX
-                                        }px`}
-                                    />
-                                    <HeatmapControls
-                                        playground={playgroundRef.current}
-                                        initialValues={{
-                                            maxSlices: initialHeatmapSlices,
-                                        }}
-                                    />
-                                </>
-                            )}
-
+                            <AppearanceControls
+                                playground={playgroundRef.current}
+                                initialValues={initialAppearance}
+                                isCollapsed={isAppearanceCollapsed}
+                                onToggleCollapse={toggleAppearanceCollapse}
+                            />
+                            <FidelityControls
+                                playground={playgroundRef.current}
+                                initialValues={initialFidelitySettings}
+                                isCollapsed={isFidelityCollapsed}
+                                onToggleCollapse={toggleFidelityCollapse}
+                                topPosition={fidelityPanelTop}
+                            />
+                            <LayoutControls
+                                playground={playgroundRef.current}
+                                initialValues={initialLayout}
+                                isCollapsed={isLayoutCollapsed}
+                                onToggleCollapse={toggleLayoutCollapse}
+                                topPosition={layoutPanelTop}
+                                setIsLoading={setIsLoading}
+                            />
+                            <HeatmapControls
+                                playground={playgroundRef.current}
+                                initialValues={{
+                                    maxSlices: initialHeatmapSlices,
+                                }}
+                            />
                             {isTimelineInitialized && actualSliceCount > 0 && (
                                 <TimelineSlider
                                     min={0}
-                                    max={maxSliceIndex} // Use maxSliceIndex for the slider's max prop
+                                    max={maxSliceIndex}
                                     value={currentSliceValue}
                                     onChange={handleTimelineChange}
-                                    disabled={actualSliceCount === 0} // Or simply actualSliceCount <= 1 for single slice no-slide
+                                    disabled={actualSliceCount === 0}
                                     label="Time Slice"
                                 />
                             )}
