@@ -79,6 +79,7 @@ export class QubitGrid {
     private couplingMap: number[][] | null = null;
     private connectionLines: THREE.Group;
     private instancedConnectionMesh: THREE.InstancedMesh | null = null;
+    private logicalConnectionMesh: THREE.InstancedMesh | null = null;
     private intensityAttribute: THREE.InstancedBufferAttribute | null = null;
     private qubitPositions: Map<number, THREE.Vector3> = new Map();
     private lastCalculatedSlicesChangeIDs: Array<Set<number>> = [];
@@ -122,6 +123,8 @@ export class QubitGrid {
     private _visualizationMode: "compiled" | "logical";
 
     private layoutWorker: Worker;
+    private layoutAreaSide: number = 0;
+    private currentLOD: "high" | "medium" | "low" = "high";
 
     // Getter for the number of slices in the currently active mode
     public getActiveSliceCount(): number {
@@ -185,8 +188,6 @@ export class QubitGrid {
         this.timeline = new Timeline((sliceIndex) =>
             this.loadStateFromSlice(sliceIndex),
         );
-        this.connectionLines = new THREE.Group();
-        this.scene.add(this.connectionLines);
 
         this.heatmap = new Heatmap(camera, 1, this.maxSlicesForHeatmap);
         this.scene.add(this.heatmap.mesh);
@@ -293,6 +294,35 @@ export class QubitGrid {
             this.intensityAttribute,
         );
         this.scene.add(this.instancedConnectionMesh);
+    }
+
+    private initializeLogicalInstancedConnections(maxConnections: number) {
+        if (this.logicalConnectionMesh) {
+            this.scene.remove(this.logicalConnectionMesh);
+            this.logicalConnectionMesh.geometry.dispose();
+            (this.logicalConnectionMesh.material as THREE.Material).dispose();
+            this.logicalConnectionMesh = null;
+        }
+
+        if (maxConnections === 0) return;
+
+        const cylinderGeo = new THREE.CylinderGeometry(1, 1, 1, 8, 1);
+
+        const material = new THREE.MeshBasicMaterial({
+            color: 0x00ffff,
+            transparent: true,
+            opacity: 0.75,
+        });
+
+        this.logicalConnectionMesh = new THREE.InstancedMesh(
+            cylinderGeo,
+            material,
+            maxConnections,
+        );
+        this.logicalConnectionMesh.instanceMatrix.setUsage(
+            THREE.DynamicDrawUsage,
+        );
+        this.scene.add(this.logicalConnectionMesh);
     }
 
     private clearInstancedConnections() {
@@ -471,6 +501,19 @@ export class QubitGrid {
             newQubitCount = this.logicalCircuitInfo.num_qubits;
             this.allOperationsPerSlice =
                 this.logicalCircuitInfo.interaction_graph_ops_per_slice || [];
+
+            let maxLogicalConnections = 0;
+            if (this.allOperationsPerSlice) {
+                this.allOperationsPerSlice.forEach((ops_in_slice) => {
+                    const twoQubitOps = ops_in_slice.filter(
+                        (op) => op.qubits.length === 2,
+                    ).length;
+                    if (twoQubitOps > maxLogicalConnections) {
+                        maxLogicalConnections = twoQubitOps;
+                    }
+                });
+            }
+            this.initializeLogicalInstancedConnections(maxLogicalConnections);
         } else if (mode === "compiled" && this.compiledCircuitInfo) {
             //eslint-disable-next-line @typescript-eslint/no-unused-vars
             selectedCircuitInfo = this.compiledCircuitInfo;
@@ -737,83 +780,81 @@ export class QubitGrid {
         blochSphere.blochSphere.userData.qubitState = qubit.state;
     }
 
-    private clearConnectionCylinders() {
-        this.connectionLines.children.forEach((child) => {
-            if (child instanceof THREE.Mesh) {
-                child.geometry.dispose();
-                if (Array.isArray(child.material)) {
-                    child.material.forEach((mat) => mat.dispose());
-                } else {
-                    child.material.dispose();
-                }
-            }
-        });
-        this.connectionLines.clear();
-    }
-
     drawConnections() {
-        this.clearConnectionCylinders();
         const yAxis = new THREE.Vector3(0, 1, 0);
 
         if (this._visualizationMode === "logical") {
-            if (
-                this.current_slice_index >= 0 &&
-                this.current_slice_index < this.interactionPairsPerSlice.length
-            ) {
-                const currentSliceInteractionPairs =
-                    this.interactionPairsPerSlice[this.current_slice_index];
-                currentSliceInteractionPairs.forEach((pair) => {
-                    const posA = this.qubitPositions.get(pair.q1);
-                    const posB = this.qubitPositions.get(pair.q2);
-
-                    if (posA && posB) {
-                        const distance = posA.distanceTo(posB);
-                        if (distance === 0) return;
-
-                        const material = new THREE.MeshBasicMaterial({
-                            color: 0x00ffff,
-                            transparent: true,
-                            opacity: 0.75,
-                        });
-
-                        const cylinderGeo = new THREE.CylinderGeometry(
-                            this.currentConnectionThickness * 0.8,
-                            this.currentConnectionThickness * 0.8,
-                            distance,
-                            8,
-                            1,
-                        );
-                        const cylinderMesh = new THREE.Mesh(
-                            cylinderGeo,
-                            material,
-                        );
-                        cylinderMesh.position
-                            .copy(posA)
-                            .add(posB)
-                            .multiplyScalar(0.5);
-                        const direction = new THREE.Vector3()
-                            .subVectors(posB, posA)
-                            .normalize();
-                        const quaternion =
-                            new THREE.Quaternion().setFromUnitVectors(
-                                yAxis,
-                                direction,
-                            );
-                        cylinderMesh.quaternion.copy(quaternion);
-                        this.connectionLines.add(cylinderMesh);
-                    }
-                });
-            }
             if (this.instancedConnectionMesh) {
                 this.instancedConnectionMesh.count = 0;
                 this.instancedConnectionMesh.instanceMatrix.needsUpdate = true;
             }
+
+            if (
+                this.logicalConnectionMesh &&
+                this.logicalConnectionMesh.visible
+            ) {
+                let instanceCount = 0;
+                if (
+                    this.current_slice_index >= 0 &&
+                    this.current_slice_index <
+                        this.interactionPairsPerSlice.length
+                ) {
+                    const currentSliceInteractionPairs =
+                        this.interactionPairsPerSlice[this.current_slice_index];
+
+                    const matrix = new THREE.Matrix4();
+                    const position = new THREE.Vector3();
+                    const quaternion = new THREE.Quaternion();
+                    const scale = new THREE.Vector3();
+                    const direction = new THREE.Vector3();
+
+                    currentSliceInteractionPairs.forEach((pair) => {
+                        const posA = this.qubitPositions.get(pair.q1);
+                        const posB = this.qubitPositions.get(pair.q2);
+
+                        if (posA && posB) {
+                            const distance = posA.distanceTo(posB);
+                            if (distance > 0) {
+                                position
+                                    .copy(posA)
+                                    .add(posB)
+                                    .multiplyScalar(0.5);
+                                direction.subVectors(posB, posA).normalize();
+                                quaternion.setFromUnitVectors(yAxis, direction);
+                                scale.set(
+                                    this.currentConnectionThickness * 0.8,
+                                    distance,
+                                    this.currentConnectionThickness * 0.8,
+                                );
+                                matrix.compose(position, quaternion, scale);
+                                this.logicalConnectionMesh!.setMatrixAt(
+                                    instanceCount,
+                                    matrix,
+                                );
+                                instanceCount++;
+                            }
+                        }
+                    });
+                }
+                this.logicalConnectionMesh.count = instanceCount;
+                this.logicalConnectionMesh.instanceMatrix.needsUpdate = true;
+            } else if (this.logicalConnectionMesh) {
+                this.logicalConnectionMesh.count = 0;
+                this.logicalConnectionMesh.instanceMatrix.needsUpdate = true;
+            }
             return;
+        }
+
+        // Compiled mode
+        if (this.logicalConnectionMesh) {
+            this.logicalConnectionMesh.count = 0;
+            this.logicalConnectionMesh.instanceMatrix.needsUpdate = true;
         }
 
         if (
             !this.couplingMap ||
             !this.instancedConnectionMesh ||
+            !this.instancedConnectionMesh.visible ||
             this.couplingMap.length === 0 ||
             !this.qubitPositions ||
             this.qubitPositions.size === 0 ||
@@ -1036,7 +1077,7 @@ export class QubitGrid {
 
         const numDeviceQubits = this.deviceInfo.num_qubits_on_device;
         this.qubitPositions.clear();
-        const layoutAreaSide = Math.max(
+        this.layoutAreaSide = Math.max(
             5,
             Math.sqrt(numDeviceQubits) * 2.5 * (this.idealDist / 5),
         );
@@ -1059,9 +1100,9 @@ export class QubitGrid {
         this.layoutWorker.postMessage({
             numDeviceQubits,
             couplingMap: this.couplingMap,
-            areaWidth: layoutAreaSide,
-            areaHeight: layoutAreaSide,
-            areaDepth: layoutAreaSide * 0.5,
+            areaWidth: this.layoutAreaSide,
+            areaHeight: this.layoutAreaSide,
+            areaDepth: this.layoutAreaSide * 0.5,
             iterations: newIterations,
             coolingFactor: newCoolingFactor,
             kRepel: newKRepel,
@@ -1296,19 +1337,12 @@ export class QubitGrid {
         });
         this.qubitInstances.clear();
 
-        this.scene.remove(this.connectionLines);
-        this.connectionLines.traverse((object) => {
-            if (object instanceof THREE.Mesh) {
-                object.geometry?.dispose();
-                if (Array.isArray(object.material)) {
-                    object.material.forEach((m) => m.dispose());
-                } else {
-                    object.material?.dispose();
-                }
-            }
-        });
-        while (this.connectionLines.children.length > 0) {
-            this.connectionLines.remove(this.connectionLines.children[0]);
+        this.clearInstancedConnections();
+        if (this.logicalConnectionMesh) {
+            this.scene.remove(this.logicalConnectionMesh);
+            this.logicalConnectionMesh.geometry.dispose();
+            (this.logicalConnectionMesh.material as THREE.Material).dispose();
+            this.logicalConnectionMesh = null;
         }
 
         if (this.heatmap && this.heatmap.mesh) {
@@ -1339,5 +1373,58 @@ export class QubitGrid {
         }
         this.switchToMode(mode, false, this.camera);
         console.log(`QubitGrid visualization mode set to: ${mode}`);
+    }
+
+    /**
+     * Call this method from your animation loop to dynamically adjust level of detail
+     * based on camera distance. This improves performance by hiding objects that are
+     * too small to be seen clearly.
+     *
+     * Example usage in your Playground's animate() method:
+     *
+     * if (this.qubitGrid) {
+     *     const distance = this.controls.getDistance();
+     *     this.qubitGrid.updateLOD(distance);
+     * }
+     */
+    public updateLOD(cameraDistance: number): void {
+        if (this.layoutAreaSide === 0) return;
+
+        let level: "high" | "medium" | "low";
+        if (cameraDistance > this.layoutAreaSide * 2) {
+            level = "low";
+        } else if (cameraDistance > this.layoutAreaSide * 1.5) {
+            level = "medium";
+        } else {
+            level = "high";
+        }
+
+        if (level !== this.currentLOD) {
+            this.setLOD(level);
+        }
+    }
+
+    private setLOD(level: "high" | "medium" | "low") {
+        this.currentLOD = level;
+        const highVisible = level === "high";
+        const mediumVisible = level === "medium" || level === "high";
+
+        this.qubitInstances.forEach((qubit) => {
+            if (qubit.blochSphere?.blochSphere) {
+                qubit.blochSphere.blochSphere.visible = highVisible;
+            }
+        });
+
+        if (this.instancedConnectionMesh) {
+            this.instancedConnectionMesh.visible = mediumVisible;
+        }
+        if (this.logicalConnectionMesh) {
+            this.logicalConnectionMesh.visible = mediumVisible;
+        }
+
+        // The visibility of connections is now managed by the visibility of the
+        // InstancedMesh. We still call drawConnections because the *set* of
+        // connections can change with the timeline slider, independent of LOD.
+        this.drawConnections();
     }
 }

@@ -372,6 +372,11 @@ export class Playground {
 
         this.controls.update(); // For damping or other controls-related updates
 
+        if (this.grid) {
+            const distance = this.controls.getDistance();
+            this.grid.updateLOD(distance);
+        }
+
         // Update camera position for heatmap shader
         if (this.grid && this.grid.heatmap) {
             this.grid.heatmap.material.uniforms.cameraPosition.value.copy(
