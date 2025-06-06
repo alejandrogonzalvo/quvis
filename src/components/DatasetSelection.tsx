@@ -117,6 +117,14 @@ const DatasetSelection: React.FC<DatasetSelectionProps> = ({ onSelect }) => {
                     style={buttonStyle}
                     onMouseOver={handleMouseOver}
                     onMouseOut={handleMouseOut}
+                    onClick={() => onSelect("ghz")}
+                >
+                    Greenberger-Horne-Zeilinger (GHZ)
+                </button>
+                <button
+                    style={buttonStyle}
+                    onMouseOver={handleMouseOver}
+                    onMouseOut={handleMouseOut}
                     onClick={triggerFileInput}
                 >
                     Upload Custom JSON
