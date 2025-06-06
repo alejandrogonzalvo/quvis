@@ -1,6 +1,7 @@
 from qiskit import QuantumCircuit, transpile
 from qiskit.transpiler import CouplingMap
 from qiskit.converters import circuit_to_dag
+from qiskit.dagcircuit import DAGOpNode
 import json
 import argparse
 
@@ -94,18 +95,20 @@ def main():
 
     # --- Extract interactions from the DECOMPOSED (logical) GHZ circuit ---
     print("\nExtracting logical interactions from the decomposed GHZ circuit...")
-    logical_dag = circuit_to_dag(decomposed_ghz_qc) 
+    logical_dag = circuit_to_dag(decomposed_ghz_qc)
     logical_operations_per_slice = []
     logical_qubit_indices = {qubit: i for i, qubit in enumerate(decomposed_ghz_qc.qubits)}
 
+    num_logical_layers = logical_dag.depth()
+    print(f"  Processing {num_logical_layers} logical layers...")
+    for i, layer_nodes in enumerate(logical_dag.multigraph_layers()):
+        if (i + 1) % 100 == 0 or (i + 1) == num_logical_layers:
+            print(f"    Processed {i + 1}/{num_logical_layers} logical layers...")
 
-    for i, layer in enumerate(logical_dag.layers()):
-        slice_ops = []
-        for node in layer['graph'].op_nodes():
-            op = node.op
-            op_name = op.name
-            op_qubit_indices = [logical_qubit_indices[q] for q in node.qargs]
-            slice_ops.append({"name": op_name, "qubits": op_qubit_indices})
+        slice_ops = [
+            {"name": node.op.name, "qubits": [logical_qubit_indices[q] for q in node.qargs]}
+            for node in layer_nodes if isinstance(node, DAGOpNode)
+        ]
         
         if slice_ops:
             logical_operations_per_slice.append(slice_ops)
@@ -136,16 +139,18 @@ def main():
     print("\nExtracting compiled qubit interactions for visualization...")
     compiled_dag = circuit_to_dag(transpiled_qc)
     compiled_operations_per_slice = []
-    
     compiled_qubit_indices = {qubit: i for i, qubit in enumerate(transpiled_qc.qubits)}
 
-    for i, layer in enumerate(compiled_dag.layers()):
-        slice_ops = []
-        for node in layer['graph'].op_nodes():
-            op = node.op
-            op_name = op.name
-            op_qubit_indices = [compiled_qubit_indices[q] for q in node.qargs]
-            slice_ops.append({"name": op_name, "qubits": op_qubit_indices})
+    num_compiled_layers = compiled_dag.depth()
+    print(f"  Processing {num_compiled_layers} compiled layers...")
+    for i, layer_nodes in enumerate(compiled_dag.multigraph_layers()):
+        if (i + 1) % 100 == 0 or (i + 1) == num_compiled_layers:
+            print(f"    Processed {i + 1}/{num_compiled_layers} compiled layers...")
+
+        slice_ops = [
+            {"name": node.op.name, "qubits": [compiled_qubit_indices[q] for q in node.qargs]}
+            for node in layer_nodes if isinstance(node, DAGOpNode)
+        ]
         
         if slice_ops:
             compiled_operations_per_slice.append(slice_ops)
@@ -173,7 +178,7 @@ def main():
     output_filename = "ghz_viz_data.json"
 
     with open(output_filename, 'w') as f:
-        json.dump(output_data, f, indent=4)
+        json.dump(output_data, f, separators=(',', ':'))
 
     print(f"\nInteraction data saved to {output_filename}")
     print(f"  Logical circuit: {decomposed_ghz_qc.num_qubits} qubits, {len(logical_operations_per_slice)} slices.")

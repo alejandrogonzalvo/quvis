@@ -87,15 +87,17 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
     useEffect(() => {
         const handler = setTimeout(() => {
             setIsLoading(true);
-            setTimeout(() => {
-                playground?.updateLayoutParameters({
+            playground?.updateLayoutParameters(
+                {
                     repelForce,
                     idealDistance,
                     iterations,
                     coolingFactor,
-                });
-                setIsLoading(false);
-            }, 10); // Small delay to allow UI update
+                },
+                () => {
+                    setIsLoading(false);
+                },
+            );
         }, 500); // Debounce for 500ms
 
         return () => {
@@ -140,10 +142,9 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
 
     const handleRecompileLayout = () => {
         setIsLoading(true);
-        setTimeout(() => {
-            playground?.recompileLayout();
+        playground?.recompileLayout(() => {
             setIsLoading(false);
-        }, 10); // Small delay to allow UI update
+        });
     };
 
     if (!playground) {
@@ -248,7 +249,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                         <label htmlFor="cooling-factor" style={labelStyle}>
                             Cooling Factor:{" "}
                             <span style={valueStyle}>
-                                {coolingFactor.toFixed(3)}
+                                {coolingFactor.toFixed(2)}
                             </span>
                         </label>
                         <input
@@ -256,7 +257,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                             id="cooling-factor"
                             min="0.8"
                             max="1.0"
-                            step="0.001"
+                            step="0.01"
                             value={coolingFactor}
                             onChange={handleCoolingFactorChange}
                             style={sliderStyle}
@@ -264,7 +265,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                     </div>
 
                     <button onClick={handleRecompileLayout} style={buttonStyle}>
-                        Recompile Layout
+                        Re-run Simulation
                     </button>
                 </>
             )}
