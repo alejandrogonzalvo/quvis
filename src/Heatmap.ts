@@ -11,6 +11,13 @@ export class Heatmap {
     camera: THREE.PerspectiveCamera;
     maxSlices: number;
 
+    clusteredMesh: THREE.Points<
+        THREE.BufferGeometry,
+        THREE.ShaderMaterial
+    > | null = null;
+    private clusters: { position: THREE.Vector3; qubitIds: number[] }[] = [];
+    private clusteredIntensities: Float32Array | null = null;
+
     constructor(
         camera: THREE.PerspectiveCamera,
         qubit_number: number,
@@ -111,6 +118,126 @@ export class Heatmap {
         });
 
         this.mesh = new THREE.Points(geometry, this.material);
+        this.mesh.visible = true;
+    }
+
+    public generateClusters(
+        qubitPositions: Map<number, THREE.Vector3>,
+        numDeviceQubits: number,
+    ) {
+        if (this.clusteredMesh) {
+            this.mesh.parent?.remove(this.clusteredMesh);
+            this.clusteredMesh.geometry.dispose();
+            this.clusteredMesh.material.dispose();
+            this.clusteredMesh = null;
+        }
+
+        const bbox = new THREE.Box3();
+        for (const pos of qubitPositions.values()) {
+            bbox.expandByPoint(pos);
+        }
+        if (bbox.isEmpty() || numDeviceQubits === 0) {
+            this.clusters = [];
+            return;
+        }
+
+        const numClustersTarget = Math.ceil(numDeviceQubits / 4);
+        const gridDivisions = Math.ceil(Math.pow(numClustersTarget, 1 / 3));
+
+        const gridSize = new THREE.Vector3();
+        bbox.getSize(gridSize);
+        const cellSize = new THREE.Vector3(
+            gridSize.x / gridDivisions,
+            gridSize.y / gridDivisions,
+            gridSize.z / gridDivisions,
+        );
+        if (cellSize.x === 0) cellSize.x = 1;
+        if (cellSize.y === 0) cellSize.y = 1;
+        if (cellSize.z === 0) cellSize.z = 1;
+
+        const grid: Map<
+            string,
+            { positionSum: THREE.Vector3; qubitIds: number[] }
+        > = new Map();
+
+        for (const [id, pos] of qubitPositions.entries()) {
+            const gridIndexX = Math.floor((pos.x - bbox.min.x) / cellSize.x);
+            const gridIndexY = Math.floor((pos.y - bbox.min.y) / cellSize.y);
+            const gridIndexZ = Math.floor((pos.z - bbox.min.z) / cellSize.z);
+            const key = `${gridIndexX},${gridIndexY},${gridIndexZ}`;
+
+            if (!grid.has(key)) {
+                grid.set(key, {
+                    positionSum: new THREE.Vector3(),
+                    qubitIds: [],
+                });
+            }
+            const cell = grid.get(key)!;
+            cell.positionSum.add(pos);
+            cell.qubitIds.push(id);
+        }
+
+        this.clusters = [];
+        for (const cell of grid.values()) {
+            if (cell.qubitIds.length > 0) {
+                const avgPos = cell.positionSum.divideScalar(
+                    cell.qubitIds.length,
+                );
+                this.clusters.push({
+                    position: avgPos,
+                    qubitIds: cell.qubitIds,
+                });
+            }
+        }
+
+        if (this.clusters.length === 0) return;
+
+        const numClusters = this.clusters.length;
+        const clusteredPositions = new Float32Array(numClusters * 3);
+        this.clusteredIntensities = new Float32Array(numClusters);
+
+        for (let i = 0; i < numClusters; i++) {
+            clusteredPositions[i * 3] = this.clusters[i].position.x;
+            clusteredPositions[i * 3 + 1] = this.clusters[i].position.y;
+            clusteredPositions[i * 3 + 2] = this.clusters[i].position.z;
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute(
+            "position",
+            new THREE.BufferAttribute(clusteredPositions, 3),
+        );
+        geometry.setAttribute(
+            "intensity",
+            new THREE.BufferAttribute(this.clusteredIntensities, 1),
+        );
+
+        const clusteredMaterial = this.material.clone();
+        clusteredMaterial.uniforms.baseSize.value =
+            this.material.uniforms.baseSize.value * 4.0;
+
+        this.clusteredMesh = new THREE.Points(geometry, clusteredMaterial);
+        this.clusteredMesh.visible = false;
+        this.mesh.parent?.add(this.clusteredMesh);
+    }
+
+    public updateBaseSize(newSize: number) {
+        this.material.uniforms.baseSize.value = newSize;
+        if (this.clusteredMesh) {
+            this.clusteredMesh.material.uniforms.baseSize.value = newSize * 4;
+        }
+    }
+
+    public setLOD(level: "high" | "low") {
+        if (level === "low" && this.clusteredMesh) {
+            this.mesh.visible = false;
+            this.clusteredMesh.visible = true;
+        } else {
+            this.mesh.visible = true;
+            if (this.clusteredMesh) {
+                this.clusteredMesh.visible = false;
+            }
+        }
     }
 
     public clearPositionsCache() {
@@ -218,6 +345,35 @@ export class Heatmap {
             .intensity as THREE.BufferAttribute;
         intensityAttr.needsUpdate = true;
 
+        if (
+            this.clusteredMesh &&
+            this.clusteredIntensities &&
+            this.clusters.length > 0
+        ) {
+            const perQubitNormalizedIntensities = this.intensities;
+
+            for (let i = 0; i < this.clusters.length; i++) {
+                const cluster = this.clusters[i];
+                let totalIntensity = 0;
+                for (const qubitId of cluster.qubitIds) {
+                    if (qubitId < perQubitNormalizedIntensities.length) {
+                        totalIntensity +=
+                            perQubitNormalizedIntensities[qubitId];
+                    }
+                }
+                const avgIntensity =
+                    cluster.qubitIds.length > 0
+                        ? totalIntensity / cluster.qubitIds.length
+                        : 0;
+                this.clusteredIntensities[i] = avgIntensity;
+            }
+
+            (
+                this.clusteredMesh.geometry.attributes
+                    .intensity as THREE.BufferAttribute
+            ).needsUpdate = true;
+        }
+
         return {
             maxObservedRawWeightedSum: maxObservedRawInteractionCount, // Return the max raw count
             numSlicesEffectivelyUsed: numSlicesInWindow,
@@ -230,6 +386,13 @@ export class Heatmap {
         }
         if (this.mesh.material) {
             this.mesh.material.dispose();
+        }
+
+        if (this.clusteredMesh) {
+            this.mesh.parent?.remove(this.clusteredMesh);
+            this.clusteredMesh.geometry.dispose();
+            this.clusteredMesh.material.dispose();
+            this.clusteredMesh = null;
         }
         // this.mesh is removed from the scene by QubitGrid
         console.log("Heatmap disposed");

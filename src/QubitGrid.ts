@@ -1094,6 +1094,12 @@ export class QubitGrid {
                     },
                 ),
             );
+            if (this.heatmap) {
+                this.heatmap.generateClusters(
+                    this.qubitPositions,
+                    numDeviceQubits,
+                );
+            }
             onLayoutCalculated();
         };
 
@@ -1391,9 +1397,9 @@ export class QubitGrid {
         if (this.layoutAreaSide === 0) return;
 
         let level: "high" | "medium" | "low";
-        if (cameraDistance > this.layoutAreaSide * 2) {
+        if (cameraDistance > this.layoutAreaSide * 1.5) {
             level = "low";
-        } else if (cameraDistance > this.layoutAreaSide * 1.5) {
+        } else if (cameraDistance > this.layoutAreaSide * 1.2) {
             level = "medium";
         } else {
             level = "high";
@@ -1420,6 +1426,14 @@ export class QubitGrid {
         }
         if (this.logicalConnectionMesh) {
             this.logicalConnectionMesh.visible = mediumVisible;
+        }
+
+        if (this.heatmap) {
+            if (level === "low") {
+                this.heatmap.setLOD("low");
+            } else {
+                this.heatmap.setLOD("high");
+            }
         }
 
         // The visibility of connections is now managed by the visibility of the

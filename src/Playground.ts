@@ -468,8 +468,7 @@ export class Playground {
         if (params.baseSize !== undefined) {
             this.currentBaseSize = params.baseSize;
             if (this.grid && this.grid.heatmap) {
-                this.grid.heatmap.material.uniforms.baseSize.value =
-                    this.currentBaseSize;
+                this.grid.heatmap.updateBaseSize(this.currentBaseSize);
             }
         }
     }
