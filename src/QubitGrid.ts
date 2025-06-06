@@ -64,6 +64,87 @@ const CYLINDER_FRAGMENT_SHADER = `
     }
 `;
 
+class OctreeNode {
+    box: THREE.Box3;
+    centerOfMass: THREE.Vector3 = new THREE.Vector3();
+    mass: number = 0;
+    qubitId: number | null = null;
+    children: (OctreeNode | null)[] = [];
+
+    constructor(box: THREE.Box3) {
+        this.box = box;
+    }
+
+    insert(
+        qubitId: number,
+        position: THREE.Vector3,
+        qubitPositions: Map<number, THREE.Vector3>,
+    ): void {
+        if (!this.box.containsPoint(position)) {
+            return;
+        }
+
+        if (this.mass === 0) {
+            this.qubitId = qubitId;
+            this.centerOfMass.copy(position);
+            this.mass = 1;
+            return;
+        }
+
+        if (this.isLeaf()) {
+            this.subdivide();
+            // Re-insert existing qubit into the correct child
+            const existingQubitPos = qubitPositions.get(this.qubitId!);
+            if (existingQubitPos) {
+                const existingQubitIndex = this.getOctant(existingQubitPos);
+                this.children[existingQubitIndex]!.insert(
+                    this.qubitId!,
+                    existingQubitPos,
+                    qubitPositions,
+                );
+            }
+        }
+
+        // Insert new qubit into the correct child
+        const newQubitIndex = this.getOctant(position);
+        this.children[newQubitIndex]!.insert(qubitId, position, qubitPositions);
+
+        // Update center of mass
+        this.centerOfMass
+            .multiplyScalar(this.mass)
+            .add(position)
+            .divideScalar(this.mass + 1);
+        this.mass++;
+        this.qubitId = null; // Internal node
+    }
+
+    isLeaf(): boolean {
+        return this.children.length === 0;
+    }
+
+    private getOctant(point: THREE.Vector3): number {
+        const center = this.box.getCenter(new THREE.Vector3());
+        let index = 0;
+        if (point.x > center.x) index |= 1;
+        if (point.y > center.y) index |= 2;
+        if (point.z > center.z) index |= 4;
+        return index;
+    }
+
+    private subdivide(): void {
+        const size = this.box.getSize(new THREE.Vector3()).multiplyScalar(0.5);
+        for (let i = 0; i < 8; i++) {
+            const min = new THREE.Vector3(
+                this.box.min.x + (i & 1 ? size.x : 0),
+                this.box.min.y + (i & 2 ? size.y : 0),
+                this.box.min.z + (i & 4 ? size.z : 0),
+            );
+            const max = new THREE.Vector3().addVectors(min, size);
+            this.children[i] = new OctreeNode(new THREE.Box3(min, max));
+        }
+    }
+}
+
 export class QubitGrid {
     scene: THREE.Scene;
     slices: Array<Slice>;
@@ -99,6 +180,7 @@ export class QubitGrid {
     private iterations: number;
     private coolingFactor: number;
     private kAttract: number = 0.05;
+    private barnesHutTheta: number = 0.8;
 
     private currentConnectionThickness: number;
     private currentInactiveElementAlpha: number;
@@ -294,17 +376,20 @@ export class QubitGrid {
             for (let i = 0; i < numDeviceQubits; i++)
                 forces.set(i, new THREE.Vector3(0, 0, 0));
 
+            const boundingBox = new THREE.Box3();
+            this.qubitPositions.forEach((pos) =>
+                boundingBox.expandByPoint(pos),
+            );
+            const octree = new OctreeNode(boundingBox);
+            this.qubitPositions.forEach((pos, id) =>
+                octree.insert(id, pos, this.qubitPositions),
+            );
+
             for (let i = 0; i < numDeviceQubits; i++) {
-                for (let j = i + 1; j < numDeviceQubits; j++) {
-                    const posI = this.qubitPositions.get(i)!;
-                    const posJ = this.qubitPositions.get(j)!;
-                    const delta = new THREE.Vector3().subVectors(posI, posJ);
-                    const dist = delta.length() || 1e-6;
-                    const forceMag = (this.kRepel * this.kRepel) / dist;
-                    const forceVec = delta.normalize().multiplyScalar(forceMag);
-                    forces.get(i)!.add(forceVec);
-                    forces.get(j)!.sub(forceVec);
-                }
+                const posI = this.qubitPositions.get(i)!;
+                const force = new THREE.Vector3();
+                this.calculateRepulsiveForce(octree, posI, i, force);
+                forces.get(i)!.add(force);
             }
 
             if (couplingMap) {
@@ -372,6 +457,54 @@ export class QubitGrid {
             pos.y = (pos.y - (minY + currentHeight / 2)) * scale;
             pos.z = (pos.z - (minZ + currentDepth / 2)) * scale;
         });
+    }
+
+    private calculateRepulsiveForce(
+        node: OctreeNode,
+        qubitPos: THREE.Vector3,
+        qubitId: number,
+        force: THREE.Vector3,
+    ) {
+        if (node.mass === 0 || node.qubitId === qubitId) {
+            return;
+        }
+
+        const distance = qubitPos.distanceTo(node.centerOfMass);
+
+        if (node.isLeaf()) {
+            if (node.qubitId !== null) {
+                const delta = new THREE.Vector3().subVectors(
+                    qubitPos,
+                    node.centerOfMass,
+                );
+                const dist = Math.max(delta.length(), 0.1);
+                const forceMag = (this.kRepel * this.kRepel) / dist;
+                force.add(delta.normalize().multiplyScalar(forceMag));
+            }
+        } else {
+            const size = node.box.getSize(new THREE.Vector3()).x; // Assuming cube-like nodes
+            if (size / distance < this.barnesHutTheta) {
+                const delta = new THREE.Vector3().subVectors(
+                    qubitPos,
+                    node.centerOfMass,
+                );
+                const dist = Math.max(delta.length(), 0.1);
+                const forceMag =
+                    ((this.kRepel * this.kRepel) / dist) * node.mass;
+                force.add(delta.normalize().multiplyScalar(forceMag));
+            } else {
+                for (const child of node.children) {
+                    if (child) {
+                        this.calculateRepulsiveForce(
+                            child,
+                            qubitPos,
+                            qubitId,
+                            force,
+                        );
+                    }
+                }
+            }
+        }
     }
 
     private handleLoadError(
