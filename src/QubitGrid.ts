@@ -1437,9 +1437,9 @@ export class QubitGrid {
         if (this.layoutAreaSide === 0) return;
 
         let level: "high" | "medium" | "low";
-        if (cameraDistance > this.layoutAreaSide * 1.5) {
+        if (cameraDistance > this.layoutAreaSide * 1.2) {
             level = "low";
-        } else if (cameraDistance > this.layoutAreaSide * 1.2) {
+        } else if (cameraDistance > this.layoutAreaSide * 0.8) {
             level = "medium";
         } else {
             level = "high";
