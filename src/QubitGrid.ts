@@ -223,7 +223,9 @@ export class QubitGrid {
         }
 
         if (typeof datasetNameOrData === "string") {
-            const dataUrl = `/quvis/${datasetNameOrData}_viz_data.json`;
+            const dataUrl = datasetNameOrData.endsWith(".json")
+                ? `/quvis/${datasetNameOrData}`
+                : `/quvis/${datasetNameOrData}_viz_data.json`;
             this.loadSlicesFromJSON(dataUrl, camera);
         } else if (datasetNameOrData && typeof datasetNameOrData === "object") {
             if (
