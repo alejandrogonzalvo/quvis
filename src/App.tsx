@@ -119,6 +119,7 @@ const App: React.FC = () => {
 
     // Callback for dataset selection
     const handleDatasetSelect = (datasetName: string) => {
+        setIsLoading(true);
         setSelectedDataset(datasetName);
         // Reset playground and timeline related states if a new dataset is selected
         if (playgroundRef.current) {
@@ -141,6 +142,7 @@ const App: React.FC = () => {
         setMaxSliceIndex(sliceCount > 0 ? sliceCount - 1 : 0); // Max index for slider
         setCurrentSliceValue(initialSliceIndex);
         setIsTimelineInitialized(true);
+        setIsLoading(false);
     };
 
     // Callback for when visualization mode has switched and slice parameters might have changed
