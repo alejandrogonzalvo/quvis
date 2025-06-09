@@ -5,8 +5,6 @@ interface DatasetSelectionProps {
 }
 
 const DatasetSelection: React.FC<DatasetSelectionProps> = ({ onSelect }) => {
-    const fileInputRef = React.useRef<HTMLInputElement>(null);
-
     const buttonStyle: React.CSSProperties = {
         padding: "20px 40px",
         margin: "20px",
@@ -69,17 +67,6 @@ const DatasetSelection: React.FC<DatasetSelectionProps> = ({ onSelect }) => {
         e.currentTarget.style.transform = "scale(1)";
     };
 
-    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            onSelect(file);
-        }
-    };
-
-    const triggerFileInput = () => {
-        fileInputRef.current?.click();
-    };
-
     return (
         <div style={containerStyle}>
             <h1 style={mainTitleStyle}>QuViS</h1>
@@ -125,17 +112,10 @@ const DatasetSelection: React.FC<DatasetSelectionProps> = ({ onSelect }) => {
                     style={buttonStyle}
                     onMouseOver={handleMouseOver}
                     onMouseOut={handleMouseOut}
-                    onClick={triggerFileInput}
+                    onClick={() => onSelect("ghz_viz_data100x100.json")}
                 >
-                    Upload Custom JSON
+                    GHZ 10.000 qubits
                 </button>
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    style={{ display: "none" }}
-                    accept=".json"
-                    onChange={handleFileUpload}
-                />
             </div>
         </div>
     );

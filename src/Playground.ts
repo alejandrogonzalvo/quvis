@@ -386,22 +386,6 @@ export class Playground {
                 this.camera.zoom;
         }
 
-        if (
-            this.grid &&
-            this.grid.heatmap &&
-            this.grid.slices &&
-            this.grid.slices.length > 0 &&
-            this.grid.interactionPairsPerSlice &&
-            this.grid.interactionPairsPerSlice.length > 0
-        ) {
-            // Pass the qubit instances, full slice interaction pair data, current slice index, and all slice data
-            this.grid.heatmap.updatePoints(
-                this.grid.qubitInstances,
-                this.currentSlice,
-                this.grid.slices, // Pass all slice data for historical state checking
-            );
-        }
-
         this.renderer.render(this.scene, this.camera);
     }
 
