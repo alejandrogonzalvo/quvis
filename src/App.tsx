@@ -10,6 +10,7 @@ import FidelityControls from "./components/FidelityControls.js";
 import LoadingIndicator from "./components/LoadingIndicator.js";
 import VisualizationModeSwitcher from "./components/VisualizationModeSwitcher.js";
 import "./../style.css";
+import PlaybackControls from "./components/PlaybackControls.js";
 
 const BASE_TOP_MARGIN_PX = 20;
 const INTER_PANEL_SPACING_PX = 20;
@@ -100,6 +101,10 @@ const App: React.FC = () => {
     const [isAppearanceCollapsed, setIsAppearanceCollapsed] = useState(false);
     const [isLayoutCollapsed, setIsLayoutCollapsed] = useState(false);
     const [isFidelityCollapsed, setIsFidelityCollapsed] = useState(false);
+
+    // State for playback
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [playbackSpeed, setPlaybackSpeed] = useState(0.1); // seconds per slice
 
     // State for UI visibility
     const [isUiVisible, setIsUiVisible] = useState(true);
@@ -196,6 +201,13 @@ const App: React.FC = () => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key.toLowerCase() === "h") {
                 setIsUiVisible((prev) => !prev);
+            } else if (
+                event.code === "Space" &&
+                isPlaygroundInitialized &&
+                actualSliceCount > 0
+            ) {
+                event.preventDefault();
+                handlePlayPause();
             }
         };
 
@@ -203,7 +215,37 @@ const App: React.FC = () => {
         return () => {
             window.removeEventListener("keydown", handleKeyDown);
         };
-    }, []);
+    }, [isPlaygroundInitialized, actualSliceCount]);
+
+    useEffect(() => {
+        if (!isPlaying || !isPlaygroundInitialized) {
+            return;
+        }
+
+        if (currentSliceValue >= maxSliceIndex) {
+            setIsPlaying(false); // Stop at the end
+            return;
+        }
+
+        const timerId = setTimeout(() => {
+            // Directly increment slice value
+            const nextSlice = currentSliceValue + 1;
+            if (nextSlice <= maxSliceIndex) {
+                setCurrentSliceValue(nextSlice);
+                if (playgroundRef.current) {
+                    playgroundRef.current.setCurrentSlice(nextSlice);
+                }
+            }
+        }, playbackSpeed * 1000);
+
+        return () => clearTimeout(timerId);
+    }, [
+        isPlaying,
+        currentSliceValue,
+        maxSliceIndex,
+        playbackSpeed,
+        isPlaygroundInitialized,
+    ]);
 
     useEffect(() => {
         if (mountRef.current && selectedDataset) {
@@ -291,6 +333,9 @@ const App: React.FC = () => {
     }, [selectedDataset]); // Only run this effect when selectedDataset changes
 
     const handleTimelineChange = (newSliceIndex: number) => {
+        if (isPlaying) {
+            setIsPlaying(false);
+        }
         setCurrentSliceValue(newSliceIndex);
         if (playgroundRef.current) {
             playgroundRef.current.setCurrentSlice(newSliceIndex);
@@ -299,6 +344,17 @@ const App: React.FC = () => {
 
     const handleModeChange = (mode: "compiled" | "logical") => {
         setVisualizationMode(mode);
+    };
+
+    const handlePlayPause = () => {
+        if (currentSliceValue >= maxSliceIndex && !isPlaying) {
+            return; // Don't start playing if at the end
+        }
+        setIsPlaying((prev) => !prev);
+    };
+
+    const handleSpeedChange = (newSpeed: number) => {
+        setPlaybackSpeed(newSpeed);
     };
 
     const fidelityPanelTop = isAppearanceCollapsed
@@ -353,6 +409,19 @@ const App: React.FC = () => {
                                     maxSlices: initialHeatmapSlices,
                                 }}
                             />
+                            {isTimelineInitialized && actualSliceCount > 0 && (
+                                <PlaybackControls
+                                    isPlaying={isPlaying}
+                                    onPlayPause={handlePlayPause}
+                                    speed={playbackSpeed}
+                                    onSpeedChange={handleSpeedChange}
+                                    disabled={
+                                        !isPlaygroundInitialized ||
+                                        actualSliceCount === 0
+                                    }
+                                    isAtEnd={currentSliceValue >= maxSliceIndex}
+                                />
+                            )}
                             {isTimelineInitialized && actualSliceCount > 0 && (
                                 <TimelineSlider
                                     min={0}
