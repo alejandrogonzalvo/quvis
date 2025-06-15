@@ -11,6 +11,7 @@ import LoadingIndicator from "./components/LoadingIndicator.js";
 import VisualizationModeSwitcher from "./components/VisualizationModeSwitcher.js";
 import "./../style.css";
 import PlaybackControls from "./components/PlaybackControls.js";
+import DebugInfo from "./components/DebugInfo.js";
 
 const BASE_TOP_MARGIN_PX = 20;
 const INTER_PANEL_SPACING_PX = 20;
@@ -105,6 +106,10 @@ const App: React.FC = () => {
     // State for playback
     const [isPlaying, setIsPlaying] = useState(false);
     const [playbackSpeed, setPlaybackSpeed] = useState(0.1); // seconds per slice
+
+    // State for Debug Info
+    const [fps, setFps] = useState(0);
+    const [layoutTime, setLayoutTime] = useState(0);
 
     // State for UI visibility
     const [isUiVisible, setIsUiVisible] = useState(true);
@@ -332,6 +337,23 @@ const App: React.FC = () => {
         };
     }, [selectedDataset]); // Only run this effect when selectedDataset changes
 
+    useEffect(() => {
+        const intervalId = setInterval(() => {
+            if (playgroundRef.current) {
+                setFps(playgroundRef.current.currentFPS);
+                const newLayoutTime =
+                    playgroundRef.current.lastLayoutCalculationTime;
+                if (newLayoutTime > 0) {
+                    setLayoutTime(newLayoutTime);
+                    // Resetting it in the source might be an option if we only want to show it once
+                    // For now, we'll just keep showing the last value.
+                }
+            }
+        }, 500); // Poll for debug info every 500ms
+
+        return () => clearInterval(intervalId);
+    }, [isPlaygroundInitialized]); // Rerun when playground is initialized
+
     const handleTimelineChange = (newSliceIndex: number) => {
         if (isPlaying) {
             setIsPlaying(false);
@@ -410,17 +432,25 @@ const App: React.FC = () => {
                                 }}
                             />
                             {isTimelineInitialized && actualSliceCount > 0 && (
-                                <PlaybackControls
-                                    isPlaying={isPlaying}
-                                    onPlayPause={handlePlayPause}
-                                    speed={playbackSpeed}
-                                    onSpeedChange={handleSpeedChange}
-                                    disabled={
-                                        !isPlaygroundInitialized ||
-                                        actualSliceCount === 0
-                                    }
-                                    isAtEnd={currentSliceValue >= maxSliceIndex}
-                                />
+                                <>
+                                    <DebugInfo
+                                        fps={fps}
+                                        layoutTime={layoutTime}
+                                    />
+                                    <PlaybackControls
+                                        isPlaying={isPlaying}
+                                        onPlayPause={handlePlayPause}
+                                        speed={playbackSpeed}
+                                        onSpeedChange={handleSpeedChange}
+                                        disabled={
+                                            !isPlaygroundInitialized ||
+                                            actualSliceCount === 0
+                                        }
+                                        isAtEnd={
+                                            currentSliceValue >= maxSliceIndex
+                                        }
+                                    />
+                                </>
                             )}
                             {isTimelineInitialized && actualSliceCount > 0 && (
                                 <TimelineSlider

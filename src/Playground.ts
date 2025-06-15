@@ -69,6 +69,11 @@ export class Playground {
     currentOneQubitFidelityBase: number = 0.99; // Default base fidelity for 1-qubit gates
     currentTwoQubitFidelityBase: number = 0.98; // Default base fidelity for 2-qubit gates
 
+    // Debug Info
+    public currentFPS: number = 0;
+    private lastFPSTime: number = 0;
+    private frameCount: number = 0;
+
     private containerElement: HTMLElement | null = null;
     private animationFrameId: number | null = null;
     private onSlicesLoadedCallback:
@@ -366,27 +371,28 @@ export class Playground {
     }
 
     animate() {
-        if (!this.renderer || !this.scene || !this.camera) return;
-
         this.animationFrameId = requestAnimationFrame(() => this.animate());
 
-        this.controls.update(); // For damping or other controls-related updates
+        const now = performance.now();
+        this.frameCount++;
+        if (now >= this.lastFPSTime + 1000) {
+            this.currentFPS = this.frameCount;
+            this.frameCount = 0;
+            this.lastFPSTime = now;
+        }
 
+        // Update LOD based on camera distance
         if (this.grid) {
             const distance = this.controls.getDistance();
             this.grid.updateLOD(distance);
         }
 
-        // Update camera position for heatmap shader
-        if (this.grid && this.grid.heatmap) {
-            this.grid.heatmap.material.uniforms.cameraPosition.value.copy(
-                this.camera.position,
-            );
-            this.grid.heatmap.material.uniforms.scaleFactor.value =
-                this.camera.zoom;
-        }
-
+        this.controls.update();
         this.renderer.render(this.scene, this.camera);
+    }
+
+    public get lastLayoutCalculationTime(): number {
+        return this.grid ? this.grid.lastLayoutCalculationTime : 0;
     }
 
     public updateLayoutParameters(

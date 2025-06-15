@@ -85,6 +85,7 @@ export class QubitGrid {
     private lastCalculatedSlicesChangeIDs: Array<Set<number>> = [];
     public lastMaxObservedRawHeatmapSum: number = 0;
     public lastEffectiveSlicesForHeatmap: number = 0;
+    public lastLayoutCalculationTime: number = 0;
 
     // Data stores for different views
     private logicalCircuitInfo: LogicalCircuitInfo | null = null;
@@ -97,6 +98,7 @@ export class QubitGrid {
     private cumulativeQubitInteractions: number[][] = [];
     private cumulativeWeightedPairInteractions: Map<string, number[]> =
         new Map();
+    private _isQubitRenderEnabled: boolean = true;
 
     public qubitInstances: Map<number, Qubit> = new Map(); // Stores all qubits based on num_qubits_on_device
     private current_slice_index: number = 0;
@@ -792,6 +794,14 @@ export class QubitGrid {
             qubit.dispose();
         });
         this.qubitInstances.clear();
+
+        this._isQubitRenderEnabled = numQubitsToCreate <= 1000;
+        if (!this._isQubitRenderEnabled) {
+            console.warn(
+                `Device has ${numQubitsToCreate} qubits. Not rendering qubit spheres to maintain performance.`,
+            );
+        }
+
         for (let i = 0; i < numQubitsToCreate; i++) {
             const pos =
                 this.qubitPositions.get(i) || new THREE.Vector3(0, 0, 0);
@@ -802,11 +812,15 @@ export class QubitGrid {
 
     createQubit(id: number, x: number, y: number, z: number) {
         const blochSphere = new BlochSphere(x, y, z);
-        this.scene.add(blochSphere.blochSphere);
+        if (this._isQubitRenderEnabled) {
+            this.scene.add(blochSphere.blochSphere);
+        }
         const qubit = new Qubit(id, State.ZERO, blochSphere);
         this.qubitInstances.set(id, qubit);
-        blochSphere.blochSphere.userData.qubitId = id;
-        blochSphere.blochSphere.userData.qubitState = qubit.state;
+        if (this._isQubitRenderEnabled) {
+            blochSphere.blochSphere.userData.qubitId = id;
+            blochSphere.blochSphere.userData.qubitState = qubit.state;
+        }
     }
 
     drawConnections() {
@@ -1132,7 +1146,9 @@ export class QubitGrid {
             Math.sqrt(numDeviceQubits) * 2.5 * (this.idealDist / 5),
         );
 
+        const startTime = performance.now();
         this.layoutWorker.onmessage = (event) => {
+            this.lastLayoutCalculationTime = performance.now() - startTime;
             const { qubitPositions } = event.data;
             this.qubitPositions = new Map(
                 qubitPositions.map(
