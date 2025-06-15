@@ -1,6 +1,7 @@
 import json
 import argparse
 import os
+from qiskit.transpiler import CouplingMap
 
 def create_ring_coupling_map(num_device_qubits: int) -> list[list[int]]:
     """
@@ -75,13 +76,34 @@ def create_nxn_grid_coupling_map(n: int) -> tuple[list[list[int]], int]:
     return coupling_map, num_qubits_grid
 
 
+def create_heavy_hex_coupling_map(distance: int) -> tuple[list[list[int]], int]:
+    """
+    Generates a coupling map for a heavy-hexagonal lattice using Qiskit's built-in function.
+    See: https://docs.quantum.ibm.com/api/qiskit/qiskit.transpiler.CouplingMap#from_heavy_hex
+    """
+    if distance <= 0 or distance % 2 == 0:
+        raise ValueError("distance must be a positive odd integer")
+    
+    # Generate the coupling map using Qiskit
+    cmap_qiskit = CouplingMap.from_heavy_hex(distance=distance, bidirectional=True)
+    
+    # Extract the coupling map as a list of lists.
+    # get_edges() returns a list of tuples, so we convert them to lists for JSON serialization.
+    coupling_map = [list(edge) for edge in cmap_qiskit.get_edges()]
+
+    # Get the total number of qubits
+    num_qubits = cmap_qiskit.size()
+    
+    return coupling_map, num_qubits
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate and save a coupling map for a quantum device topology.")
     parser.add_argument(
         "--topology",
         type=str,
         required=True,
-        choices=["ring", "grid"],
+        choices=["ring", "grid", "heavy-hex"],
         help="Type of qubit topology."
     )
     parser.add_argument(
@@ -93,6 +115,11 @@ def main():
         "--size",
         type=int,
         help="Dimension of the grid (e.g., N for an N x N 'grid' topology)."
+    )
+    parser.add_argument(
+        "--distance",
+        type=int,
+        help="The code distance for 'heavy-hex' topology (must be an odd positive integer)."
     )
     parser.add_argument(
         "--output_dir",
@@ -144,6 +171,22 @@ def main():
         if not output_filename:
             output_filename = f"grid_{grid_dim}x{grid_dim}.json"
         print(f"Generated grid coupling map for a {grid_dim}x{grid_dim} grid ({total_qubits} qubits).")
+
+    elif args.topology == "heavy-hex":
+        if args.distance is None or args.distance <= 0 or args.distance % 2 == 0:
+            parser.error("--distance (a positive odd integer) is required for 'heavy-hex' topology.")
+        
+        distance = args.distance
+        cmap, total_qubits = create_heavy_hex_coupling_map(distance)
+        coupling_map_data = {
+            "topology_type": "heavy-hex",
+            "heavy_hex_distance": distance,
+            "num_qubits": total_qubits,
+            "coupling_map": cmap
+        }
+        if not output_filename:
+            output_filename = f"heavy_hex_d{distance}.json"
+        print(f"Generated heavy-hex coupling map for distance {distance} ({total_qubits} qubits).")
 
     else:
         # Should not happen due to choices in argparse

@@ -116,6 +116,14 @@ const DatasetSelection: React.FC<DatasetSelectionProps> = ({ onSelect }) => {
                 >
                     GHZ 10.000 qubits
                 </button>
+                <button
+                    style={buttonStyle}
+                    onMouseOver={handleMouseOver}
+                    onMouseOut={handleMouseOut}
+                    onClick={() => onSelect("ghz_viz_data_heavy_hex.json")}
+                >
+                    GHZ Heavy Hex
+                </button>
             </div>
         </div>
     );
