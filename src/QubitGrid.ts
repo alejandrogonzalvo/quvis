@@ -896,7 +896,7 @@ export class QubitGrid {
             return;
         }
 
-        const weight_base = 1.3;
+        const weight_base = this.heatmapWeightBase;
 
         const windowEndSlice = this.current_slice_index + 1;
         let windowStartSlice;
@@ -939,19 +939,25 @@ export class QubitGrid {
                     numSlicesInWindow > 0 &&
                     this.cumulativeWeightedPairInteractions.has(key)
                 ) {
-                    const cumulativeWeights =
+                    const scaledCumulativeWeights =
                         this.cumulativeWeightedPairInteractions.get(key)!;
 
                     const C = windowEndSlice - 1;
-                    const S_C = cumulativeWeights[C];
-                    const S_Start_minus_1 =
-                        windowStartSlice > 0
-                            ? cumulativeWeights[windowStartSlice - 1]
-                            : 0;
 
-                    currentPairWeightedSum =
-                        Math.pow(weight_base, -windowStartSlice) *
-                        (S_C - S_Start_minus_1);
+                    if (C >= 0) {
+                        const S_prime_C = scaledCumulativeWeights[C];
+                        const S_prime_Start_minus_1 =
+                            windowStartSlice > 0
+                                ? scaledCumulativeWeights[windowStartSlice - 1]
+                                : 0;
+                        const numSlicesInWindow = C - windowStartSlice + 1;
+                        if (numSlicesInWindow > 0) {
+                            currentPairWeightedSum =
+                                S_prime_C -
+                                S_prime_Start_minus_1 *
+                                    Math.pow(weight_base, -numSlicesInWindow);
+                        }
+                    }
                 }
 
                 pairData.push({
@@ -1072,7 +1078,9 @@ export class QubitGrid {
             const q1 = Math.min(pair[0], pair[1]);
             const q2 = Math.max(pair[0], pair[1]);
             const key = `${q1}-${q2}`;
-            const cumulativeWeights = new Array(this.slices.length).fill(0);
+            const scaledCumulativeWeights = new Array(this.slices.length).fill(
+                0,
+            );
 
             for (let i = 0; i < this.slices.length; i++) {
                 const sliceInteractionPairs = this.interactionPairsPerSlice[i];
@@ -1087,15 +1095,15 @@ export class QubitGrid {
                     }
                 }
 
-                const currentWeight = hadInteraction * Math.pow(weight_base, i);
-                if (i === 0) {
-                    cumulativeWeights[i] = currentWeight;
-                } else {
-                    cumulativeWeights[i] =
-                        cumulativeWeights[i - 1] + currentWeight;
-                }
+                const prevScaledSum =
+                    i === 0 ? 0 : scaledCumulativeWeights[i - 1];
+                scaledCumulativeWeights[i] =
+                    prevScaledSum / weight_base + hadInteraction;
             }
-            this.cumulativeWeightedPairInteractions.set(key, cumulativeWeights);
+            this.cumulativeWeightedPairInteractions.set(
+                key,
+                scaledCumulativeWeights,
+            );
         }
     }
 
