@@ -103,7 +103,7 @@ const PlaybackControls: React.FC<PlaybackControlsProps> = ({
 
     const isPlayPauseDisabled = disabled || (isAtEnd && !isPlaying);
 
-    const minSpeedMs = 0.1;
+    const minSpeedMs = 0.001;
     const maxSpeedMs = 100;
     const sliderMin = 0;
     const sliderMax = 1000; // Use a larger range for more precision
@@ -134,10 +134,14 @@ const PlaybackControls: React.FC<PlaybackControlsProps> = ({
     };
 
     const formatSpeed = (speedInMs: number): string => {
-        if (speedInMs < 10) {
-            return speedInMs.toFixed(1);
+        if (speedInMs < 1) {
+            const speedInUs = speedInMs * 1000;
+            return `${speedInUs.toFixed(0)} µs`;
         }
-        return speedInMs.toFixed(0);
+        if (speedInMs < 10) {
+            return `${speedInMs.toFixed(1)} ms`;
+        }
+        return `${speedInMs.toFixed(0)} ms`;
     };
 
     const currentSpeedMs = speed * 1000;
@@ -158,7 +162,7 @@ const PlaybackControls: React.FC<PlaybackControlsProps> = ({
                 </button>
             </div>
             <div style={sliderLabelStyle}>
-                Speed: {formatSpeed(currentSpeedMs)} ms/slice
+                Speed: {formatSpeed(currentSpeedMs)}/slice
             </div>
             <div style={sliderContainerStyle}>
                 <ActualSlider
