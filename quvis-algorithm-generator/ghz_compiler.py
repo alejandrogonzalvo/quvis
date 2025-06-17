@@ -4,8 +4,13 @@ from qiskit.converters import circuit_to_dag
 from qiskit.dagcircuit import DAGOpNode
 import json
 import argparse
+from compiler_utils import (
+    load_coupling_map, validate_coupling_map, extract_operations_per_slice, 
+    get_common_parser, LogicalCircuitInfo, CompiledCircuitInfo, DeviceInfo, 
+    VisualizationData
+)
 
-def create_ghz_circuit(num_qubits):
+def create_ghz_circuit(num_qubits: int) -> QuantumCircuit:
     """Creates a GHZ state circuit."""
     if num_qubits == 0:
         return QuantumCircuit(0)
@@ -15,109 +20,43 @@ def create_ghz_circuit(num_qubits):
         qc.cx(0, i)
     return qc
 
+def parse_args() -> argparse.Namespace:
+    parser = get_common_parser("Compile a GHZ circuit for a given device topology and extract interactions.")
+    parser.set_defaults(output="ghz_viz_data.json")
+    return parser.parse_args()
+
 def main():
-    # --- Argument Parsing --- 
-    parser = argparse.ArgumentParser(description="Compile a GHZ circuit for a given device topology (from file) and extract interactions.")
-    parser.add_argument(
-        "-q", "--qubits", 
-        type=int, 
-        default=3, 
-        help="Number of qubits for the GHZ circuit (default: 3)"
-    )
-    parser.add_argument(
-        "--coupling_map_file",
-        type=str,
-        required=True,
-        help="Path to the JSON file containing the device coupling map and info."
-    )
-    args = parser.parse_args()
+    args: argparse.Namespace = parse_args()
 
-    # --- Configuration from args ---
-    m_ghz_qubits = args.qubits
-    coupling_map_filepath = args.coupling_map_file
-    # ---------------------
+    m_ghz_qubits: int = args.qubits
+    coupling_map_filepath: str = args.coupling_map_file
+    output_filename: str = args.output
 
-    # --- Load Coupling Map from File ---
-    print(f"Loading coupling map from: {coupling_map_filepath}")
-    try:
-        with open(coupling_map_filepath, 'r') as f:
-            device_data = json.load(f)
-    except FileNotFoundError:
-        print(f"Error: Coupling map file not found at {coupling_map_filepath}")
-        return
-    except json.JSONDecodeError:
-        print(f"Error: Could not decode JSON from {coupling_map_filepath}")
+    device_data: dict = load_coupling_map(coupling_map_filepath)
+    if not device_data:
         return
 
-    coupling_map_list = device_data.get("coupling_map")
-    num_device_qubits = device_data.get("num_qubits")
-    topology_type = device_data.get("topology_type", "unknown")
+    coupling_map_list: list = device_data.get("coupling_map")
+    num_device_qubits: int = device_data.get("num_qubits")
+    topology_type: str = device_data.get("topology_type", "unknown")
 
-    if coupling_map_list is None or num_device_qubits is None:
-        print("Error: The coupling map file must contain 'coupling_map' (list) and 'num_qubits' (int).")
-        return
-
-    if not isinstance(num_device_qubits, int) or num_device_qubits <= 0:
-        print(f"Error: 'num_qubits' in {coupling_map_filepath} must be a positive integer. Found: {num_device_qubits}")
+    if not validate_coupling_map(device_data, m_ghz_qubits, coupling_map_filepath):
         return
 
     print(f"Successfully loaded device data: Topology='{topology_type}', Device Qubits='{num_device_qubits}'")
-    # --- End Load Coupling Map ---
-
-    print(f"Config: GHZ qubits = {m_ghz_qubits}, Device Qubits (from file) = {num_device_qubits}")
-
-    if m_ghz_qubits > num_device_qubits:
-        print(
-            f"Warning: GHZ circuit has {m_ghz_qubits} qubits, but the device (from {coupling_map_filepath}) only has {num_device_qubits} qubits."
-        )
-        print(
-            "Compilation might fail or produce a very inefficient circuit if GHZ qubits > device qubits."
-        )
-
-    if not coupling_map_list and num_device_qubits > 1: 
-        print(
-            f"Warning: Loaded an empty coupling map for a device with {num_device_qubits} qubits from {coupling_map_filepath}. This might be an issue if num_device_qubits > 1."
-        )
-    elif coupling_map_list:
-        print(f"Using coupling map (loaded from file): {coupling_map_list}")
-
-    # Create GHZ circuit
+    
     print(
         f"\nCreating a GHZ circuit for {m_ghz_qubits} qubits."
     )
     ghz_qc = create_ghz_circuit(m_ghz_qubits)
 
-    # --- DECOMPOSE THE GHZ CIRCUIT FOR THE LOGICAL VIEW ---
-    print("\nDecomposing the original GHZ circuit into standard gates for logical view...")
+    decomposed_ghz_qc = ghz_qc.decompose()
 
-    logical_basis_gates = ['u3', 'cx']
-    decomposed_ghz_qc = transpile(ghz_qc, basis_gates=logical_basis_gates, optimization_level=0) 
-
-    # --- Extract interactions from the DECOMPOSED (logical) GHZ circuit ---
     print("\nExtracting logical interactions from the decomposed GHZ circuit...")
-    logical_dag = circuit_to_dag(decomposed_ghz_qc)
-    logical_operations_per_slice = []
-    logical_qubit_indices = {qubit: i for i, qubit in enumerate(decomposed_ghz_qc.qubits)}
-
-    num_logical_layers = logical_dag.depth()
-    print(f"  Processing {num_logical_layers} logical layers...")
-    for i, layer_nodes in enumerate(logical_dag.multigraph_layers()):
-        if (i + 1) % 100 == 0 or (i + 1) == num_logical_layers:
-            print(f"    Processed {i + 1}/{num_logical_layers} logical layers...")
-
-        slice_ops = [
-            {"name": node.op.name, "qubits": [logical_qubit_indices[q] for q in node.qargs]}
-            for node in layer_nodes if isinstance(node, DAGOpNode)
-        ]
-        
-        if slice_ops:
-            logical_operations_per_slice.append(slice_ops)
-
+    logical_operations_per_slice = extract_operations_per_slice(decomposed_ghz_qc)
     print(f"  Number of logical qubits (after decomposition): {decomposed_ghz_qc.num_qubits}")
     print(f"  Number of time slices in decomposed logical circuit: {len(logical_operations_per_slice)}")
-    # --- End of original interaction extraction ---
 
-    # --- Transpile the GHZ circuit for the device ---
     print(
         f"\nTranspiling GHZ circuit for the device topology (from {coupling_map_filepath})..."
     )
@@ -135,50 +74,34 @@ def main():
         **transpile_options
     )
 
-    # --- Extract qubit interactions per time slice from the transpiled circuit ---
     print("\nExtracting compiled qubit interactions for visualization...")
-    compiled_dag = circuit_to_dag(transpiled_qc)
-    compiled_operations_per_slice = []
-    compiled_qubit_indices = {qubit: i for i, qubit in enumerate(transpiled_qc.qubits)}
-
-    num_compiled_layers = compiled_dag.depth()
-    print(f"  Processing {num_compiled_layers} compiled layers...")
-    for i, layer_nodes in enumerate(compiled_dag.multigraph_layers()):
-        if (i + 1) % 100 == 0 or (i + 1) == num_compiled_layers:
-            print(f"    Processed {i + 1}/{num_compiled_layers} compiled layers...")
-
-        slice_ops = [
-            {"name": node.op.name, "qubits": [compiled_qubit_indices[q] for q in node.qargs]}
-            for node in layer_nodes if isinstance(node, DAGOpNode)
-        ]
-        
-        if slice_ops:
-            compiled_operations_per_slice.append(slice_ops)
-
+    compiled_operations_per_slice = extract_operations_per_slice(transpiled_qc)
     num_qubits_in_compiled_circuit = transpiled_qc.num_qubits
     
-    # Create the data structure for JSON
-    output_data = {
-        "logical_circuit_info": {
-            "num_qubits": decomposed_ghz_qc.num_qubits,
-            "interaction_graph_ops_per_slice": logical_operations_per_slice
-        },
-        "compiled_circuit_info": {
-            "num_qubits": num_qubits_in_compiled_circuit,
-            "compiled_interaction_graph_ops_per_slice": compiled_operations_per_slice
-        },
-        "device_info": {
-            "source_coupling_map_file": coupling_map_filepath,
-            "topology_type": topology_type,
-            "num_qubits_on_device": num_device_qubits,
-            "connectivity_graph_coupling_map": coupling_map_list
-        }
-    }
+    logical_info = LogicalCircuitInfo(
+        num_qubits=decomposed_ghz_qc.num_qubits,
+        interaction_graph_ops_per_slice=logical_operations_per_slice
+    )
 
-    output_filename = "ghz_viz_data.json"
+    compiled_info = CompiledCircuitInfo(
+        num_qubits=num_qubits_in_compiled_circuit,
+        compiled_interaction_graph_ops_per_slice=compiled_operations_per_slice
+    )
 
-    with open(output_filename, 'w') as f:
-        json.dump(output_data, f, separators=(',', ':'))
+    device_info = DeviceInfo(
+        source_coupling_map_file=coupling_map_filepath,
+        topology_type=topology_type,
+        num_qubits_on_device=num_device_qubits,
+        connectivity_graph_coupling_map=coupling_map_list
+    )
+
+    output_data = VisualizationData(
+        logical_circuit_info=logical_info,
+        compiled_circuit_info=compiled_info,
+        device_info=device_info
+    )
+
+    output_data.to_json_file(output_filename)
 
     print(f"\nInteraction data saved to {output_filename}")
     print(f"  Logical circuit: {decomposed_ghz_qc.num_qubits} qubits, {len(logical_operations_per_slice)} slices.")
