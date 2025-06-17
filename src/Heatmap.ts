@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { Qubit } from "./Qubit.js";
 
 export class Heatmap {
     mesh: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
@@ -244,12 +243,47 @@ export class Heatmap {
     }
 
     updatePoints(
-        qubits: Map<number, Qubit>,
+        qubitPositions: Map<number, THREE.Vector3>,
         currentSliceIndex: number,
         cumulativeInteractions: number[][],
     ): { maxObservedRawWeightedSum: number; numSlicesEffectivelyUsed: number } {
-        let posIndex = 0;
+        if (qubitPositions.size === 0) {
+            this.intensities.fill(0);
+            this.mesh.geometry.attributes.intensity.needsUpdate = true;
+            if (this.clusteredIntensities) {
+                this.clusteredIntensities.fill(0);
+                this.clusteredMesh!.geometry.attributes.intensity.needsUpdate =
+                    true;
+            }
+            return {
+                maxObservedRawWeightedSum: 0,
+                numSlicesEffectivelyUsed: 0,
+            };
+        }
 
+        // The positions are now managed by QubitGrid and passed directly
+        // We just need to update our internal buffer if the size mismatches
+        if (this.positions.length !== qubitPositions.size * 3) {
+            this.positions = new Float32Array(qubitPositions.size * 3);
+            this.intensities = new Float32Array(qubitPositions.size);
+            this.mesh.geometry.setAttribute(
+                "position",
+                new THREE.BufferAttribute(this.positions, 3),
+            );
+            this.mesh.geometry.setAttribute(
+                "intensity",
+                new THREE.BufferAttribute(this.intensities, 1),
+            );
+        }
+
+        qubitPositions.forEach((pos, id) => {
+            this.positions[id * 3] = pos.x;
+            this.positions[id * 3 + 1] = pos.y;
+            this.positions[id * 3 + 2] = pos.z;
+        });
+        this.mesh.geometry.attributes.position.needsUpdate = true;
+
+        let maxObservedRawWeightedSum = 0;
         const windowEndSlice = currentSliceIndex + 1;
         let windowStartSlice;
         if (this.maxSlices === -1) {
@@ -275,19 +309,23 @@ export class Heatmap {
             // Handle case with no data
             for (let i = 0; i < numHeatmapPoints; i++) {
                 this.intensities[i] = 0;
-                const qubitInfo = qubits.get(i);
-                if (!this.qubitPositions[i] && qubitInfo) {
-                    const posVec = new THREE.Vector3();
-                    qubitInfo.blochSphere.blochSphere.getWorldPosition(posVec);
-                    this.qubitPositions[i] = posVec;
+                const pos = this.positions.slice(i * 3, i * 3 + 3);
+                if (!this.qubitPositions[i] && pos.every(Number.isFinite)) {
+                    this.qubitPositions[i] = new THREE.Vector3(
+                        pos[0],
+                        pos[1],
+                        pos[2],
+                    );
                 }
-                const pos = this.qubitPositions[i];
-                if (pos) {
-                    this.positions[posIndex++] = pos.x;
-                    this.positions[posIndex++] = pos.y;
-                    this.positions[posIndex++] = pos.z;
+                const posVec = this.qubitPositions[i];
+                if (posVec) {
+                    this.positions[i * 3] = posVec.x;
+                    this.positions[i * 3 + 1] = posVec.y;
+                    this.positions[i * 3 + 2] = posVec.z;
                 } else {
-                    posIndex += 3;
+                    this.positions[i * 3] = 0;
+                    this.positions[i * 3 + 1] = 0;
+                    this.positions[i * 3 + 2] = 0;
                 }
             }
         } else {
@@ -296,23 +334,30 @@ export class Heatmap {
                 heatmapQubitId < numHeatmapPoints;
                 heatmapQubitId++
             ) {
-                const qubitInfo = qubits.get(heatmapQubitId);
-
-                if (!this.qubitPositions[heatmapQubitId] && qubitInfo) {
-                    const posVec = new THREE.Vector3();
-                    qubitInfo.blochSphere.blochSphere.getWorldPosition(posVec);
-                    this.qubitPositions[heatmapQubitId] = posVec;
+                const pos = this.positions.slice(
+                    heatmapQubitId * 3,
+                    heatmapQubitId * 3 + 3,
+                );
+                if (
+                    !this.qubitPositions[heatmapQubitId] &&
+                    pos.every(Number.isFinite)
+                ) {
+                    this.qubitPositions[heatmapQubitId] = new THREE.Vector3(
+                        pos[0],
+                        pos[1],
+                        pos[2],
+                    );
                 }
-                const pos = this.qubitPositions[heatmapQubitId];
+                const posVec = this.qubitPositions[heatmapQubitId];
 
-                if (pos) {
-                    this.positions[posIndex++] = pos.x;
-                    this.positions[posIndex++] = pos.y;
-                    this.positions[posIndex++] = pos.z;
+                if (posVec) {
+                    this.positions[heatmapQubitId * 3] = posVec.x;
+                    this.positions[heatmapQubitId * 3 + 1] = posVec.y;
+                    this.positions[heatmapQubitId * 3 + 2] = posVec.z;
                 } else {
-                    this.positions[posIndex++] = 0;
-                    this.positions[posIndex++] = 0;
-                    this.positions[posIndex++] = 0;
+                    this.positions[heatmapQubitId * 3] = 0;
+                    this.positions[heatmapQubitId * 3 + 1] = 0;
+                    this.positions[heatmapQubitId * 3 + 2] = 0;
                 }
 
                 let interactionCount = 0;
@@ -362,12 +407,7 @@ export class Heatmap {
             }
         }
 
-        const positionAttr = this.mesh.geometry.attributes
-            .position as THREE.BufferAttribute;
-        positionAttr.needsUpdate = true;
-        const intensityAttr = this.mesh.geometry.attributes
-            .intensity as THREE.BufferAttribute;
-        intensityAttr.needsUpdate = true;
+        this.mesh.geometry.attributes.intensity.needsUpdate = true;
 
         if (
             this.clusteredMesh &&
@@ -398,8 +438,10 @@ export class Heatmap {
             ).needsUpdate = true;
         }
 
+        maxObservedRawWeightedSum = maxObservedRawInteractionCount;
+
         return {
-            maxObservedRawWeightedSum: maxObservedRawInteractionCount, // Return the max raw count
+            maxObservedRawWeightedSum,
             numSlicesEffectivelyUsed: numSlicesInWindow,
         };
     }

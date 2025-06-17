@@ -8,9 +8,13 @@ interface AppearanceControlsProps {
         connectionThickness: number;
         inactiveAlpha: number;
         baseSize: number;
+        renderBlochSpheres: boolean;
+        renderConnectionLines: boolean;
     };
     isCollapsed: boolean;
     onToggleCollapse: () => void;
+    onRenderBlochSpheresChange: (checked: boolean) => void;
+    onRenderConnectionLinesChange: (checked: boolean) => void;
 }
 
 const panelStyle: React.CSSProperties = {
@@ -47,11 +51,24 @@ const valueStyle: React.CSSProperties = {
     fontSize: "0.9em",
 };
 
+const toggleContainerStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: "15px",
+};
+
+const toggleLabelStyle: React.CSSProperties = {
+    fontSize: "0.9em",
+};
+
 const AppearanceControls: React.FC<AppearanceControlsProps> = ({
     playground,
     initialValues,
     isCollapsed,
     onToggleCollapse,
+    onRenderBlochSpheresChange,
+    onRenderConnectionLinesChange,
 }) => {
     const [qubitSize, setQubitSize] = useState(initialValues.qubitSize);
     const [connectionThickness, setConnectionThickness] = useState(
@@ -61,12 +78,20 @@ const AppearanceControls: React.FC<AppearanceControlsProps> = ({
         initialValues.inactiveAlpha,
     );
     const [baseSize, setBaseSize] = useState(initialValues.baseSize);
+    const [renderBlochSpheres, setRenderBlochSpheres] = useState(
+        initialValues.renderBlochSpheres,
+    );
+    const [renderConnectionLines, setRenderConnectionLines] = useState(
+        initialValues.renderConnectionLines,
+    );
 
     useEffect(() => {
         setQubitSize(initialValues.qubitSize);
         setConnectionThickness(initialValues.connectionThickness);
         setInactiveAlpha(initialValues.inactiveAlpha);
         setBaseSize(initialValues.baseSize);
+        setRenderBlochSpheres(initialValues.renderBlochSpheres);
+        setRenderConnectionLines(initialValues.renderConnectionLines);
     }, [initialValues]);
 
     const handleQubitSizeChange = (
@@ -99,6 +124,22 @@ const AppearanceControls: React.FC<AppearanceControlsProps> = ({
         const value = parseFloat(event.target.value);
         setBaseSize(value);
         playground?.updateAppearanceParameters({ baseSize: value });
+    };
+
+    const handleRenderBlochSpheresChange = (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const checked = event.target.checked;
+        setRenderBlochSpheres(checked);
+        onRenderBlochSpheresChange(checked);
+    };
+
+    const handleRenderConnectionLinesChange = (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const checked = event.target.checked;
+        setRenderConnectionLines(checked);
+        onRenderConnectionLinesChange(checked);
     };
 
     if (!playground) {
@@ -144,6 +185,34 @@ const AppearanceControls: React.FC<AppearanceControlsProps> = ({
 
             {!isCollapsed && (
                 <>
+                    <div style={toggleContainerStyle}>
+                        <label
+                            htmlFor="render-bloch-spheres"
+                            style={toggleLabelStyle}
+                        >
+                            Render Bloch Spheres
+                        </label>
+                        <input
+                            type="checkbox"
+                            id="render-bloch-spheres"
+                            checked={renderBlochSpheres}
+                            onChange={handleRenderBlochSpheresChange}
+                        />
+                    </div>
+                    <div style={toggleContainerStyle}>
+                        <label
+                            htmlFor="render-connection-lines"
+                            style={toggleLabelStyle}
+                        >
+                            Render Connection Lines
+                        </label>
+                        <input
+                            type="checkbox"
+                            id="render-connection-lines"
+                            checked={renderConnectionLines}
+                            onChange={handleRenderConnectionLinesChange}
+                        />
+                    </div>
                     <div style={controlGroupStyle}>
                         <label htmlFor="qubit-size" style={labelStyle}>
                             Qubit Size:{" "}

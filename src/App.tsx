@@ -19,7 +19,7 @@ const COLLAPSED_PANEL_HEADER_HEIGHT_PX = 50;
 const PANEL_BOTTOM_PADDING_PX = 15;
 const CONTROL_GROUP_APPROX_HEIGHT_PX = 65;
 
-const APPEARANCE_PANEL_SLIDER_COUNT = 4;
+const APPEARANCE_PANEL_SLIDER_COUNT = 5;
 const APPEARANCE_PANEL_EXPANDED_CONTENT_HEIGHT =
     APPEARANCE_PANEL_SLIDER_COUNT * CONTROL_GROUP_APPROX_HEIGHT_PX;
 const APPEARANCE_HEADER_ADJUSTMENT_PX = 20;
@@ -73,12 +73,14 @@ const App: React.FC = () => {
         connectionThickness: 0.05,
         inactiveAlpha: 0.1,
         baseSize: 500.0,
+        renderBlochSpheres: false,
+        renderConnectionLines: true,
     });
 
     // State for LayoutControls initial values (matching Playground defaults)
     const [initialLayout, setInitialLayout] = useState({
         repelForce: 0.6,
-        idealDistance: 5.0,
+        idealDistance: 1.0,
         iterations: 500,
         coolingFactor: 1.0,
     });
@@ -125,6 +127,14 @@ const App: React.FC = () => {
 
     const toggleFidelityCollapse = () => {
         setIsFidelityCollapsed(!isFidelityCollapsed);
+    };
+
+    const handleRenderBlochSpheresChange = (checked: boolean) => {
+        playgroundRef.current?.setBlochSpheresVisible(checked);
+    };
+
+    const handleRenderConnectionLinesChange = (checked: boolean) => {
+        playgroundRef.current?.setConnectionLinesVisible(checked);
     };
 
     // Callback for dataset selection
@@ -274,6 +284,10 @@ const App: React.FC = () => {
                         playgroundInstance.currentConnectionThickness,
                     inactiveAlpha: playgroundInstance.currentInactiveAlpha,
                     baseSize: playgroundInstance.currentBaseSize,
+                    renderBlochSpheres:
+                        playgroundInstance.areBlochSpheresVisible,
+                    renderConnectionLines:
+                        playgroundInstance.areConnectionLinesVisible,
                 });
                 setInitialLayout({
                     repelForce: playgroundInstance.currentRepelForce,
@@ -409,6 +423,12 @@ const App: React.FC = () => {
                                 initialValues={initialAppearance}
                                 isCollapsed={isAppearanceCollapsed}
                                 onToggleCollapse={toggleAppearanceCollapse}
+                                onRenderBlochSpheresChange={
+                                    handleRenderBlochSpheresChange
+                                }
+                                onRenderConnectionLinesChange={
+                                    handleRenderConnectionLinesChange
+                                }
                             />
                             <FidelityControls
                                 playground={playgroundRef.current}

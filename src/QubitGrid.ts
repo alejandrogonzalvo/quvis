@@ -99,6 +99,10 @@ export class QubitGrid {
     private cumulativeWeightedPairInteractions: Map<string, number[]> =
         new Map();
     private _isQubitRenderEnabled: boolean = true;
+    private _areBlochSpheresVisible: boolean = false;
+    private _areConnectionLinesVisible: boolean = true;
+    private slicesProcessedForHeatmap = 0;
+    public isFullyLoaded = false;
 
     public qubitInstances: Map<number, Qubit> = new Map(); // Stores all qubits based on num_qubits_on_device
     private current_slice_index: number = 0;
@@ -541,10 +545,9 @@ export class QubitGrid {
 
         this.interactionPairsPerSlice = [];
 
-        // Initialize cumulative interactions array
-        this.cumulativeQubitInteractions = new Array(this._qubit_count)
-            .fill(0)
-            .map(() => new Array(this.allOperationsPerSlice.length).fill(0));
+        // Initialize cumulative interactions array - will be filled by background process
+        this.cumulativeQubitInteractions = [];
+        this.cumulativeWeightedPairInteractions = new Map();
 
         this.slices = this.allOperationsPerSlice.map(
             (ops_in_slice, sliceIdx) => {
@@ -563,46 +566,11 @@ export class QubitGrid {
                 });
                 this.interactionPairsPerSlice.push(currentSlicePairs);
 
-                for (let qid = 0; qid < this._qubit_count; qid++) {
-                    const hadInteraction = slice.interacting_qubits.has(qid)
-                        ? 1
-                        : 0;
-                    if (sliceIdx === 0) {
-                        this.cumulativeQubitInteractions[qid][sliceIdx] =
-                            hadInteraction;
-                    } else {
-                        this.cumulativeQubitInteractions[qid][sliceIdx] =
-                            this.cumulativeQubitInteractions[qid][
-                                sliceIdx - 1
-                            ] + hadInteraction;
-                    }
-                }
                 return slice;
             },
         );
 
-        this.interactionPairsPerSlice = [];
-        this.slices = this.allOperationsPerSlice.map(
-            (ops_in_slice, sliceIdx) => {
-                const slice = new Slice(sliceIdx);
-                const currentSlicePairs: Array<{ q1: number; q2: number }> = [];
-                ops_in_slice.forEach((op) => {
-                    op.qubits.forEach((qid) =>
-                        slice.interacting_qubits.add(qid),
-                    );
-                    if (op.qubits.length === 2) {
-                        currentSlicePairs.push({
-                            q1: op.qubits[0],
-                            q2: op.qubits[1],
-                        });
-                    }
-                });
-                this.interactionPairsPerSlice.push(currentSlicePairs);
-                return slice;
-            },
-        );
-
-        this.calculateCumulativePairInteractions();
+        this.calculateCumulativeDataInBackground();
 
         if (this.slices.length > 0) {
             if (
@@ -627,33 +595,35 @@ export class QubitGrid {
             }
             const numDeviceQubits = this.deviceInfo.num_qubits_on_device;
 
-            this.recalculateLayoutAndRedraw(
-                this.kRepel,
-                this.idealDist,
-                this.iterations,
-                this.coolingFactor,
-                () => {
-                    this.createGrid(numDeviceQubits);
+            this.calculateGridLayoutPositions(numDeviceQubits);
+            this.lastLayoutCalculationTime = 0; // Grid layout is instantaneous
 
-                    if (this.heatmap && this.heatmap.mesh)
-                        this.scene.remove(this.heatmap.mesh);
-                    if (this.heatmap) this.heatmap.dispose();
-                    this.heatmap = new Heatmap(
-                        camera,
-                        this._qubit_count,
-                        this.maxSlicesForHeatmap,
-                    );
-                    this.scene.add(this.heatmap.mesh);
+            if (this.heatmap) {
+                this.heatmap.generateClusters(
+                    this.qubitPositions,
+                    numDeviceQubits,
+                );
+            }
 
-                    if (this.onSlicesLoadedCallback) {
-                        this.onSlicesLoadedCallback(
-                            this.slices.length,
-                            this.current_slice_index,
-                        );
-                    }
-                    this.onCurrentSliceChange();
-                },
+            this.createGrid(numDeviceQubits);
+
+            if (this.heatmap && this.heatmap.mesh)
+                this.scene.remove(this.heatmap.mesh);
+            if (this.heatmap) this.heatmap.dispose();
+            this.heatmap = new Heatmap(
+                camera,
+                this._qubit_count,
+                this.maxSlicesForHeatmap,
             );
+            this.scene.add(this.heatmap.mesh);
+
+            if (this.onSlicesLoadedCallback) {
+                this.onSlicesLoadedCallback(
+                    this.slices.length,
+                    this.current_slice_index,
+                );
+            }
+            this.onCurrentSliceChange();
         } else {
             if (previousQubitCount !== this._qubit_count && camera) {
                 if (this.heatmap && this.heatmap.mesh)
@@ -673,6 +643,30 @@ export class QubitGrid {
         if (this.couplingMap) {
             this.initializeInstancedConnections(this.couplingMap.length);
             this.drawConnections();
+        }
+    }
+
+    private calculateGridLayoutPositions(numQubits: number) {
+        if (numQubits === 0) {
+            this.qubitPositions.clear();
+            return;
+        }
+
+        const cols = Math.ceil(Math.sqrt(numQubits));
+        const rows = Math.ceil(numQubits / cols);
+
+        const gridWidth = (cols - 1) * this.idealDist;
+        const gridHeight = (rows - 1) * this.idealDist;
+        const startX = -gridWidth / 2;
+        const startY = gridHeight / 2;
+
+        this.qubitPositions.clear();
+        for (let i = 0; i < numQubits; i++) {
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            const x = startX + col * this.idealDist;
+            const y = startY - row * this.idealDist;
+            this.qubitPositions.set(i, new THREE.Vector3(x, y, 0));
         }
     }
 
@@ -722,11 +716,18 @@ export class QubitGrid {
             } else break;
         }
         this.lastCalculatedSlicesChangeIDs = slicesChangeIDs;
+
+        const lastLoadedSlice = this.slicesProcessedForHeatmap - 1;
+        const effectiveSliceIndex = Math.min(
+            this.current_slice_index,
+            lastLoadedSlice,
+        );
+
         if (this.heatmap) {
-            if (this.qubitInstances.size > 0 && this.slices) {
+            if (this.qubitPositions.size > 0 && this.slices) {
                 const heatmapUpdateResults = this.heatmap.updatePoints(
-                    this.qubitInstances,
-                    this.current_slice_index,
+                    this.qubitPositions,
+                    effectiveSliceIndex,
                     this.cumulativeQubitInteractions,
                 );
                 this.lastMaxObservedRawHeatmapSum =
@@ -810,21 +811,26 @@ export class QubitGrid {
         this.updateQubitOpacities();
     }
 
-    createQubit(id: number, x: number, y: number, z: number) {
-        const blochSphere = new BlochSphere(x, y, z);
-        if (this._isQubitRenderEnabled) {
-            this.scene.add(blochSphere.blochSphere);
-        }
-        const qubit = new Qubit(id, State.ZERO, blochSphere);
+    createQubit(id: number) {
+        // Don't create BlochSphere here anymore. Do it lazily.
+        const qubit = new Qubit(id, State.ZERO, null);
         this.qubitInstances.set(id, qubit);
-        if (this._isQubitRenderEnabled) {
-            blochSphere.blochSphere.userData.qubitId = id;
-            blochSphere.blochSphere.userData.qubitState = qubit.state;
-        }
+        // UserData is now set on the BlochSphere group when it's created,
+        // so we don't need to handle it here.
     }
 
     drawConnections() {
         const yAxis = new THREE.Vector3(0, 1, 0);
+
+        if (!this._areConnectionLinesVisible) {
+            if (this.instancedConnectionMesh) {
+                this.instancedConnectionMesh.count = 0;
+            }
+            if (this.logicalConnectionMesh) {
+                this.logicalConnectionMesh.count = 0;
+            }
+            return;
+        }
 
         if (this._visualizationMode === "logical") {
             if (this.instancedConnectionMesh) {
@@ -910,9 +916,15 @@ export class QubitGrid {
             return;
         }
 
+        const lastLoadedSlice = this.slicesProcessedForHeatmap - 1;
+        const effectiveSliceIndex = Math.min(
+            this.current_slice_index,
+            lastLoadedSlice,
+        );
+
         const weight_base = this.heatmapWeightBase;
 
-        const windowEndSlice = this.current_slice_index + 1;
+        const windowEndSlice = effectiveSliceIndex + 1;
         let windowStartSlice;
         if (this.maxSlicesForHeatmap === -1) {
             windowStartSlice = 0;
@@ -958,7 +970,7 @@ export class QubitGrid {
 
                     const C = windowEndSlice - 1;
 
-                    if (C >= 0) {
+                    if (C >= 0 && C < scaledCumulativeWeights.length) {
                         const S_prime_C = scaledCumulativeWeights[C];
                         const S_prime_Start_minus_1 =
                             windowStartSlice > 0
@@ -1080,45 +1092,101 @@ export class QubitGrid {
         return interactionCount / slicesToConsider.length;
     }
 
-    private calculateCumulativePairInteractions() {
-        this.cumulativeWeightedPairInteractions = new Map<string, number[]>();
-        if (!this.couplingMap || this.slices.length === 0) {
+    private calculateCumulativeDataInBackground() {
+        const totalSlices = this.allOperationsPerSlice.length;
+        if (totalSlices === 0) {
+            this.isFullyLoaded = true;
             return;
         }
 
-        const weight_base = this.heatmapWeightBase;
+        // Initialize data structures with empty inner arrays to be grown dynamically
+        this.cumulativeQubitInteractions = new Array(this._qubit_count)
+            .fill(0)
+            .map(() => []);
+        this.cumulativeWeightedPairInteractions = new Map<string, number[]>();
+        if (this.couplingMap) {
+            for (const pair of this.couplingMap) {
+                const q1 = Math.min(pair[0], pair[1]);
+                const q2 = Math.max(pair[0], pair[1]);
+                const key = `${q1}-${q2}`;
+                // Initialize with empty arrays
+                this.cumulativeWeightedPairInteractions.set(key, []);
+            }
+        }
 
-        for (const pair of this.couplingMap) {
-            const q1 = Math.min(pair[0], pair[1]);
-            const q2 = Math.max(pair[0], pair[1]);
-            const key = `${q1}-${q2}`;
-            const scaledCumulativeWeights = new Array(this.slices.length).fill(
-                0,
-            );
+        const chunkSize = 500; // Process 500 slices at a time
+        let startIndex = 0;
 
-            for (let i = 0; i < this.slices.length; i++) {
-                const sliceInteractionPairs = this.interactionPairsPerSlice[i];
-                let hadInteraction = 0;
-                for (const interaction of sliceInteractionPairs) {
-                    if (
-                        (interaction.q1 === q1 && interaction.q2 === q2) ||
-                        (interaction.q1 === q2 && interaction.q2 === q1)
-                    ) {
-                        hadInteraction = 1;
-                        break;
+        const processChunk = () => {
+            const endIndex = Math.min(startIndex + chunkSize, totalSlices);
+
+            // Process cumulativeQubitInteractions for the chunk
+            for (let i = startIndex; i < endIndex; i++) {
+                const slice = this.slices[i];
+                for (let qid = 0; qid < this._qubit_count; qid++) {
+                    const hadInteraction = slice.interacting_qubits.has(qid)
+                        ? 1
+                        : 0;
+                    const prevSum =
+                        i === 0
+                            ? 0
+                            : this.cumulativeQubitInteractions[qid][i - 1];
+                    this.cumulativeQubitInteractions[qid].push(
+                        prevSum + hadInteraction,
+                    );
+                }
+            }
+
+            // Process cumulativeWeightedPairInteractions for the chunk
+            if (this.couplingMap) {
+                const weight_base = this.heatmapWeightBase;
+                for (const pair of this.couplingMap) {
+                    const q1 = Math.min(pair[0], pair[1]);
+                    const q2 = Math.max(pair[0], pair[1]);
+                    const key = `${q1}-${q2}`;
+                    const scaledCumulativeWeights =
+                        this.cumulativeWeightedPairInteractions.get(key)!;
+
+                    for (let i = startIndex; i < endIndex; i++) {
+                        const sliceInteractionPairs =
+                            this.interactionPairsPerSlice[i];
+                        let hadInteraction = 0;
+                        for (const interaction of sliceInteractionPairs) {
+                            if (
+                                (interaction.q1 === q1 &&
+                                    interaction.q2 === q2) ||
+                                (interaction.q1 === q2 && interaction.q2 === q1)
+                            ) {
+                                hadInteraction = 1;
+                                break;
+                            }
+                        }
+                        const prevScaledSum =
+                            i === 0 ? 0 : scaledCumulativeWeights[i - 1];
+                        scaledCumulativeWeights.push(
+                            prevScaledSum / weight_base + hadInteraction,
+                        );
                     }
                 }
-
-                const prevScaledSum =
-                    i === 0 ? 0 : scaledCumulativeWeights[i - 1];
-                scaledCumulativeWeights[i] =
-                    prevScaledSum / weight_base + hadInteraction;
             }
-            this.cumulativeWeightedPairInteractions.set(
-                key,
-                scaledCumulativeWeights,
-            );
-        }
+
+            this.slicesProcessedForHeatmap = endIndex;
+
+            // If user is viewing a slice that just got processed, refresh the view
+            if (this.current_slice_index < this.slicesProcessedForHeatmap) {
+                this.onCurrentSliceChange();
+            }
+
+            startIndex = endIndex;
+            if (startIndex < totalSlices) {
+                setTimeout(processChunk, 0); // Yield to main thread
+            } else {
+                console.log("Fully loaded all slice data in background.");
+                this.isFullyLoaded = true;
+            }
+        };
+
+        setTimeout(processChunk, 0);
     }
 
     public recalculateLayoutAndRedraw(
@@ -1477,34 +1545,93 @@ export class QubitGrid {
     }
 
     private setLOD(level: "high" | "medium" | "low") {
+        if (this.currentLOD === level) return;
         this.currentLOD = level;
-        const highVisible = level === "high";
-        const mediumVisible = level === "medium" || level === "high";
 
-        this.qubitInstances.forEach((qubit) => {
-            if (qubit.blochSphere?.blochSphere) {
-                qubit.blochSphere.blochSphere.visible = highVisible;
+        Object.values(this.qubitInstances).forEach((qubit) => {
+            qubit.setLOD(level);
+        });
+    }
+
+    public applyGridLayout() {
+        if (!this.qubitInstances.size) return;
+
+        const qubits = Array.from(this.qubitInstances.values()).sort(
+            (a, b) => a.id - b.id,
+        );
+        const numQubits = qubits.length;
+        const cols = Math.ceil(Math.sqrt(numQubits));
+        const rows = Math.ceil(numQubits / cols);
+
+        const gridWidth = (cols - 1) * this.idealDist;
+        const gridHeight = (rows - 1) * this.idealDist;
+        const startX = -gridWidth / 2;
+        const startY = gridHeight / 2;
+
+        qubits.forEach((qubit, index) => {
+            const col = index % cols;
+            const row = Math.floor(index / cols);
+            const x = startX + col * this.idealDist;
+            const y = startY - row * this.idealDist;
+            if (qubit.blochSphere) {
+                qubit.blochSphere.blochSphere.position.set(x, y, 0);
             }
+
+            // Update stored position for layout algorithms if they are used later
+            this.qubitPositions.set(qubit.id, new THREE.Vector3(x, y, 0));
         });
 
+        if (this.heatmap) {
+            this.heatmap.generateClusters(
+                this.qubitPositions,
+                this.qubitInstances.size,
+            );
+            this.heatmap.clearPositionsCache();
+        }
+
+        this.onCurrentSliceChange();
+    }
+
+    public updateIdealDistance(distance: number) {
+        if (this.idealDist !== distance) {
+            this.idealDist = distance;
+            this.applyGridLayout(); // Re-apply grid layout with new distance
+        }
+    }
+
+    public setBlochSpheresVisible(visible: boolean) {
+        this._areBlochSpheresVisible = visible;
+
+        if (visible) {
+            // Lazy-create Bloch spheres if they don't exist
+            this.qubitInstances.forEach((qubit) => {
+                if (!qubit.blochSphere) {
+                    const pos =
+                        this.qubitPositions.get(qubit.id) ||
+                        new THREE.Vector3();
+                    const blochSphere = new BlochSphere(pos.x, pos.y, pos.z);
+                    qubit.blochSphere = blochSphere;
+                    this.scene.add(blochSphere.blochSphere);
+                }
+                qubit.blochSphere.blochSphere.visible = true;
+            });
+        } else {
+            // Just hide them if they exist
+            this.qubitInstances.forEach((qubit) => {
+                if (qubit.blochSphere && qubit.blochSphere.blochSphere) {
+                    qubit.blochSphere.blochSphere.visible = false;
+                }
+            });
+        }
+    }
+
+    public setConnectionLinesVisible(visible: boolean) {
+        this._areConnectionLinesVisible = visible;
         if (this.instancedConnectionMesh) {
-            this.instancedConnectionMesh.visible = mediumVisible;
+            this.instancedConnectionMesh.visible = visible;
         }
         if (this.logicalConnectionMesh) {
-            this.logicalConnectionMesh.visible = mediumVisible;
+            this.logicalConnectionMesh.visible = visible;
         }
-
-        if (this.heatmap) {
-            if (level === "low") {
-                this.heatmap.setLOD("low");
-            } else {
-                this.heatmap.setLOD("high");
-            }
-        }
-
-        // The visibility of connections is now managed by the visibility of the
-        // InstancedMesh. We still call drawConnections because the *set* of
-        // connections can change with the timeline slider, independent of LOD.
-        this.drawConnections();
     }
 }

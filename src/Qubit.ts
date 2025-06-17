@@ -4,12 +4,12 @@ import { State } from "./State.js";
 export class Qubit {
     id: number;
     private _state: State;
-    blochSphere: BlochSphere;
+    blochSphere: BlochSphere | null;
 
     constructor(
         id: number = 0,
         initialState: State = State.ZERO,
-        blochSphereInstance: BlochSphere,
+        blochSphereInstance: BlochSphere | null = null,
     ) {
         this.id = id;
         this._state = initialState;

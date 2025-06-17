@@ -60,6 +60,23 @@ const buttonStyle: React.CSSProperties = {
     marginTop: "10px",
 };
 
+const tabButtonStyle: React.CSSProperties = {
+    padding: "10px 15px",
+    border: "none",
+    background: "none",
+    color: "white",
+    cursor: "pointer",
+    fontSize: "1em",
+    borderBottom: "2px solid transparent",
+    marginBottom: "-1px",
+};
+
+const activeTabButtonStyle: React.CSSProperties = {
+    ...tabButtonStyle,
+    borderBottom: "2px solid #007bff",
+    fontWeight: "bold",
+};
+
 const LayoutControls: React.FC<LayoutControlsProps> = ({
     playground,
     initialValues,
@@ -68,6 +85,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
     topPosition,
     setIsLoading,
 }) => {
+    const [activeTab, setActiveTab] = useState<"grid" | "force">("grid");
     const [repelForce, setRepelForce] = useState(initialValues.repelForce);
     const [idealDistance, setIdealDistance] = useState(
         initialValues.idealDistance,
@@ -85,32 +103,48 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
     }, [initialValues]);
 
     useEffect(() => {
-        const handler = setTimeout(() => {
-            setIsLoading(true);
-            playground?.updateLayoutParameters(
-                {
-                    repelForce,
-                    idealDistance,
-                    iterations,
-                    coolingFactor,
-                },
-                () => {
-                    setIsLoading(false);
-                },
-            );
-        }, 500); // Debounce for 500ms
+        // Only run simulation updates if the force tab is active
+        if (activeTab === "force") {
+            const handler = setTimeout(() => {
+                setIsLoading(true);
+                playground?.updateLayoutParameters(
+                    {
+                        repelForce,
+                        idealDistance,
+                        iterations,
+                        coolingFactor,
+                    },
+                    () => {
+                        setIsLoading(false);
+                    },
+                );
+            }, 500); // Debounce for 500ms
 
-        return () => {
-            clearTimeout(handler);
-        };
+            return () => {
+                clearTimeout(handler);
+            };
+        }
     }, [
         repelForce,
-        idealDistance,
         iterations,
         coolingFactor,
         playground,
         setIsLoading,
+        activeTab,
     ]);
+
+    // Separate useEffect for idealDistance to avoid triggering force layout updates
+    useEffect(() => {
+        if (activeTab === "grid") {
+            const handler = setTimeout(() => {
+                playground?.updateIdealDistance(idealDistance);
+            }, 100); // Shorter debounce for responsiveness
+
+            return () => {
+                clearTimeout(handler);
+            };
+        }
+    }, [idealDistance, playground, activeTab]);
 
     const handleRepelForceChange = (
         event: React.ChangeEvent<HTMLInputElement>,
@@ -147,6 +181,10 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
         });
     };
 
+    const handleGridLayout = () => {
+        playground?.applyGridLayout();
+    };
+
     if (!playground) {
         return null;
     }
@@ -162,17 +200,10 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                     alignItems: "center",
                     borderBottom: "1px solid #666",
                     paddingBottom: "10px",
-                    marginBottom: isCollapsed ? "0" : "20px",
+                    marginBottom: isCollapsed ? "0" : "10px",
                 }}
             >
-                <h4
-                    style={{
-                        marginTop: "0",
-                        marginBottom: "0",
-                    }}
-                >
-                    Layout Simulation
-                </h4>
+                <h4 style={{ margin: "0" }}>Layout Controls</h4>
                 <button
                     onClick={onToggleCollapse}
                     style={{
@@ -190,83 +221,135 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
 
             {!isCollapsed && (
                 <>
-                    <div style={controlGroupStyle}>
-                        <label htmlFor="repel-force" style={labelStyle}>
-                            Repel Force:{" "}
-                            <span style={valueStyle}>
-                                {repelForce.toFixed(2)}
-                            </span>
-                        </label>
-                        <input
-                            type="range"
-                            id="repel-force"
-                            min="0.01"
-                            max="1.0"
-                            step="0.01"
-                            value={repelForce}
-                            onChange={handleRepelForceChange}
-                            style={sliderStyle}
-                        />
+                    <div
+                        style={{
+                            display: "flex",
+                            borderBottom: "1px solid #666",
+                            marginBottom: "20px",
+                        }}
+                    >
+                        <button
+                            style={
+                                activeTab === "grid"
+                                    ? activeTabButtonStyle
+                                    : tabButtonStyle
+                            }
+                            onClick={() => setActiveTab("grid")}
+                        >
+                            Grid
+                        </button>
+                        <button
+                            style={
+                                activeTab === "force"
+                                    ? activeTabButtonStyle
+                                    : tabButtonStyle
+                            }
+                            onClick={() => setActiveTab("force")}
+                        >
+                            Force-based
+                        </button>
                     </div>
 
-                    <div style={controlGroupStyle}>
-                        <label htmlFor="ideal-distance" style={labelStyle}>
-                            Ideal Distance:{" "}
-                            <span style={valueStyle}>
-                                {idealDistance.toFixed(1)}
-                            </span>
-                        </label>
-                        <input
-                            type="range"
-                            id="ideal-distance"
-                            min="0.5"
-                            max="100"
-                            step="0.1"
-                            value={idealDistance}
-                            onChange={handleIdealDistanceChange}
-                            style={sliderStyle}
-                        />
-                    </div>
+                    {activeTab === "grid" && (
+                        <>
+                            <div style={controlGroupStyle}>
+                                <label
+                                    htmlFor="ideal-distance"
+                                    style={labelStyle}
+                                >
+                                    Ideal Distance:{" "}
+                                    <span style={valueStyle}>
+                                        {idealDistance.toFixed(1)}
+                                    </span>
+                                </label>
+                                <input
+                                    type="range"
+                                    id="ideal-distance"
+                                    min="0.5"
+                                    max="5"
+                                    step="0.1"
+                                    value={idealDistance}
+                                    onChange={handleIdealDistanceChange}
+                                    style={sliderStyle}
+                                />
+                            </div>
+                            <button
+                                onClick={handleGridLayout}
+                                style={{ ...buttonStyle, marginTop: "20px" }}
+                            >
+                                Apply Grid Layout
+                            </button>
+                        </>
+                    )}
 
-                    <div style={controlGroupStyle}>
-                        <label htmlFor="iterations" style={labelStyle}>
-                            Iterations:{" "}
-                            <span style={valueStyle}>{iterations}</span>
-                        </label>
-                        <input
-                            type="range"
-                            id="iterations"
-                            min="50"
-                            max="10000"
-                            step="50"
-                            value={iterations}
-                            onChange={handleIterationsChange}
-                            style={sliderStyle}
-                        />
-                    </div>
+                    {activeTab === "force" && (
+                        <>
+                            <div style={controlGroupStyle}>
+                                <label htmlFor="repel-force" style={labelStyle}>
+                                    Repel Force:{" "}
+                                    <span style={valueStyle}>
+                                        {repelForce.toFixed(2)}
+                                    </span>
+                                </label>
+                                <input
+                                    type="range"
+                                    id="repel-force"
+                                    min="0.01"
+                                    max="1.0"
+                                    step="0.01"
+                                    value={repelForce}
+                                    onChange={handleRepelForceChange}
+                                    style={sliderStyle}
+                                />
+                            </div>
 
-                    <div style={controlGroupStyle}>
-                        <label htmlFor="cooling-factor" style={labelStyle}>
-                            Cooling Factor:{" "}
-                            <span style={valueStyle}>
-                                {coolingFactor.toFixed(2)}
-                            </span>
-                        </label>
-                        <input
-                            type="range"
-                            id="cooling-factor"
-                            min="0.8"
-                            max="1.0"
-                            step="0.01"
-                            value={coolingFactor}
-                            onChange={handleCoolingFactorChange}
-                            style={sliderStyle}
-                        />
-                    </div>
+                            <div style={controlGroupStyle}>
+                                <label htmlFor="iterations" style={labelStyle}>
+                                    Iterations:{" "}
+                                    <span style={valueStyle}>{iterations}</span>
+                                </label>
+                                <input
+                                    type="range"
+                                    id="iterations"
+                                    min="50"
+                                    max="10000"
+                                    step="50"
+                                    value={iterations}
+                                    onChange={handleIterationsChange}
+                                    style={sliderStyle}
+                                />
+                            </div>
 
-                    <button onClick={handleRecompileLayout} style={buttonStyle}>
-                        Re-run Simulation
-                    </button>
+                            <div style={controlGroupStyle}>
+                                <label
+                                    htmlFor="cooling-factor"
+                                    style={labelStyle}
+                                >
+                                    Cooling Factor:{" "}
+                                    <span style={valueStyle}>
+                                        {coolingFactor.toFixed(2)}
+                                    </span>
+                                </label>
+                                <input
+                                    type="range"
+                                    id="cooling-factor"
+                                    min="0.8"
+                                    max="1.0"
+                                    step="0.01"
+                                    value={coolingFactor}
+                                    onChange={handleCoolingFactorChange}
+                                    style={sliderStyle}
+                                />
+                            </div>
+
+                            <button
+                                onClick={handleRecompileLayout}
+                                style={buttonStyle}
+                            >
+                                Re-run Simulation
+                            </button>
+                        </>
+                    )}
                 </>
             )}
         </div>

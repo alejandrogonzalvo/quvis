@@ -9,7 +9,7 @@ interface HeatmapControlsProps {
     };
 }
 
-const SLIDER_MAX_VALUE = 10;
+const SLIDER_MAX_VALUE = 100;
 
 const panelStyle: React.CSSProperties = {
     position: "fixed",

@@ -44,7 +44,7 @@ export class Playground {
 
     // Stored layout parameters - Using defaults defined here
     currentRepelForce: number = 0.6;
-    currentIdealDistance: number = 5.0;
+    currentIdealDistance: number = 1.0;
     currentIterations: number = 500;
     currentCoolingFactor: number = 1.0;
 
@@ -64,6 +64,8 @@ export class Playground {
     currentConnectionThickness: number = 0.05;
     currentInactiveAlpha: number = 0.1;
     currentBaseSize: number = 500.0; // Default from Heatmap.ts shader
+    areBlochSpheresVisible: boolean = false; // Default off
+    areConnectionLinesVisible: boolean = true; // Default on
 
     currentSlice: number = 0; // Initialize currentSlice
     currentOneQubitFidelityBase: number = 0.99; // Default base fidelity for 1-qubit gates
@@ -609,5 +611,32 @@ export class Playground {
             this.onModeSwitchedCallback?.(newSliceCount, newCurrentSliceIndex);
         }
         console.log(`Playground visualization mode set to: ${mode}`);
+    }
+
+    public applyGridLayout(): void {
+        if (this.grid) {
+            this.grid.applyGridLayout();
+        }
+    }
+
+    public updateIdealDistance(distance: number): void {
+        if (this.grid) {
+            this.currentIdealDistance = distance;
+            this.grid.updateIdealDistance(distance);
+        }
+    }
+
+    public setBlochSpheresVisible(visible: boolean): void {
+        this.areBlochSpheresVisible = visible;
+        if (this.grid) {
+            this.grid.setBlochSpheresVisible(visible);
+        }
+    }
+
+    public setConnectionLinesVisible(visible: boolean): void {
+        this.areConnectionLinesVisible = visible;
+        if (this.grid) {
+            this.grid.setConnectionLinesVisible(visible);
+        }
     }
 }
