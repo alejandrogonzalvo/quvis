@@ -214,7 +214,9 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key.toLowerCase() === "h") {
+            if (event.key === "0" && playgroundRef.current) {
+                playgroundRef.current.resetCamera();
+            } else if (event.key.toLowerCase() === "h") {
                 setIsUiVisible((prev) => !prev);
             } else if (
                 event.code === "Space" &&

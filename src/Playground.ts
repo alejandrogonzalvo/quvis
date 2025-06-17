@@ -624,6 +624,12 @@ export class Playground {
         }
     }
 
+    public resetCamera(): void {
+        if (this.controls) {
+            this.controls.reset();
+        }
+    }
+
     public updateIdealDistance(distance: number): void {
         if (this.grid) {
             this.currentIdealDistance = distance;
