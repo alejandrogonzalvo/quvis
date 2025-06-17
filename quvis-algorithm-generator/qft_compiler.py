@@ -13,13 +13,6 @@ from compiler_utils import (
 def parse_args() -> argparse.Namespace:
     parser = get_common_parser("Compile a QFT circuit for a given device topology (from file) and extract interactions.")
     parser.set_defaults(output="qft_viz_data.json")
-    # Override the help text for the qubits argument
-    parser.add_argument(
-        "-q", "--qubits", 
-        type=int, 
-        default=3, 
-        help="Number of qubits for the QFT circuit (default: 3)"
-    )
     return parser.parse_args()
 
 def main():

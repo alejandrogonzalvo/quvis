@@ -39,12 +39,6 @@ def parse_args() -> argparse.Namespace:
         help="Number of QAOA repetitions/layers (p) (default: 1)"
     )
     parser.set_defaults(output="qaoa_viz_data.json")
-    parser.add_argument(
-        "-q", "--qubits", 
-        type=int, 
-        default=4, 
-        help="Number of qubits for the QAOA circuit (default: 4)"
-    )
     return parser.parse_args()
 
 def main():
