@@ -63,7 +63,7 @@ def main():
     custom_coupling_map = CouplingMap(couplinglist=coupling_map_list) if coupling_map_list else None
 
     transpile_options = {
-        "basis_gates": ["u1", "u2", "u3", "cx"],
+        "basis_gates": ['id', 'rz', 'sx', 'x', 'cx'],
         "optimization_level": 3,
     }
     if custom_coupling_map:
