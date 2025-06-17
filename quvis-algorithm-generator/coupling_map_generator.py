@@ -76,6 +76,43 @@ def create_nxn_grid_coupling_map(n: int) -> tuple[list[list[int]], int]:
     return coupling_map, num_qubits_grid
 
 
+def create_3d_grid_coupling_map(n: int) -> tuple[list[list[int]], int]:
+    """
+    Generates a coupling map for an n x n x n cubic grid of qubits.
+    Returns the coupling map and the total number of qubits.
+    Qubits are numbered layer by layer (z), then row by row (y), then column by column (x),
+    from 0 to n*n*n - 1. The index is calculated as: `z*n*n + y*n + x`.
+    """
+    if n <= 0:
+        raise ValueError("n must be a positive integer")
+    
+    num_qubits_grid = n * n * n
+    if n == 1:  # Single qubit, no connections
+        return [], num_qubits_grid
+
+    coupling_map = []
+    for i in range(num_qubits_grid):
+        z, rem = divmod(i, n * n)
+        y, x = divmod(rem, n)
+
+        # Connection in x-direction: (i) -- (i+1)
+        if x < n - 1:
+            right_neighbor = i + 1
+            coupling_map.append([i, right_neighbor])
+
+        # Connection in y-direction: (i) -- (i+n)
+        if y < n - 1:
+            down_neighbor = i + n
+            coupling_map.append([i, down_neighbor])
+
+        # Connection in z-direction: (i) -- (i+n*n)
+        if z < n - 1:
+            front_neighbor = i + n * n
+            coupling_map.append([i, front_neighbor])
+            
+    return coupling_map, num_qubits_grid
+
+
 def create_heavy_hex_coupling_map(distance: int) -> tuple[list[list[int]], int]:
     """
     Generates a coupling map for a heavy-hexagonal lattice using Qiskit's built-in function.
@@ -103,7 +140,7 @@ def main():
         "--topology",
         type=str,
         required=True,
-        choices=["ring", "grid", "heavy-hex"],
+        choices=["ring", "grid", "3d-grid", "heavy-hex"],
         help="Type of qubit topology."
     )
     parser.add_argument(
@@ -114,7 +151,7 @@ def main():
     parser.add_argument(
         "--size",
         type=int,
-        help="Dimension of the grid (e.g., N for an N x N 'grid' topology)."
+        help="Dimension of the grid (e.g., N for an N x N 'grid' or N x N x N '3d-grid' topology)."
     )
     parser.add_argument(
         "--distance",
@@ -171,6 +208,24 @@ def main():
         if not output_filename:
             output_filename = f"grid_{grid_dim}x{grid_dim}.json"
         print(f"Generated grid coupling map for a {grid_dim}x{grid_dim} grid ({total_qubits} qubits).")
+
+    elif args.topology == "3d-grid":
+        if args.size is None or args.size <= 0:
+            parser.error("--size (positive integer for N in N x N x N) is required for '3d-grid' topology.")
+        
+        grid_dim = args.size
+        cmap, total_qubits = create_3d_grid_coupling_map(grid_dim)
+        coupling_map_data = {
+            "topology_type": "3d-grid",
+            "grid_dim_x": grid_dim,
+            "grid_dim_y": grid_dim,
+            "grid_dim_z": grid_dim,
+            "num_qubits": total_qubits,
+            "coupling_map": cmap
+        }
+        if not output_filename:
+            output_filename = f"grid_3d_{grid_dim}x{grid_dim}x{grid_dim}.json"
+        print(f"Generated 3D grid coupling map for a {grid_dim}x{grid_dim}x{grid_dim} grid ({total_qubits} qubits).")
 
     elif args.topology == "heavy-hex":
         if args.distance is None or args.distance <= 0 or args.distance % 2 == 0:

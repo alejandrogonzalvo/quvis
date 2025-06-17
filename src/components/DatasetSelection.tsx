@@ -124,6 +124,14 @@ const DatasetSelection: React.FC<DatasetSelectionProps> = ({ onSelect }) => {
                 >
                     GHZ Heavy Hex
                 </button>
+                <button
+                    style={buttonStyle}
+                    onMouseOver={handleMouseOver}
+                    onMouseOut={handleMouseOut}
+                    onClick={() => onSelect("ghz_viz_data_3d.json")}
+                >
+                    GHZ 3D Grid
+                </button>
             </div>
         </div>
     );
