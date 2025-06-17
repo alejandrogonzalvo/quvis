@@ -598,13 +598,6 @@ export class QubitGrid {
             this.calculateGridLayoutPositions(numDeviceQubits);
             this.lastLayoutCalculationTime = 0; // Grid layout is instantaneous
 
-            if (this.heatmap) {
-                this.heatmap.generateClusters(
-                    this.qubitPositions,
-                    numDeviceQubits,
-                );
-            }
-
             this.createGrid(numDeviceQubits);
 
             if (this.heatmap && this.heatmap.mesh)
@@ -616,6 +609,13 @@ export class QubitGrid {
                 this.maxSlicesForHeatmap,
             );
             this.scene.add(this.heatmap.mesh);
+
+            if (this.heatmap) {
+                this.heatmap.generateClusters(
+                    this.qubitPositions,
+                    numDeviceQubits,
+                );
+            }
 
             if (this.onSlicesLoadedCallback) {
                 this.onSlicesLoadedCallback(
@@ -657,6 +657,7 @@ export class QubitGrid {
 
         const gridWidth = (cols - 1) * this.idealDist;
         const gridHeight = (rows - 1) * this.idealDist;
+        this.layoutAreaSide = Math.max(gridWidth, gridHeight);
         const startX = -gridWidth / 2;
         const startY = gridHeight / 2;
 
@@ -804,9 +805,7 @@ export class QubitGrid {
         }
 
         for (let i = 0; i < numQubitsToCreate; i++) {
-            const pos =
-                this.qubitPositions.get(i) || new THREE.Vector3(0, 0, 0);
-            this.createQubit(i, pos.x, pos.y, pos.z);
+            this.createQubit(i);
         }
         this.updateQubitOpacities();
     }
@@ -1531,14 +1530,13 @@ export class QubitGrid {
         if (this.layoutAreaSide === 0) return;
 
         let level: "high" | "medium" | "low";
-        if (cameraDistance > this.layoutAreaSide * 1.2) {
+        if (cameraDistance > this.layoutAreaSide * 3) {
             level = "low";
-        } else if (cameraDistance > this.layoutAreaSide * 0.8) {
+        } else if (cameraDistance > this.layoutAreaSide * 1.5) {
             level = "medium";
         } else {
             level = "high";
         }
-
         if (level !== this.currentLOD) {
             this.setLOD(level);
         }
@@ -1548,9 +1546,17 @@ export class QubitGrid {
         if (this.currentLOD === level) return;
         this.currentLOD = level;
 
-        Object.values(this.qubitInstances).forEach((qubit) => {
+        this.qubitInstances.forEach((qubit) => {
             qubit.setLOD(level);
         });
+
+        if (this.heatmap) {
+            if (level === "high") {
+                this.heatmap.setLOD("high");
+            } else {
+                this.heatmap.setLOD("low");
+            }
+        }
     }
 
     public applyGridLayout() {

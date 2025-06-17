@@ -196,6 +196,8 @@ export class Playground {
                 "Heatmap not immediately available after QubitGrid construction.",
             );
         }
+
+        this.animate();
     }
 
     // updateLegend() { // This method relies on DOM elements that are being removed/commented out
@@ -373,24 +375,27 @@ export class Playground {
     }
 
     animate() {
-        this.animationFrameId = requestAnimationFrame(() => this.animate());
+        this.animationFrameId = requestAnimationFrame(this.animate.bind(this));
 
-        const now = performance.now();
-        this.frameCount++;
-        if (now >= this.lastFPSTime + 1000) {
-            this.currentFPS = this.frameCount;
-            this.frameCount = 0;
-            this.lastFPSTime = now;
-        }
+        // Update FPS counter
+        this.updateFPS();
 
-        // Update LOD based on camera distance
+        this.controls.update();
+
+        // LOD update based on camera distance
         if (this.grid) {
             const distance = this.controls.getDistance();
             this.grid.updateLOD(distance);
         }
 
-        this.controls.update();
         this.renderer.render(this.scene, this.camera);
+
+        // Update camera position uniform for heatmap shader
+        if (this.grid && this.grid.heatmap) {
+            this.grid.heatmap.material.uniforms.cameraPosition.value.copy(
+                this.camera.position,
+            );
+        }
     }
 
     public get lastLayoutCalculationTime(): number {
@@ -637,6 +642,16 @@ export class Playground {
         this.areConnectionLinesVisible = visible;
         if (this.grid) {
             this.grid.setConnectionLinesVisible(visible);
+        }
+    }
+
+    private updateFPS(): void {
+        const now = performance.now();
+        this.frameCount++;
+        if (now >= this.lastFPSTime + 1000) {
+            this.currentFPS = this.frameCount;
+            this.frameCount = 0;
+            this.lastFPSTime = now;
         }
     }
 }

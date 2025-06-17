@@ -28,6 +28,12 @@ export class Qubit {
         // console.log(`Qubit ${this.id} SET state: _state AFTER: ${this._state}, typeof _state: ${typeof this._state}. (Enum string: ${State[this._state]})`);
     }
 
+    setLOD(level: "high" | "medium" | "low"): void {
+        if (this.blochSphere) {
+            this.blochSphere.setLOD(level);
+        }
+    }
+
     dispose() {
         if (this.blochSphere) {
             this.blochSphere.dispose();

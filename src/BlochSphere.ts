@@ -33,6 +33,7 @@ export class BlochSphere {
             axisGeometry,
             new THREE.MeshBasicMaterial({ color: 0x888888 }),
         );
+        zAxis.name = "zAxis";
         this.blochSphere.add(zAxis);
 
         // X-axis (horizontal)
@@ -40,6 +41,7 @@ export class BlochSphere {
             axisGeometry,
             new THREE.MeshBasicMaterial({ color: 0x888888 }),
         );
+        xAxis.name = "xAxis";
         xAxis.rotation.z = Math.PI / 2;
         this.blochSphere.add(xAxis);
 
@@ -48,6 +50,7 @@ export class BlochSphere {
             axisGeometry,
             new THREE.MeshBasicMaterial({ color: 0x888888 }),
         );
+        yAxis.name = "yAxis";
         yAxis.rotation.x = Math.PI / 2;
         this.blochSphere.add(yAxis);
 
@@ -57,6 +60,7 @@ export class BlochSphere {
             color: 0x888888,
         });
         const equator = new THREE.Mesh(equatorGeometry, equatorMaterial);
+        equator.name = "equator";
         equator.rotation.x = Math.PI / 2;
         this.blochSphere.add(equator);
 
@@ -66,7 +70,24 @@ export class BlochSphere {
             color: 0x888888,
         });
         const meridian = new THREE.Mesh(meridianGeometry, meridianMaterial);
+        meridian.name = "meridian";
         this.blochSphere.add(meridian);
+    }
+
+    public setLOD(level: "high" | "medium" | "low"): void {
+        const highDetail = level === "high";
+        const mediumDetail = level === "medium";
+
+        this.blochSphere.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+                const name = object.name;
+                if (name === "equator" || name === "meridian") {
+                    object.visible = highDetail;
+                } else if (name.endsWith("Axis")) {
+                    object.visible = highDetail || mediumDetail;
+                }
+            }
+        });
     }
 
     public setOpacity(opacity: number): void {
