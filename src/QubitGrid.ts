@@ -1489,10 +1489,6 @@ export class QubitGrid {
             this.heatmap.dispose();
         }
 
-        if (this.timeline && typeof this.timeline.dispose === "function") {
-            this.timeline.dispose();
-        }
-
         this.qubitPositions.clear();
         this.slices = [];
         this.allOperationsPerSlice = [];
