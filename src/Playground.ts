@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { QubitGrid } from "./QubitGrid.js";
+import { QubitGridController } from "./QubitGridController.js";
 
 export interface TooltipData {
     id: number;
@@ -20,7 +20,7 @@ export class Playground {
     renderer: THREE.WebGLRenderer;
     controls: OrbitControls;
     lightRig: THREE.Group<THREE.Object3DEventMap>;
-    grid: QubitGrid;
+    grid: QubitGridController;
     mouse: THREE.Vector2;
     raycaster: THREE.Raycaster;
     // Commented out direct DOM element properties for controls
@@ -177,7 +177,7 @@ export class Playground {
             this.boundOnMouseLeave,
         );
 
-        this.grid = new QubitGrid(
+        this.grid = new QubitGridController(
             this.scene,
             this.mouse,
             this.camera,
@@ -192,7 +192,11 @@ export class Playground {
             this.currentInactiveAlpha,
             this.onSlicesLoadedCallback,
         );
-        this.grid.setQubitScale(this.currentQubitSize);
+        this.grid.updateAppearanceParameters({
+            qubitSize: this.currentQubitSize,
+        });
+        this.grid.setBlochSpheresVisible(this.areBlochSpheresVisible);
+        this.grid.setConnectionLinesVisible(this.areConnectionLinesVisible);
 
         if (this.grid.heatmap) {
             this.grid.heatmap.material.uniforms.aspect.value =
@@ -484,12 +488,8 @@ export class Playground {
         // this.updateLegend(); // Legend will be a React component
         // console.log(`Playground.updateHeatmapSlices: new maxSlices = ${slices}`); // Original log, can be kept or removed
         if (this.grid) {
-            this.grid.maxSlicesForHeatmap = this.maxHeatmapSlices;
-            if (this.grid.heatmap) {
-                this.grid.heatmap.maxSlices = this.maxHeatmapSlices;
-            }
-            // console.log(`Playground.updateHeatmapSlices: QubitGrid.maxSlicesForHeatmap set to ${this.grid.maxSlicesForHeatmap}`); // Original log
-            this.grid.onCurrentSliceChange();
+            this.grid.updateHeatmapSlices(this.maxHeatmapSlices);
+            // Legend refresh is now handled internally by HeatmapManager
         } else {
             console.warn(
                 `Playground (${this.instanceId}): updateHeatmapSlices called, but this.grid is not available.`,
@@ -507,11 +507,13 @@ export class Playground {
     public recompileLayout(onLayoutComplete?: () => void) {
         if (this.grid) {
             console.log("Recompiling layout with new parameters.");
-            this.grid.recalculateLayoutAndRedraw(
-                this.currentRepelForce,
-                this.currentIdealDistance,
-                this.currentIterations,
-                this.currentCoolingFactor,
+            this.grid.updateLayoutParameters(
+                {
+                    repelForce: this.currentRepelForce,
+                    idealDistance: this.currentIdealDistance,
+                    iterations: this.currentIterations,
+                    coolingFactor: this.currentCoolingFactor,
+                },
                 () => {
                     // This callback ensures that any follow-up action
                     // happens only after the layout and redraw are complete.
@@ -582,7 +584,11 @@ export class Playground {
     // New method to be called by React components to refresh the legend
     public triggerLegendRefresh(): void {
         if (this.grid) {
-            this.grid.refreshLegend();
+            // Legend refresh is now handled internally by HeatmapManager
+            // when updateHeatmapSlices is called or during normal visualization updates
+            console.log(
+                "Legend refresh triggered - handled internally by HeatmapManager",
+            );
         } else {
             console.warn(
                 "Playground: QubitGrid (this.grid) not ready for legend refresh.",
