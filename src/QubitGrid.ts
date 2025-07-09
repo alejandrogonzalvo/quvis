@@ -1617,6 +1617,11 @@ export class QubitGrid {
                         new THREE.Vector3();
                     const blochSphere = new BlochSphere(pos.x, pos.y, pos.z);
                     qubit.blochSphere = blochSphere;
+
+                    // Set userData for tooltip detection
+                    blochSphere.blochSphere.userData.qubitId = qubit.id;
+                    blochSphere.blochSphere.userData.qubitState = qubit.state;
+
                     this.scene.add(blochSphere.blochSphere);
                 }
                 qubit.blochSphere.blochSphere.visible = true;

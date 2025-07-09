@@ -168,8 +168,14 @@ export class Playground {
         this.raycaster = new THREE.Raycaster();
 
         window.addEventListener("resize", this.onWindowResize.bind(this));
-        window.addEventListener("mousemove", this.boundOnMouseMove);
-        window.addEventListener("mouseleave", this.boundOnMouseLeave);
+        this.renderer.domElement.addEventListener(
+            "mousemove",
+            this.boundOnMouseMove,
+        );
+        this.renderer.domElement.addEventListener(
+            "mouseleave",
+            this.boundOnMouseLeave,
+        );
 
         this.grid = new QubitGrid(
             this.scene,
@@ -531,8 +537,14 @@ export class Playground {
             cancelAnimationFrame(this.animationFrameId);
         }
         window.removeEventListener("resize", this.onWindowResize.bind(this));
-        window.removeEventListener("mousemove", this.boundOnMouseMove);
-        window.removeEventListener("mouseleave", this.boundOnMouseLeave);
+        this.renderer.domElement.removeEventListener(
+            "mousemove",
+            this.boundOnMouseMove,
+        );
+        this.renderer.domElement.removeEventListener(
+            "mouseleave",
+            this.boundOnMouseLeave,
+        );
 
         if (this.controls) {
             this.controls.dispose();
