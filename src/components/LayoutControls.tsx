@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Playground } from "../Playground.js"; // Adjust path as necessary
+import type { Playground } from "../Playground.js";
+import { colors } from "../theme/colors.js";
 
 interface LayoutControlsProps {
     playground: Playground | null;
@@ -18,14 +19,14 @@ interface LayoutControlsProps {
 const basePanelStyle: React.CSSProperties = {
     position: "fixed",
     left: "20px",
-    backgroundColor: "rgba(50, 50, 50, 0.8)",
+    backgroundColor: colors.background.panel,
     padding: "15px",
     borderRadius: "8px",
-    color: "white",
+    color: colors.text.primary,
     fontFamily: "Arial, sans-serif",
     zIndex: 10,
     width: "280px",
-    boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
+    boxShadow: `0 2px 10px ${colors.shadow.light}`,
 };
 
 const controlGroupStyle: React.CSSProperties = {
@@ -51,8 +52,8 @@ const valueStyle: React.CSSProperties = {
 const buttonStyle: React.CSSProperties = {
     width: "100%",
     padding: "10px",
-    backgroundColor: "#007bff",
-    color: "white",
+    backgroundColor: colors.primary.main,
+    color: colors.text.primary,
     border: "none",
     borderRadius: "5px",
     cursor: "pointer",
@@ -64,7 +65,7 @@ const tabButtonStyle: React.CSSProperties = {
     padding: "10px 15px",
     border: "none",
     background: "none",
-    color: "white",
+    color: colors.text.primary,
     cursor: "pointer",
     fontSize: "1em",
     borderBottom: "2px solid transparent",
@@ -73,7 +74,7 @@ const tabButtonStyle: React.CSSProperties = {
 
 const activeTabButtonStyle: React.CSSProperties = {
     ...tabButtonStyle,
-    borderBottom: "2px solid #007bff",
+    borderBottom: `2px solid ${colors.primary.main}`,
     fontWeight: "bold",
 };
 
@@ -198,7 +199,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    borderBottom: "1px solid #666",
+                    borderBottom: `1px solid ${colors.border.separator}`,
                     paddingBottom: "10px",
                     marginBottom: isCollapsed ? "0" : "10px",
                 }}
@@ -209,7 +210,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                     style={{
                         background: "none",
                         border: "none",
-                        color: "white",
+                        color: colors.text.primary,
                         cursor: "pointer",
                         fontSize: "1.2em",
                         padding: "0 5px",
@@ -224,7 +225,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                     <div
                         style={{
                             display: "flex",
-                            borderBottom: "1px solid #666",
+                            borderBottom: `1px solid ${colors.border.separator}`,
                             marginBottom: "20px",
                         }}
                     >

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Playground } from "../Playground.js"; // Adjust path as necessary
+import type { Playground } from "../Playground.js";
+import { colors } from "../theme/colors.js";
 
 interface AppearanceControlsProps {
     playground: Playground | null;
@@ -21,14 +22,14 @@ const panelStyle: React.CSSProperties = {
     position: "fixed",
     top: "20px",
     left: "20px",
-    backgroundColor: "rgba(50, 50, 50, 0.8)",
+    backgroundColor: colors.background.panel,
     padding: "15px",
     borderRadius: "8px",
-    color: "white",
+    color: colors.text.primary,
     fontFamily: "Arial, sans-serif",
-    zIndex: 10, // Ensure it's above the canvas but potentially below other modals
+    zIndex: 10,
     width: "280px",
-    boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
+    boxShadow: `0 2px 10px ${colors.shadow.light}`,
 };
 
 const controlGroupStyle: React.CSSProperties = {
@@ -153,7 +154,7 @@ const AppearanceControls: React.FC<AppearanceControlsProps> = ({
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    borderBottom: "1px solid #666",
+                    borderBottom: `1px solid ${colors.border.separator}`,
                     paddingBottom: "10px",
                     marginBottom: isCollapsed ? "0" : "20px",
                 }}
@@ -162,8 +163,6 @@ const AppearanceControls: React.FC<AppearanceControlsProps> = ({
                     style={{
                         marginTop: "0",
                         marginBottom: "0",
-                        // borderBottom: "1px solid #666", // Moved to parent div
-                        // paddingBottom: "10px", // Moved to parent div
                     }}
                 >
                     Appearance
@@ -173,10 +172,11 @@ const AppearanceControls: React.FC<AppearanceControlsProps> = ({
                     style={{
                         background: "none",
                         border: "none",
-                        color: "white",
+                        color: colors.text.primary,
                         cursor: "pointer",
                         fontSize: "1.2em",
-                        padding: "0 5px",
+                        padding: "0",
+                        lineHeight: "1",
                     }}
                 >
                     {isCollapsed ? "▶" : "▼"}

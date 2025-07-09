@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Playground } from "../Playground.js";
+import type { Playground } from "../Playground.js";
 import KeyboardControlsGuide from "./KeyboardControlsGuide.js";
+import { colors } from "../theme/colors.js";
 
 interface HeatmapControlsProps {
     playground: Playground | null;
@@ -15,14 +16,14 @@ const panelStyle: React.CSSProperties = {
     position: "fixed",
     top: "20px",
     right: "20px",
-    backgroundColor: "rgba(50, 50, 50, 0.8)",
+    backgroundColor: colors.background.panel,
     padding: "15px",
     borderRadius: "8px",
-    color: "white",
+    color: colors.text.primary,
     fontFamily: "Arial, sans-serif",
     zIndex: 10,
     width: "200px",
-    boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
+    boxShadow: `0 2px 10px ${colors.shadow.light}`,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",

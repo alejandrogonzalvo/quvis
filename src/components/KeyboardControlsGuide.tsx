@@ -1,13 +1,14 @@
 import React from "react";
+import { colors } from "../theme/colors.js";
 
 // Styles for when this component is embedded
 const embeddedContainerStyle: React.CSSProperties = {
     width: "90%", // Match other elements in HeatmapControls
     padding: "10px",
     marginTop: "0px", // Legend container should have marginBottom
-    border: "1px solid rgba(255, 255, 255, 0.2)",
+    border: `1px solid ${colors.border.light}`,
     borderRadius: "4px",
-    color: "white",
+    color: colors.text.primary,
     fontFamily: "Arial, sans-serif",
     fontSize: "1em",
     textAlign: "left",
@@ -19,7 +20,7 @@ const titleStyle: React.CSSProperties = {
     fontWeight: "bold",
     marginBottom: "8px",
     textAlign: "center",
-    color: "#ddd",
+    color: colors.text.muted,
 };
 
 const controlTextStyle: React.CSSProperties = {

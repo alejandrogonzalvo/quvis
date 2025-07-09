@@ -1,4 +1,5 @@
 import React from "react";
+import { colors } from "../theme/colors.js";
 
 interface DatasetSelectionProps {
     onSelect: (datasetName: string | File) => void;
@@ -10,9 +11,9 @@ const DatasetSelection: React.FC<DatasetSelectionProps> = ({ onSelect }) => {
         margin: "20px",
         fontSize: "24px",
         cursor: "pointer",
-        backgroundColor: "#333",
-        color: "white",
-        border: "2px solid #555",
+        backgroundColor: colors.background.panelSolid,
+        color: colors.text.primary,
+        border: `2px solid ${colors.border.main}`,
         borderRadius: "10px",
         transition: "background-color 0.3s, transform 0.2s",
     };
@@ -24,46 +25,46 @@ const DatasetSelection: React.FC<DatasetSelectionProps> = ({ onSelect }) => {
         justifyContent: "center",
         height: "100vh",
         width: "100vw",
-        backgroundColor: "#121212", // Dark background
-        color: "white",
+        backgroundColor: colors.background.main,
+        color: colors.text.primary,
         fontFamily: '"Arial", sans-serif',
-        textAlign: "center", // Ensure text is centered
+        textAlign: "center",
     };
 
     const mainTitleStyle: React.CSSProperties = {
         fontSize: "72px",
         fontWeight: "bold",
-        color: "#61DAFB", // A vibrant, techy blue
-        textShadow: "3px 3px 6px #000000",
+        color: colors.primary.accent,
+        textShadow: `3px 3px 6px ${colors.shadow.text}`,
         marginBottom: "30px",
     };
 
     const subTitleStyle: React.CSSProperties = {
         fontSize: "28px",
         marginBottom: "10px",
-        color: "#eee",
-        textShadow: "2px 2px 4px #000000",
+        color: colors.text.secondary,
+        textShadow: `2px 2px 4px ${colors.shadow.text}`,
     };
 
     const infoTextStyle: React.CSSProperties = {
         fontSize: "18px",
-        color: "#aaa",
+        color: colors.text.disabled,
         marginTop: "-20px", // Pull it closer to the subtitle
         marginBottom: "50px", // Add space before buttons
     };
 
     const linkStyle: React.CSSProperties = {
-        color: "#61DAFB",
+        color: colors.primary.accent,
         textDecoration: "none",
     };
 
     const handleMouseOver = (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.currentTarget.style.backgroundColor = "#444";
+        e.currentTarget.style.backgroundColor = colors.background.hover;
         e.currentTarget.style.transform = "scale(1.05)";
     };
 
     const handleMouseOut = (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.currentTarget.style.backgroundColor = "#333";
+        e.currentTarget.style.backgroundColor = colors.background.panelSolid;
         e.currentTarget.style.transform = "scale(1)";
     };
 

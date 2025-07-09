@@ -1,6 +1,7 @@
 import React from "react";
-import * as RCSlider from "rc-slider";
+import RCSlider from "rc-slider";
 import "rc-slider/assets/index.css";
+import { colors } from "../theme/colors.js";
 
 interface PlaybackControlsProps {
     isPlaying: boolean;
@@ -34,10 +35,10 @@ const PlaybackControls: React.FC<PlaybackControlsProps> = ({
         padding: "15px",
         boxSizing: "border-box",
         zIndex: 10,
-        backgroundColor: "rgba(50, 50, 50, 0.8)",
+        backgroundColor: colors.background.panel,
         borderRadius: "8px",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
-        color: "white",
+        boxShadow: `0 2px 10px ${colors.shadow.light}`,
+        color: colors.text.primary,
         fontFamily: "Arial, sans-serif",
     };
 
@@ -55,9 +56,9 @@ const PlaybackControls: React.FC<PlaybackControlsProps> = ({
     };
 
     const buttonStyle: React.CSSProperties = {
-        background: "rgba(255, 255, 255, 0.1)",
-        color: "white",
-        border: "1px solid rgba(255, 255, 255, 0.3)",
+        background: colors.interactive.button.background,
+        color: colors.text.primary,
+        border: `1px solid ${colors.border.light}`,
         borderRadius: "4px",
         padding: "5px 10px",
         cursor: "pointer",
@@ -83,8 +84,8 @@ const PlaybackControls: React.FC<PlaybackControlsProps> = ({
     };
 
     const handleStyle: React.CSSProperties = {
-        borderColor: "#007bff",
-        backgroundColor: "#007bff",
+        borderColor: colors.primary.main,
+        backgroundColor: colors.primary.main,
         opacity: 1,
         height: 14,
         width: 14,
@@ -92,12 +93,12 @@ const PlaybackControls: React.FC<PlaybackControlsProps> = ({
     };
 
     const trackStyle: React.CSSProperties = {
-        backgroundColor: "#007bff",
+        backgroundColor: colors.primary.main,
         height: 4,
     };
 
     const railStyle: React.CSSProperties = {
-        backgroundColor: "#555",
+        backgroundColor: colors.interactive.slider.rail,
         height: 4,
     };
 

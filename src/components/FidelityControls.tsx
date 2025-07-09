@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Playground } from "../Playground.js"; // Adjusted path with .js extension
+import type { Playground } from "../Playground.js";
+import { colors } from "../theme/colors.js";
 
 interface FidelityControlsProps {
     playground: Playground | null;
@@ -57,8 +58,8 @@ const FidelityControls: React.FC<FidelityControlsProps> = ({
         position: "fixed",
         top: topPosition,
         left: "20px",
-        background: "rgba(40, 40, 40, 0.9)",
-        color: "white",
+        background: colors.background.panelAlt,
+        color: colors.text.primary,
         padding: "10px",
         borderRadius: "8px",
         width: "250px",

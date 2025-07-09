@@ -54,7 +54,7 @@ export class Timeline {
         //         marker.style.left = `${(index / (this.slices - 1)) * 100}%`;
         //         marker.style.width = "2px";
         //         marker.style.height = "20px";
-        //         marker.style.backgroundColor = "#fff";
+        //         marker.style.backgroundColor = colors.text.primary;
         //         marker.style.transform = "translateX(-1px)";
         //         this.markers.appendChild(marker);
         //     }

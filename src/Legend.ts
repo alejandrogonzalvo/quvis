@@ -1,3 +1,5 @@
+import { colors } from "./theme/colors.js";
+
 export class HeatmapLegend {
     private container: HTMLElement | null;
     private readonly containerId: string;
@@ -31,11 +33,11 @@ export class HeatmapLegend {
 
     private applyStyles() {
         this.container.style.padding = "10px";
-        this.container.style.background = "rgba(50, 50, 50, 0.8)";
+        this.container.style.background = colors.background.panel;
         this.container.style.borderRadius = "5px";
         this.container.style.fontFamily = "Arial, sans-serif";
         this.container.style.fontSize = "12px";
-        this.container.style.color = "white";
+        this.container.style.color = colors.text.primary;
         this.container.style.minWidth = "180px";
         this.container.style.marginTop = "0px";
         this.stylesApplied = true;
@@ -156,14 +158,14 @@ export class HeatmapLegend {
             <div style="margin-bottom: 5px; font-weight: bold; text-align: center;">Heatmap Legend</div>
             <div id="${titleId}" style="font-size:11px; text-align: center; margin-bottom: 8px;"></div>
             <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 5px;">
-                <div style="width: 100px; height: 15px; background: linear-gradient(to right, #00FF00, #FFFF00, #FF0000); border: 1px solid #999;"></div>
+                <div style="width: 100px; height: 15px; background: linear-gradient(to right, ${colors.visualization.heatmapGradient.start}, ${colors.visualization.heatmapGradient.middle}, ${colors.visualization.heatmapGradient.end}); border: 1px solid ${colors.visualization.legendBorder};"></div>
             </div>
             <div style="font-size: 11px; line-height: 1.4; text-align: center;">
                 <span id="${textLowId}" style="font-size: 1.2em;"></span><br>
                 <span id="${textMedId}" style="font-size: 1.2em;"></span><br>
                 <span id="${textHighId}" style="font-size: 1.2em;"></span>
             </div>
-            <div id="${subtitleId}" style="font-size: 9px; color: #ccc; margin-top: 5px; text-align: center;"></div>
+            <div id="${subtitleId}" style="font-size: 9px; color: ${colors.text.muted}; margin-top: 5px; text-align: center;"></div>
         `;
         this.container.innerHTML = htmlContent;
 

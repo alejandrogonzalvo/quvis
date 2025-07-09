@@ -12,6 +12,7 @@ import VisualizationModeSwitcher from "./components/VisualizationModeSwitcher.js
 import "./../style.css";
 import PlaybackControls from "./components/PlaybackControls.js";
 import DebugInfo from "./components/DebugInfo.js";
+import { colors } from "./theme/colors.js";
 
 const BASE_TOP_MARGIN_PX = 20;
 const INTER_PANEL_SPACING_PX = 20;
@@ -492,8 +493,8 @@ const App: React.FC = () => {
                                             bottom: "30px",
                                             left: "50%",
                                             transform: "translateX(-50%)",
-                                            color: "white",
-                                            background: "rgba(0,0,0,0.5)",
+                                            color: colors.text.primary,
+                                            background: colors.shadow.medium,
                                             padding: "10px",
                                             borderRadius: "5px",
                                         }}

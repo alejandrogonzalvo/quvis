@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback } from "react";
 import * as RCSlider from "rc-slider"; // Import as namespace
 import "rc-slider/assets/index.css";
+import { colors } from "../theme/colors.js";
 
 interface TimelineSliderProps {
     min: number;
@@ -36,10 +37,10 @@ const TimelineSlider: React.FC<TimelineSliderProps> = ({
         padding: "15px", // Matched AppearanceControls
         boxSizing: "border-box",
         zIndex: 10,
-        backgroundColor: "rgba(50, 50, 50, 0.8)", // Matched AppearanceControls
+        backgroundColor: colors.background.panel,
         borderRadius: "8px", // Matched AppearanceControls
-        boxShadow: "0 2px 10px rgba(0,0,0,0.3)", // Matched AppearanceControls
-        color: "white", // Matched AppearanceControls (for text color inheritance)
+        boxShadow: `0 2px 10px ${colors.shadow.light}`, // Matched AppearanceControls
+        color: colors.text.primary, // Matched AppearanceControls (for text color inheritance)
         fontFamily: "Arial, sans-serif", // Matched AppearanceControls
     };
 
@@ -58,9 +59,9 @@ const TimelineSlider: React.FC<TimelineSliderProps> = ({
     };
 
     const arrowButtonStyle: React.CSSProperties = {
-        background: "rgba(255, 255, 255, 0.1)",
-        color: "white",
-        border: "1px solid rgba(255, 255, 255, 0.3)",
+        background: colors.interactive.button.background,
+        color: colors.text.primary,
+        border: `1px solid ${colors.border.light}`,
         borderRadius: "4px",
         padding: "5px 10px",
         margin: "0 10px",
@@ -83,8 +84,8 @@ const TimelineSlider: React.FC<TimelineSliderProps> = ({
 
     // Custom styles for rc-slider to better fit a dark theme
     const handleStyle: React.CSSProperties = {
-        borderColor: "#007bff", // Blue border for the handle
-        backgroundColor: "#007bff", // Blue background for the handle
+        borderColor: colors.primary.main, // Blue border for the handle
+        backgroundColor: colors.primary.main, // Blue background for the handle
         opacity: 1,
         height: 18, // Slightly larger handle
         width: 18,
@@ -92,12 +93,12 @@ const TimelineSlider: React.FC<TimelineSliderProps> = ({
     };
 
     const trackStyle: React.CSSProperties = {
-        backgroundColor: "#007bff", // Blue track for the selected part
+        backgroundColor: colors.interactive.slider.selected, // Blue track for the selected part
         height: 4, // Thinner track
     };
 
     const railStyle: React.CSSProperties = {
-        backgroundColor: "#555", // Darker rail for the unselected part
+        backgroundColor: colors.interactive.slider.rail, // Darker rail for the unselected part
         height: 4, // Thinner rail
     };
 

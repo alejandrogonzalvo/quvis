@@ -1,4 +1,5 @@
 import React from "react";
+import { colors } from "../theme/colors.js";
 
 interface DebugInfoProps {
     fps: number;
@@ -14,10 +15,9 @@ const DebugInfo: React.FC<DebugInfoProps> = ({ fps, layoutTime }) => {
         padding: "15px",
         boxSizing: "border-box",
         zIndex: 10,
-        backgroundColor: "rgba(50, 50, 50, 0.8)",
+        backgroundColor: colors.background.panel,
         borderRadius: "8px",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
-        color: "white",
+        color: colors.text.primary,
         fontFamily: "Arial, sans-serif",
     };
 
