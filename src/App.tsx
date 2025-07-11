@@ -9,7 +9,6 @@ import DatasetSelection from "./components/DatasetSelection.js";
 import FidelityControls from "./components/FidelityControls.js";
 import LoadingIndicator from "./components/LoadingIndicator.js";
 import VisualizationModeSwitcher from "./components/VisualizationModeSwitcher.js";
-import "./../style.css";
 import PlaybackControls from "./components/PlaybackControls.js";
 import DebugInfo from "./components/DebugInfo.js";
 import { colors } from "./theme/colors.js";
