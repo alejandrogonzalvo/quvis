@@ -34,7 +34,7 @@ export class LayoutManager {
         };
 
         this.layoutWorker = new Worker(
-            new URL("./layoutWorker.ts", import.meta.url),
+            new URL("../../data/workers/layoutWorker.ts", import.meta.url),
             { type: "module" },
         );
     }

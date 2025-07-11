@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { colors, colorHelpers } from "./theme/colors.js";
+import { colors, colorHelpers } from "../../ui/theme/colors.js";
 
 export class BlochSphere {
     blochSphere: THREE.Group;

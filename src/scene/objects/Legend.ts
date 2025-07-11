@@ -1,4 +1,4 @@
-import { colors } from "./theme/colors.js";
+import { colors } from "../../ui/theme/colors.js";
 
 export class HeatmapLegend {
     private container: HTMLElement | null;

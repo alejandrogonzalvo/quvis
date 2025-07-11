@@ -1,5 +1,5 @@
-import { Timeline } from "./Timeline.js";
-import { Slice } from "./Slice.js";
+import { Timeline } from "../../data/models/Timeline.js";
+import { Slice } from "../../data/models/Slice.js";
 
 export class VisualizationStateManager {
     private timeline: Timeline;

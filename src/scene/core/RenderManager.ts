@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { Qubit } from "./Qubit.js";
-import { State } from "./State.js";
-import { BlochSphere } from "./BlochSphere.js";
+import { Qubit } from "../../data/models/Qubit.js";
+import { State } from "../../data/models/State.js";
+import { BlochSphere } from "../objects/BlochSphere.js";
 
 const CYLINDER_VERTEX_SHADER = `
     varying vec3 vNormal;

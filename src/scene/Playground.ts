@@ -1,21 +1,21 @@
 import * as THREE from "three";
-import { QubitGridController } from "./QubitGridController.js";
+import { QubitGridController } from "./objects/QubitGridController.js";
 import {
     ThreeSceneSetup,
     ThreeSceneComponents,
-} from "./modules/ThreeSceneSetup.js";
+} from "./interaction/modules/ThreeSceneSetup.js";
 import {
     MouseInteractionHandler,
     TooltipData,
-} from "./modules/MouseInteractionHandler.js";
-import { LayoutParameterManager } from "./modules/LayoutParameterManager.js";
-import { AppearanceParameterManager } from "./modules/AppearanceParameterManager.js";
-import { AnimationController } from "./modules/AnimationController.js";
-import { VisualizationStateManager } from "./modules/VisualizationStateManager.js";
-import { EventManager } from "./modules/EventManager.js";
+} from "./interaction/modules/MouseInteractionHandler.js";
+import { LayoutParameterManager } from "./interaction/modules/LayoutParameterManager.js";
+import { AppearanceParameterManager } from "./interaction/modules/AppearanceParameterManager.js";
+import { AnimationController } from "./interaction/modules/AnimationController.js";
+import { VisualizationStateManager } from "./interaction/modules/VisualizationStateManager.js";
+import { EventManager } from "./interaction/modules/EventManager.js";
 
 // Re-export TooltipData for backward compatibility
-export type { TooltipData } from "./modules/MouseInteractionHandler.js";
+export type { TooltipData } from "./interaction/modules/MouseInteractionHandler.js";
 
 export class Playground {
     // Core components

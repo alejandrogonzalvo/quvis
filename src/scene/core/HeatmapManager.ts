@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { Heatmap } from "./Heatmap.js";
-import { HeatmapLegend } from "./Legend.js";
+import { Heatmap } from "../objects/Heatmap.js";
+import { HeatmapLegend } from "../objects/Legend.js";
 
 export class HeatmapManager {
     private heatmap: Heatmap;

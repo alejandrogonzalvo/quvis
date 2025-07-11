@@ -1,9 +1,9 @@
 import * as THREE from "three";
-import { CircuitDataManager } from "./CircuitDataManager.js";
-import { LayoutManager } from "./LayoutManager.js";
-import { RenderManager } from "./RenderManager.js";
-import { VisualizationStateManager } from "./VisualizationStateManager.js";
-import { HeatmapManager } from "./HeatmapManager.js";
+import { CircuitDataManager } from "../../data/managers/CircuitDataManager.js";
+import { LayoutManager } from "../core/LayoutManager.js";
+import { RenderManager } from "../core/RenderManager.js";
+import { VisualizationStateManager } from "../core/VisualizationStateManager.js";
+import { HeatmapManager } from "../core/HeatmapManager.js";
 
 /**
  * QubitGridController - Refactored main class that coordinates all subsystems

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Playground, TooltipData } from "./Playground.js";
+import { Playground, TooltipData } from "../scene/Playground.js";
 import TimelineSlider from "./components/TimelineSlider.js";
 import AppearanceControls from "./components/AppearanceControls.js";
 import LayoutControls from "./components/LayoutControls.js";
