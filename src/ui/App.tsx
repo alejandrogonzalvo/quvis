@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Playground, TooltipData } from "./Playground.js";
+import { Playground, TooltipData } from "../scene/Playground.js";
 import TimelineSlider from "./components/TimelineSlider.js";
 import AppearanceControls from "./components/AppearanceControls.js";
 import LayoutControls from "./components/LayoutControls.js";
@@ -9,7 +9,6 @@ import DatasetSelection from "./components/DatasetSelection.js";
 import FidelityControls from "./components/FidelityControls.js";
 import LoadingIndicator from "./components/LoadingIndicator.js";
 import VisualizationModeSwitcher from "./components/VisualizationModeSwitcher.js";
-import "./../style.css";
 import PlaybackControls from "./components/PlaybackControls.js";
 import DebugInfo from "./components/DebugInfo.js";
 import { colors } from "./theme/colors.js";
@@ -171,9 +170,6 @@ const App: React.FC = () => {
         newSliceCount: number,
         newCurrentSliceIndex: number,
     ) => {
-        console.log(
-            `App.handleModeSwitched: newSliceCount=${newSliceCount}, newCurrentSliceIndex=${newCurrentSliceIndex}`,
-        );
         setActualSliceCount(newSliceCount);
         setMaxSliceIndex(newSliceCount > 0 ? newSliceCount - 1 : 0);
         setCurrentSliceValue(newCurrentSliceIndex);
@@ -183,34 +179,45 @@ const App: React.FC = () => {
     };
 
     const handleTooltipUpdate = (data: TooltipData | null) => {
-        if (data) {
-            let content = `Qubit ${data.id}\n`;
-            if (
-                data.oneQubitGatesInWindow !== undefined &&
-                data.twoQubitGatesInWindow !== undefined &&
-                data.sliceWindowForGateCount !== undefined
-            ) {
-                const plural1Q = data.oneQubitGatesInWindow === 1 ? "" : "s";
-                content += `1-Qubit Gate${plural1Q}: ${data.oneQubitGatesInWindow}`;
-
-                content += `\n`;
-
-                const plural2Q = data.twoQubitGatesInWindow === 1 ? "" : "s";
-                content += `2-Qubit Gate${plural2Q}: ${data.twoQubitGatesInWindow}`;
-
-                if (data.fidelity !== undefined) {
-                    content += `\nFidelity: ${data.fidelity.toFixed(4)}`;
-                }
-            } else if (data.stateName) {
-                content += `|${data.stateName}⟩`;
-            }
-            setTooltipContent(content);
-            setTooltipX(data.x);
-            setTooltipY(data.y);
-            setTooltipVisible(true);
-        } else {
+        if (!data) {
             setTooltipVisible(false);
+            return;
         }
+
+        // Helper function for pluralization
+        const pluralize = (count: number, singular: string) => {
+            return count === 1 ? singular : `${singular}s`;
+        };
+
+        let content = `Qubit ${data.id}\n`;
+        const isQubitGateData =
+            data.oneQubitGatesInWindow !== undefined &&
+            data.twoQubitGatesInWindow !== undefined &&
+            data.sliceWindowForGateCount !== undefined;
+        if (isQubitGateData) {
+            const oneQubitGateLabel = pluralize(
+                data.oneQubitGatesInWindow,
+                "1-Qubit Gate",
+            );
+            const twoQubitGateLabel = pluralize(
+                data.twoQubitGatesInWindow,
+                "2-Qubit Gate",
+            );
+
+            content += `${oneQubitGateLabel}: ${data.oneQubitGatesInWindow}\n`;
+            content += `${twoQubitGateLabel}: ${data.twoQubitGatesInWindow}`;
+
+            if (data.fidelity !== undefined) {
+                content += `\nFidelity: ${data.fidelity.toFixed(4)}`;
+            }
+        } else if (data.stateName) {
+            content += `|${data.stateName}⟩`;
+        }
+
+        setTooltipContent(content);
+        setTooltipX(data.x);
+        setTooltipY(data.y);
+        setTooltipVisible(true);
     };
 
     useEffect(() => {
@@ -508,7 +515,6 @@ const App: React.FC = () => {
                                 x={tooltipX}
                                 y={tooltipY}
                             />
-                            {/* The div for Heatmap Legend has been moved to HeatmapControls.tsx */}
                         </>
                     )}
                 </>

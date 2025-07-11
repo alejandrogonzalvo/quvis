@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { colors, colorHelpers } from "../../ui/theme/colors.js";
 
 export class BlochSphere {
     blochSphere: THREE.Group;
@@ -11,7 +12,7 @@ export class BlochSphere {
         // Main sphere (transparent)
         const sphereGeometry = new THREE.SphereGeometry(0.4, 32, 32);
         const sphereMaterial = new THREE.MeshPhongMaterial({
-            color: 0xffffff,
+            color: colorHelpers.cssColorToHex(colors.text.primary),
             transparent: true,
             opacity: this.maxMainSphereOpacity,
             side: THREE.DoubleSide,
@@ -28,27 +29,33 @@ export class BlochSphere {
             axisLength * 2,
         );
 
-        // Z-axis (vertical)
+        // Z-axis (vertical) - use theme's border color
         const zAxis = new THREE.Mesh(
             axisGeometry,
-            new THREE.MeshBasicMaterial({ color: 0x888888 }),
+            new THREE.MeshBasicMaterial({
+                color: colorHelpers.cssColorToHex(colors.border.main),
+            }),
         );
         zAxis.name = "zAxis";
         this.blochSphere.add(zAxis);
 
-        // X-axis (horizontal)
+        // X-axis (horizontal) - use theme's border color
         const xAxis = new THREE.Mesh(
             axisGeometry,
-            new THREE.MeshBasicMaterial({ color: 0x888888 }),
+            new THREE.MeshBasicMaterial({
+                color: colorHelpers.cssColorToHex(colors.border.main),
+            }),
         );
         xAxis.name = "xAxis";
         xAxis.rotation.z = Math.PI / 2;
         this.blochSphere.add(xAxis);
 
-        // Y-axis
+        // Y-axis - use theme's border color
         const yAxis = new THREE.Mesh(
             axisGeometry,
-            new THREE.MeshBasicMaterial({ color: 0x888888 }),
+            new THREE.MeshBasicMaterial({
+                color: colorHelpers.cssColorToHex(colors.border.main),
+            }),
         );
         yAxis.name = "yAxis";
         yAxis.rotation.x = Math.PI / 2;
@@ -57,7 +64,7 @@ export class BlochSphere {
         // Equatorial circle
         const equatorGeometry = new THREE.TorusGeometry(0.4, 0.005, 16, 100);
         const equatorMaterial = new THREE.MeshBasicMaterial({
-            color: 0x888888,
+            color: colorHelpers.cssColorToHex(colors.text.muted),
         });
         const equator = new THREE.Mesh(equatorGeometry, equatorMaterial);
         equator.name = "equator";
@@ -67,7 +74,7 @@ export class BlochSphere {
         // Meridian circle
         const meridianGeometry = new THREE.TorusGeometry(0.4, 0.005, 16, 100);
         const meridianMaterial = new THREE.MeshBasicMaterial({
-            color: 0x888888,
+            color: colorHelpers.cssColorToHex(colors.text.muted),
         });
         const meridian = new THREE.Mesh(meridianGeometry, meridianMaterial);
         meridian.name = "meridian";
@@ -92,26 +99,28 @@ export class BlochSphere {
 
     public setOpacity(opacity: number): void {
         this.blochSphere.traverse((object) => {
-            if (object instanceof THREE.Mesh) {
-                const material = object.material as
-                    | THREE.Material
-                    | THREE.Material[];
+            if (!(object instanceof THREE.Mesh)) {
+                return;
+            }
 
-                const applyOpacity = (mat: THREE.Material) => {
-                    mat.transparent = true;
-                    if (object.name === "mainBlochSphere") {
-                        mat.opacity = this.maxMainSphereOpacity * opacity;
-                    } else {
-                        mat.opacity = opacity;
-                    }
-                    mat.needsUpdate = true;
-                };
+            const material = object.material as
+                | THREE.Material
+                | THREE.Material[];
 
-                if (Array.isArray(material)) {
-                    material.forEach(applyOpacity);
+            const applyOpacity = (mat: THREE.Material) => {
+                mat.transparent = true;
+                if (object.name === "mainBlochSphere") {
+                    mat.opacity = this.maxMainSphereOpacity * opacity;
                 } else {
-                    applyOpacity(material);
+                    mat.opacity = opacity;
                 }
+                mat.needsUpdate = true;
+            };
+
+            if (Array.isArray(material)) {
+                material.forEach(applyOpacity);
+            } else {
+                applyOpacity(material);
             }
         });
     }
@@ -123,23 +132,22 @@ export class BlochSphere {
     }
 
     dispose() {
-        // Dispose of all geometries and materials in the blochSphere group
         this.blochSphere.traverse((object) => {
-            if (object instanceof THREE.Mesh) {
-                if (object.geometry) {
-                    object.geometry.dispose();
-                }
-                if (object.material) {
-                    if (Array.isArray(object.material)) {
-                        object.material.forEach((material) =>
-                            material.dispose(),
-                        );
-                    } else {
-                        object.material.dispose();
-                    }
+            if (!(object instanceof THREE.Mesh)) {
+                return;
+            }
+
+            if (object.geometry) {
+                object.geometry.dispose();
+            }
+
+            if (object.material) {
+                if (Array.isArray(object.material)) {
+                    object.material.forEach((material) => material.dispose());
+                } else {
+                    object.material.dispose();
                 }
             }
         });
-        // Children are removed when the group is removed from the scene, or manually if needed
     }
 }
