@@ -112,6 +112,26 @@ export const colorHelpers = {
             : null;
     },
 
+    // Convert CSS color to THREE.js hex format
+    cssColorToHex: (cssColor: string): number => {
+        // Handle hex colors
+        if (cssColor.startsWith("#")) {
+            return parseInt(cssColor.replace("#", "0x"));
+        }
+
+        // Handle rgba/rgb colors - extract RGB values and convert to hex
+        const rgbMatch = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (rgbMatch) {
+            const r = parseInt(rgbMatch[1]);
+            const g = parseInt(rgbMatch[2]);
+            const b = parseInt(rgbMatch[3]);
+            return (r << 16) | (g << 8) | b;
+        }
+
+        // Fallback to white if color format is not recognized
+        return 0xffffff;
+    },
+
     // Create rgba string with custom opacity
     withOpacity: (color: string, opacity: number): string => {
         if (color.startsWith("rgba")) {
