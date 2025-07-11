@@ -143,9 +143,7 @@ export class CircuitDataManager {
     }
 
     switchToMode(mode: "compiled" | "logical"): void {
-        console.log(`CircuitDataManager switching to mode: ${mode}`);
         this._visualizationMode = mode;
-
         let newQubitCount = 0;
 
         if (mode === "logical" && this.logicalCircuitInfo) {
@@ -216,7 +214,7 @@ export class CircuitDataManager {
             return;
         }
 
-        const chunkSize = 500; // Process 500 slices at a time
+        const chunkSize = 500;
         let startIndex = 0;
 
         const processChunk = () => {
@@ -245,35 +243,11 @@ export class CircuitDataManager {
             // Process cumulativeWeightedPairInteractions for the chunk
             const couplingMap = this.couplingMap;
             if (couplingMap) {
-                const weight_base = this.heatmapWeightBase;
-                for (const pair of couplingMap) {
-                    const q1 = Math.min(pair[0], pair[1]);
-                    const q2 = Math.max(pair[0], pair[1]);
-                    const key = `${q1}-${q2}`;
-                    const scaledCumulativeWeights =
-                        this.cumulativeWeightedPairInteractions.get(key)!;
-
-                    for (let i = startIndex; i < endIndex; i++) {
-                        const sliceInteractionPairs =
-                            this.interactionPairsPerSlice[i];
-                        let hadInteraction = 0;
-                        for (const interaction of sliceInteractionPairs) {
-                            if (
-                                (interaction.q1 === q1 &&
-                                    interaction.q2 === q2) ||
-                                (interaction.q1 === q2 && interaction.q2 === q1)
-                            ) {
-                                hadInteraction = 1;
-                                break;
-                            }
-                        }
-                        const prevScaledSum =
-                            i === 0 ? 0 : scaledCumulativeWeights[i - 1];
-                        scaledCumulativeWeights.push(
-                            prevScaledSum / weight_base + hadInteraction,
-                        );
-                    }
-                }
+                this.processCouplingMapWeightedInteractions(
+                    couplingMap,
+                    startIndex,
+                    endIndex,
+                );
             }
 
             this.slicesProcessedForHeatmap = endIndex;
@@ -290,6 +264,40 @@ export class CircuitDataManager {
         setTimeout(processChunk, 0);
     }
 
+    private processCouplingMapWeightedInteractions(
+        couplingMap: number[][],
+        startIndex: number,
+        endIndex: number,
+    ): void {
+        const weight_base = this.heatmapWeightBase;
+        for (const pair of couplingMap) {
+            const q1 = Math.min(pair[0], pair[1]);
+            const q2 = Math.max(pair[0], pair[1]);
+            const key = `${q1}-${q2}`;
+            const scaledCumulativeWeights =
+                this.cumulativeWeightedPairInteractions.get(key)!;
+
+            for (let i = startIndex; i < endIndex; i++) {
+                const sliceInteractionPairs = this.interactionPairsPerSlice[i];
+                let hadInteraction = 0;
+                for (const interaction of sliceInteractionPairs) {
+                    if (
+                        (interaction.q1 === q1 && interaction.q2 === q2) ||
+                        (interaction.q1 === q2 && interaction.q2 === q1)
+                    ) {
+                        hadInteraction = 1;
+                        break;
+                    }
+                }
+                const prevScaledSum =
+                    i === 0 ? 0 : scaledCumulativeWeights[i - 1];
+                scaledCumulativeWeights.push(
+                    prevScaledSum / weight_base + hadInteraction,
+                );
+            }
+        }
+    }
+
     getSliceCount(): number {
         return this.allOperationsPerSlice.length;
     }
@@ -302,6 +310,30 @@ export class CircuitDataManager {
             });
         }
         return interactingQubits;
+    }
+
+    private countGatesInRange(
+        startIndex: number,
+        endIndex: number,
+        qubitId: number,
+    ): [number, number] {
+        let oneQubitCount = 0;
+        let twoQubitCount = 0;
+
+        for (let i = startIndex; i <= endIndex; i++) {
+            const sliceOps = this.allOperationsPerSlice[i];
+            for (const op of sliceOps) {
+                if (op.qubits.includes(qubitId)) {
+                    if (op.qubits.length === 1) {
+                        oneQubitCount++;
+                    } else if (op.qubits.length === 2) {
+                        twoQubitCount++;
+                    }
+                }
+            }
+        }
+
+        return [oneQubitCount, twoQubitCount];
     }
 
     getGateCountForQubit(
@@ -343,41 +375,18 @@ export class CircuitDataManager {
         );
         const currentSliceEndIndex = currentSliceIndex;
 
-        // Count gates in window
-        for (let i = windowStartSliceIndex; i <= currentSliceEndIndex; i++) {
-            if (i >= 0 && i < this.allOperationsPerSlice.length) {
-                const sliceOps = this.allOperationsPerSlice[i];
-                if (sliceOps) {
-                    for (const op of sliceOps) {
-                        if (op.qubits.includes(qubitId)) {
-                            if (op.qubits.length === 1) {
-                                oneQubitGatesInWindow++;
-                            } else if (op.qubits.length === 2) {
-                                twoQubitGatesInWindow++;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        [oneQubitGatesInWindow, twoQubitGatesInWindow] = this.countGatesInRange(
+            windowStartSliceIndex,
+            currentSliceEndIndex,
+            qubitId,
+        );
 
         // Count total gates up to current slice
-        for (let i = 0; i <= currentSliceEndIndex; i++) {
-            if (i >= 0 && i < this.allOperationsPerSlice.length) {
-                const sliceOps = this.allOperationsPerSlice[i];
-                if (sliceOps) {
-                    for (const op of sliceOps) {
-                        if (op.qubits.includes(qubitId)) {
-                            if (op.qubits.length === 1) {
-                                totalOneQubitGates++;
-                            } else if (op.qubits.length === 2) {
-                                totalTwoQubitGates++;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        [totalOneQubitGates, totalTwoQubitGates] = this.countGatesInRange(
+            0,
+            currentSliceIndex,
+            qubitId,
+        );
 
         const reportedWindowForInWindowCounts =
             windowForCountsInWindow === 0 ? 1 : windowForCountsInWindow;
