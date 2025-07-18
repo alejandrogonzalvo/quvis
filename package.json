@@ -41,12 +41,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/quvis.git",
+    "url": "https://github.com/alejandrogonzalvo/quvis.git",
     "directory": "quvis/web"
   },
-  "homepage": "https://github.com/your-org/quvis",
+  "homepage": "https://github.com/alejandrogonzalvo/quvis",
   "bugs": {
-    "url": "https://github.com/your-org/quvis/issues"
+    "url": "https://github.com/alejandrogonzalvo/quvis/issues"
   },
   "keywords": [
     "quantum",
@@ -56,6 +56,6 @@
     "react",
     "circuits"
   ],
-  "author": "Alejandro Gonzalvo Hidalgo <alejandro.gonzalvo.hidalgo@cern.ch>",
+  "author": "Alejandro Gonzalvo Hidalgo <alejandro@gonzalvo.org>",
   "license": "MIT"
 }

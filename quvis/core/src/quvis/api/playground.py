@@ -360,3 +360,22 @@ class PlaygroundAPI:
             "hexagonal",
             "full",
         ]
+
+
+def generate_playground_circuit(
+    algorithm: str, num_qubits: int, topology: str, **kwargs
+) -> Dict[str, Any]:
+    """
+    Generate visualization data for playground mode.
+
+    Args:
+        algorithm: Algorithm type ('qft', 'qaoa', 'ghz')
+        num_qubits: Number of qubits (4-1000)
+        topology: Topology type
+        **kwargs: Additional parameters
+
+    Returns:
+        Visualization data dictionary
+    """
+    api = PlaygroundAPI()
+    return api.generate_visualization_data(algorithm, num_qubits, topology, **kwargs)
