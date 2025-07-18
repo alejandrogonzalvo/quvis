@@ -1,4 +1,3 @@
-import argparse
 import json
 from qiskit.converters import circuit_to_dag
 from dataclasses import dataclass, asdict
@@ -43,40 +42,6 @@ class VisualizationData:
         """Saves the data to a JSON file."""
         with open(filepath, 'w') as f:
             json.dump(asdict(self), f, separators=(',', ':'))
-
-def load_coupling_map(coupling_map_filepath: str) -> dict:
-    """Loads a coupling map from a JSON file."""
-    try:
-        with open(coupling_map_filepath, 'r') as f:
-            device_data = json.load(f)
-    except FileNotFoundError:
-        print(f"Error: Coupling map file not found at {coupling_map_filepath}")
-        return None
-    except json.JSONDecodeError:
-        print(f"Error: Could not decode JSON from {coupling_map_filepath}")
-        return None
-    return device_data
-
-def validate_coupling_map(device_data: dict, num_circuit_qubits: int, coupling_map_filepath: str) -> bool:
-    """Validates the device data and coupling map."""
-    coupling_map_list: list = device_data.get("coupling_map")
-    num_device_qubits: int = device_data.get("num_qubits")
-
-    if coupling_map_list is None or num_device_qubits is None:
-        print("Error: The coupling map file must contain 'coupling_map' (list) and 'num_qubits' (int).")
-        return False
-    if not isinstance(num_device_qubits, int) or num_device_qubits <= 0:
-        print(f"Error: 'num_qubits' in {coupling_map_filepath} must be a positive integer. Found: {num_device_qubits}")
-        return False
-    if num_circuit_qubits > num_device_qubits:
-        print(
-            f"Warning: The circuit has {num_circuit_qubits} qubits, but the device (from {coupling_map_filepath}) only has {num_device_qubits} qubits."
-        )
-        print(
-            "Compilation might fail or produce a very inefficient circuit."
-        )
-        return False
-    return True
 
 def extract_operations_per_slice(qc):
     """Extracts operations per slice from a quantum circuit."""
@@ -124,7 +89,6 @@ def extract_routing_operations_per_slice(qc):
             op = node.op
             op_name = op.name.lower()
             
-            # Check if this is a routing operation
             if op_name in routing_op_names:
                 op_qubit_indices = [qubit_indices[q] for q in node.qargs]
                 slice_routing_ops.append({
@@ -183,25 +147,3 @@ def analyze_routing_overhead(logical_circuit, compiled_circuit):
         "routing_depth": routing_depth,
         "routing_overhead_percentage": (routing_op_count / compiled_op_count * 100) if compiled_op_count > 0 else 0
     }
-
-def get_common_parser(description: str) -> argparse.ArgumentParser:
-    """Creates a common argument parser for compiler scripts."""
-    parser = argparse.ArgumentParser(description=description)
-    parser.add_argument(
-        "-q", "--qubits", 
-        type=int, 
-        default=3, 
-        help="Number of qubits for the circuit (default: 3)"
-    )
-    parser.add_argument(
-        "-c", "--coupling_map_file",
-        type=str,
-        required=True,
-        help="Path to the JSON file containing the device coupling map and info."
-    )
-    parser.add_argument(
-        "-o", "--output",
-        type=str,
-        help="Path to the output JSON file."
-    )
-    return parser 

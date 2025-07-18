@@ -23,7 +23,7 @@ visualize_circuit(qft, coupling_map, algorithm_name="My QFT")
 """
 
 # Main Library Mode Interfaces
-from .api.visualizer import QuvisVisualizer, visualize_circuit, create_example_circuit
+from .api.visualizer import QuvisVisualizer, visualize_circuit
 
 # Interactive Playground API
 from .api.playground import PlaygroundAPI
@@ -46,7 +46,6 @@ __all__ = [
     # Main Interfaces
     "QuvisVisualizer",
     "visualize_circuit", 
-    "create_example_circuit",
     
     # Playground API
     "PlaygroundAPI",
