@@ -1,0 +1,29 @@
+# Include web frontend files in the package distribution
+recursive-include quvis/web *
+recursive-include quvis/web/src *
+recursive-include quvis/web/public *
+recursive-include quvis/web/node_modules *
+
+# Include documentation
+include README.md
+include CONTRIBUTING.md
+include ARCHITECTURE.md
+
+# Include example files
+recursive-include examples *
+
+# Include configuration files
+include pyproject.toml
+include setup.py
+include package.json
+include vite.config.ts
+
+# Exclude cache and build directories
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .DS_Store
+global-exclude .git*
+global-exclude *.log
+global-exclude node_modules/.cache
+global-exclude dist
+global-exclude build 

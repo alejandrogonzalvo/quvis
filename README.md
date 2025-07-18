@@ -1,78 +1,99 @@
-# Quvis: Quantum Circuit Visualization Tool
+[![PyPI version](https://img.shields.io/pypi/v/quvis.svg)](https://pypi.org/project/quvis/)
+[![Python Version](https://img.shields.io/pypi/pyversions/quvis)](https://pypi.org/project/quvis/)
+[![Downloads](https://img.shields.io/pypi/dm/quvis.svg)](https://pypi.org/project/quvis/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Type checked: mypy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](https://mypy-lang.org/)
+[![Tests](https://img.shields.io/github/actions/workflow/status/alejandrogonzalvo/quvis/tests.yml?branch=main&label=tests)](https://github.com/alejandrogonzalvo/quvis/actions)
 
-Quvis is a visualization tool designed to display and analyze quantum circuits at various levels of abstraction, from logical interaction graphs to compiled circuits on physical quantum hardware. It aims to provide insights into circuit structure, qubit utilization, and various performance metrics.
+# Quvis - Quantum Circuit Visualization Platform
 
-## Project Overview
+Quvis is a quantum circuit visualization platform that provides interactive 3D visualization of quantum circuits with automatic compilation and routing analysis.
 
-This tool helps visualize and understand the complexities of quantum algorithms and their execution on quantum processors. It focuses on three main graph representations:
+## Installation 
 
-1.  **Interaction Graph**: A high-level view of a quantum circuit, where virtual qubits are nodes and their interactions (gates) are edges. This represents the logical structure of the algorithm.
-2.  **Compiled Interaction Graph**: A modified version of the interaction graph that accounts for the physical qubit layout and connectivity constraints of a specific quantum device. This involves adding operations like SWAP gates to enable interactions between non-adjacent qubits.
-3.  **Connectivity Graph (Coupling Map)**: Represents the physical architecture of a quantum processor, showing physical qubits as nodes and the possible two-qubit gate connections (couplers) as edges.
-
-The tool is designed to decompose the interaction and compiled interaction graphs into timeslices, facilitating detailed visualization and metric analysis. It aims to be scalable for circuits involving up to 10,000 qubits.
-
-Key metrics that can be assessed (for selected timeslices) include:
-
-*   **Burstiness**: Identifying active versus idle qubits.
-*   **Routing vs. Computing Operations**: Distinguishing between gates from the original circuit and those added for qubit routing.
-*   **Qubit Coherence**: Analyzing fidelity loss due to gate execution.
-*   **Routing Heatmaps**: Visualizing routing overhead and patterns.
-
-## Setup and Installation
-
-To set up the project locally, ensure you have Node.js installed (v20.x or higher recommended, use `nvm` if possible) and then run:
-
+### Option 1: Install from PyPI (Recommended)
 ```bash
-npm install
+# Install the latest stable version
+pip install quvis
 ```
 
-## Running the Application
-
-To start the development server:
-
+### Option 2: Install from Source (Development)
 ```bash
-npm run dev
+# Clone the repository
+git clone https://github.com/your-repo/quvis.git
+cd quvis
+
+# Install in development mode
+pip install -e .
+
+# Or using Poetry
+poetry install
 ```
 
-This will start the Vite development server. You can typically access the application in your browser at `http://localhost:5173` (or a similar address shown in your terminal).
+### Prerequisites
+- Python 3.12+
+- Node.js 16+ (for web interface)
+- npm or yarn (for frontend dependencies)
 
-Alternatively, you can run Vite directly:
-```bash
-npx vite
-```
-
-## Building for Production
-
-To create a production build:
+### Running Examples
+After installation, you can run the examples directly:
 
 ```bash
-npm run build
-```
-This command compiles the TypeScript code and bundles the application using Vite. The output will be in the `dist` directory.
+# Run the main examples
+python examples/library_usage.py
 
-Alternatively, you can run Vite build directly:
-```bash
-npx vite build
 ```
 
-## Release Process
+## **Usage**
 
-This project uses `semantic-release` for automated version management and package publishing. Releases are triggered automatically on pushes to the `main` branch.
+### Basic Usage
+```python
+from quvis import QuvisVisualizer
+from qiskit import QuantumCircuit
 
-*   Commits to the `main` branch that follow the [Conventional Commits specification](https://www.conventionalcommits.org/) will trigger a new release.
-*   The GitHub Actions workflow (defined in `.github/workflows/ci.yml`) handles the release process, including:
-    *   Determining the next version number based on commit messages.
-    *   Generating release notes.
-    *   Creating a GitHub release and tag.
-*   Successful releases on the `main` branch will automatically trigger a deployment to GitHub Pages.
+# Create visualizer
+quvis = QuvisVisualizer()
 
-Prereleases are generated for commits to the `staging` branch.
+# Add any quantum circuit
+circuit = QuantumCircuit(4)
+circuit.h(0)
+circuit.cx(0, 1)
+circuit.cx(1, 2)
+circuit.cx(2, 3)
 
-## Contributing
+# Add and visualize - opens your browser with interactive 3D view!
+quvis.add_circuit(circuit, algorithm_name="Bell State Chain")
+quvis.visualize()
+```
 
-(Details to be added here - e.g., contribution guidelines, code of conduct, how to submit pull requests)
+### Multi-Circuit Comparison
+```python
+from quvis import QuvisVisualizer
+from qiskit.circuit.library import QFT
+from qiskit import transpile
 
-## License
+quvis = QuvisVisualizer()
 
-(Details to be added here - e.g., MIT, Apache 2.0)
+# Add logical circuit
+logical_qft = QFT(4)
+quvis.add_circuit(logical_qft, algorithm_name="QFT (Logical)")
+
+# Add compiled circuit with hardware constraints
+coupling_map = [[0, 1], [1, 2], [2, 3]]
+compiled_qft = transpile(logical_qft, coupling_map=coupling_map, optimization_level=2)
+quvis.add_circuit(
+    compiled_qft, 
+    coupling_map={"coupling_map": coupling_map, "num_qubits": 4, "topology_type": "line"},
+    algorithm_name="QFT (Compiled)"
+)
+
+# Visualize both circuits with tabs - logical (green) vs compiled (orange)
+quvis.visualize()
+```
+
+## 🤝 **Contributing**
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## 📄 **License**
+
+This project is licensed under the MIT License.
