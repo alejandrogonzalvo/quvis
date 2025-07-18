@@ -7,17 +7,19 @@
 
 # Quvis - Quantum Circuit Visualization Platform
 
-Quvis is a quantum circuit visualization platform that provides interactive 3D visualization of quantum circuits with automatic compilation and routing analysis.
+Quvis is a quantum circuit visualization platform that provides interactive 3D visualization of logical and compiled circuits.
 
-## Installation 
+## Installation
 
 ### Option 1: Install from PyPI (Recommended)
+
 ```bash
 # Install the latest stable version
 pip install quvis
 ```
 
 ### Option 2: Install from Source (Development)
+
 ```bash
 # Clone the repository
 git clone https://github.com/your-repo/quvis.git
@@ -31,11 +33,13 @@ poetry install
 ```
 
 ### Prerequisites
+
 - Python 3.12+
 - Node.js 16+ (for web interface)
 - npm or yarn (for frontend dependencies)
 
 ### Running Examples
+
 After installation, you can run the examples directly:
 
 ```bash
@@ -47,6 +51,7 @@ python examples/library_usage.py
 ## **Usage**
 
 ### Basic Usage
+
 ```python
 from quvis import QuvisVisualizer
 from qiskit import QuantumCircuit
@@ -67,6 +72,7 @@ quvis.visualize()
 ```
 
 ### Multi-Circuit Comparison
+
 ```python
 from quvis import QuvisVisualizer
 from qiskit.circuit.library import QFT
@@ -82,7 +88,7 @@ quvis.add_circuit(logical_qft, algorithm_name="QFT (Logical)")
 coupling_map = [[0, 1], [1, 2], [2, 3]]
 compiled_qft = transpile(logical_qft, coupling_map=coupling_map, optimization_level=2)
 quvis.add_circuit(
-    compiled_qft, 
+    compiled_qft,
     coupling_map={"coupling_map": coupling_map, "num_qubits": 4, "topology_type": "line"},
     algorithm_name="QFT (Compiled)"
 )
@@ -92,6 +98,7 @@ quvis.visualize()
 ```
 
 ## 🤝 **Contributing**
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## 📄 **License**
