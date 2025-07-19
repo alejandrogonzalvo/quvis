@@ -5,7 +5,7 @@ This module provides the backend for the interactive playground mode,
 generating quantum circuits on-demand based on user selections.
 """
 
-import sys
+import sys, math
 from typing import Any, Dict, List
 from qiskit import QuantumCircuit
 from qiskit.circuit.library import QFT
@@ -302,14 +302,7 @@ class PlaygroundAPI:
             }
 
         elif topology == "heavy_square":
-            # Heavy square requires distance parameter
-            distance = 3  # Will give us 25 qubits
-            if num_qubits <= 7:
-                distance = 1  # 1 qubit
-            elif num_qubits <= 25:
-                distance = 3  # 25 qubits
-            elif num_qubits <= 61:
-                distance = 5  # 61 qubits
+            distance = math.ceil((1 + math.sqrt(1 + 3 * num_qubits)) / 3)
 
             coupling_map = QiskitCouplingMap.from_heavy_square(distance)
             return {
