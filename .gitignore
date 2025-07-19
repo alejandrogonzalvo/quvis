@@ -25,3 +25,4 @@ wheels/
 *.egg
 
 web/public/temp_circuit_data.json
+public/playground_circuit_data.json
