@@ -284,14 +284,10 @@ class PlaygroundAPI:
             }
 
         elif topology == "heavy_hex":
-            # Heavy hex requires distance parameter - use reasonable default
-            distance = 3  # Will give us 19 qubits
-            if num_qubits <= 7:
-                distance = 1  # 1 qubit
-            elif num_qubits <= 19:
-                distance = 3  # 19 qubits
-            elif num_qubits <= 37:
-                distance = 5  # 37 qubits
+            distance = math.ceil((2 + math.sqrt(24 + 40 * num_qubits)) / 10)
+
+            if distance % 2 == 0:
+                distance += 1
 
             coupling_map = QiskitCouplingMap.from_heavy_hex(distance)
             return {
@@ -303,6 +299,9 @@ class PlaygroundAPI:
 
         elif topology == "heavy_square":
             distance = math.ceil((1 + math.sqrt(1 + 3 * num_qubits)) / 3)
+
+            if distance % 2 == 0:
+                distance += 1
 
             coupling_map = QiskitCouplingMap.from_heavy_square(distance)
             return {
