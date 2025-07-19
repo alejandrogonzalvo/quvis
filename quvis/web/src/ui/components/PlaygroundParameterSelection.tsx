@@ -365,7 +365,7 @@ const PlaygroundParameterSelection: React.FC<
                     }
                 `}
             </style>
-            <h1 style={mainTitleStyle}>QuViS</h1>
+            <h1 style={mainTitleStyle}>Quvis</h1>
             <p style={versionStyle}>
                 Version 0.17.1 <br />
                 Made by{' '}

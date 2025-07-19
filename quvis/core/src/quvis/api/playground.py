@@ -5,8 +5,9 @@ This module provides the backend for the interactive playground mode,
 generating quantum circuits on-demand based on user selections.
 """
 
-import sys, math
+import sys, math, json, os, argparse
 from typing import Any, Dict, List
+from pathlib import Path
 from qiskit import QuantumCircuit
 from qiskit.circuit.library import QFT
 from qiskit.transpiler import CouplingMap as QiskitCouplingMap
@@ -358,16 +359,76 @@ def generate_playground_circuit(
     algorithm: str, num_qubits: int, topology: str, **kwargs
 ) -> Dict[str, Any]:
     """
-    Generate visualization data for playground mode.
-
-    Args:
-        algorithm: Algorithm type ('qft', 'qaoa', 'ghz')
-        num_qubits: Number of qubits (4-1000)
-        topology: Topology type
-        **kwargs: Additional parameters
-
-    Returns:
-        Visualization data dictionary
+    High-level function to generate a playground circuit.
     """
     api = PlaygroundAPI()
     return api.generate_visualization_data(algorithm, num_qubits, topology, **kwargs)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate a quantum circuit for the Quvis playground."
+    )
+    parser.add_argument(
+        "--algorithm", required=True, type=str, help="The algorithm to use."
+    )
+    parser.add_argument(
+        "--num-qubits", required=True, type=int, help="The number of qubits."
+    )
+    parser.add_argument(
+        "--topology", required=True, type=str, help="The circuit topology."
+    )
+    parser.add_argument(
+        "--optimization-level", type=int, default=1, help="The optimization level."
+    )
+    args = parser.parse_args()
+
+    # Generate circuit with the API
+    try:
+        print(
+            f"INFO: Generating circuit - algorithm: {args.algorithm}, qubits: {args.num_qubits}, topology: {args.topology}",
+            file=sys.stderr,
+        )
+
+        result = generate_playground_circuit(
+            algorithm=args.algorithm,
+            num_qubits=args.num_qubits,
+            topology=args.topology,
+            optimization_level=args.optimization_level,
+        )
+
+        # Add generation success flag
+        result["generation_successful"] = True
+
+        # Save to public directory for frontend
+        cwd = Path(os.getcwd())
+        output_path = cwd / "quvis/web/public/playground_circuit_data.json"
+
+        try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, "w") as f:
+                json.dump(result, f, separators=(",", ":"))
+            print(f"INFO: Saved circuit data to: {output_path}", file=sys.stderr)
+        except (OSError, IOError) as e:
+            print(
+                f"WARNING: Could not save circuit data to {output_path}: {e}",
+                file=sys.stderr,
+            )
+
+        print(f"INFO: Circuit generation completed successfully", file=sys.stderr)
+
+        # Output result to stdout (this MUST be the last print to stdout)
+        print(json.dumps(result, separators=(",", ":")))
+
+    except Exception as e:
+        print(f"ERROR: Circuit generation failed: {e}", file=sys.stderr)
+        import traceback
+
+        print(f"ERROR: Traceback: {traceback.format_exc()}", file=sys.stderr)
+        error_result = {"generation_successful": False, "error": str(e)}
+        print(json.dumps(error_result, separators=(",", ":")))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

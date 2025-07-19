@@ -1,7 +1,7 @@
 """
-QuViS API Module
+Quvis API Module
 
-This module contains the main API interfaces for the QuViS library.
+This module contains the main API interfaces for the Quvis library.
 """
 
 from .visualizer import QuvisVisualizer, visualize_circuit

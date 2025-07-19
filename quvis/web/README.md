@@ -1,6 +1,6 @@
-# QuViS Web Interface
+# Quvis Web Interface
 
-Interactive web client for QuViS quantum circuit visualization built with React and Three.js.
+Interactive web client for Quvis quantum circuit visualization built with React and Three.js.
 
 ## 🚀 **Quick Start**
 
@@ -17,24 +17,28 @@ npm run dev
 ## 🎯 **Features**
 
 ### **Interactive Circuit Generation**
+
 - Real-time parameter selection
 - Multiple quantum algorithms (QFT, GHZ, QAOA)
 - Various hardware topologies
 - Optimization level control
 
 ### **3D Visualization**
+
 - **Three.js** powered 3D rendering
 - Interactive timeline controls
 - Multiple visualization modes
 - Customizable appearance
 
 ### **Performance Monitoring**
+
 - Real-time FPS display
 - Rendering statistics
 - Layout calculation timing
 - Memory usage tracking
 
 ### **Responsive Design**
+
 - Desktop and mobile support
 - Collapsible control panels
 - Keyboard shortcuts
@@ -65,18 +69,21 @@ src/
 ## 🎮 **User Interface**
 
 ### **Parameter Selection**
+
 - Circuit type selection (QFT, GHZ, QAOA)
 - Qubit count slider (4-1000)
 - Topology selection (line, grid, heavy-hex)
 - Optimization level control
 
 ### **Visualization Controls**
+
 - **Timeline**: Step through circuit execution
 - **Appearance**: Customize colors, sizes, transparency
 - **Layout**: Adjust 3D positioning algorithms
 - **Fidelity**: Simulate quantum noise effects
 
 ### **Keyboard Shortcuts**
+
 - `Space`: Play/pause timeline
 - `0`: Reset camera view
 - `H`: Toggle UI visibility
@@ -85,11 +92,13 @@ src/
 ## 🔧 **Development**
 
 ### **Prerequisites**
+
 - Node.js 18+
 - npm or yarn
 - Modern web browser
 
 ### **Setup**
+
 ```bash
 # Install dependencies
 npm install
@@ -105,6 +114,7 @@ npm run build
 ```
 
 ### **Code Style**
+
 - **ESLint**: Code linting
 - **Prettier**: Code formatting
 - **TypeScript**: Type checking
@@ -113,12 +123,14 @@ npm run build
 ## 📊 **Performance**
 
 ### **Optimization Features**
+
 - **Caching**: Intelligent circuit data caching
 - **Lazy Loading**: Component lazy loading
 - **Memory Management**: Efficient Three.js cleanup
 - **Responsive Rendering**: Adaptive frame rates
 
 ### **Monitoring**
+
 - Real-time FPS display
 - Memory usage tracking
 - Render time statistics
@@ -140,12 +152,15 @@ npm run test:ui
 ## 🌐 **Deployment**
 
 ### **Production Build**
+
 ```bash
 npm run build
 ```
 
 ### **Static Hosting**
+
 The built application can be deployed to any static hosting service:
+
 - GitHub Pages
 - Netlify
 - Vercel
@@ -154,12 +169,15 @@ The built application can be deployed to any static hosting service:
 ## 🔌 **Integration**
 
 ### **API Integration**
-The web interface communicates with the QuViS core library via:
+
+The web interface communicates with the Quvis core library via:
+
 - `/api/generate-circuit` endpoint
 - Real-time circuit compilation
 - Cached result retrieval
 
 ### **Data Flow**
+
 1. User selects parameters
 2. Web interface sends request to core API
 3. Core library compiles quantum circuit
@@ -169,6 +187,7 @@ The web interface communicates with the QuViS core library via:
 ## 🤝 **Contributing**
 
 Areas for contribution:
+
 - **UI/UX**: Improve user interface and experience
 - **Visualization**: Enhance 3D rendering and effects
 - **Performance**: Optimize rendering and memory usage
@@ -179,8 +198,8 @@ See [CONTRIBUTING.md](../../CONTRIBUTING.md) for guidelines.
 
 ## 📄 **License**
 
-This project is part of QuViS and is licensed under the MIT License.
+This project is part of Quvis and is licensed under the MIT License.
 
 ---
 
-**QuViS Web** - Making quantum circuits interactive and accessible. 
+**Quvis Web** - Making quantum circuits interactive and accessible.

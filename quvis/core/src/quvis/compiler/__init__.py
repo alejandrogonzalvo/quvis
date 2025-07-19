@@ -1,5 +1,5 @@
 """
-QuViS Compiler Module
+Quvis Compiler Module
 
 This module contains quantum circuit compilation utilities and data structures.
 """
