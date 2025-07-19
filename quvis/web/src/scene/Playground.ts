@@ -1,21 +1,21 @@
-import * as THREE from "three";
-import { QubitGridController } from "./objects/QubitGridController.js";
+import * as THREE from 'three';
+import { QubitGridController } from './objects/QubitGridController.js';
 import {
     ThreeSceneSetup,
     ThreeSceneComponents,
-} from "./interaction/modules/ThreeSceneSetup.js";
+} from './interaction/modules/ThreeSceneSetup.js';
 import {
     MouseInteractionHandler,
     TooltipData,
-} from "./interaction/modules/MouseInteractionHandler.js";
-import { LayoutParameterManager } from "./interaction/modules/LayoutParameterManager.js";
-import { AppearanceParameterManager } from "./interaction/modules/AppearanceParameterManager.js";
-import { AnimationController } from "./interaction/modules/AnimationController.js";
-import { VisualizationStateManager } from "./interaction/modules/VisualizationStateManager.js";
-import { EventManager } from "./interaction/modules/EventManager.js";
+} from './interaction/modules/MouseInteractionHandler.js';
+import { LayoutParameterManager } from './interaction/modules/LayoutParameterManager.js';
+import { AppearanceParameterManager } from './interaction/modules/AppearanceParameterManager.js';
+import { AnimationController } from './interaction/modules/AnimationController.js';
+import { VisualizationStateManager } from './interaction/modules/VisualizationStateManager.js';
+import { EventManager } from './interaction/modules/EventManager.js';
 
 // Re-export TooltipData for backward compatibility
-export type { TooltipData } from "./interaction/modules/MouseInteractionHandler.js";
+export type { TooltipData } from './interaction/modules/MouseInteractionHandler.js';
 
 export class Playground {
     // Core components
@@ -33,28 +33,24 @@ export class Playground {
 
     // Instance properties
     public readonly instanceId: string;
-    private readonly datasetName: string;
     private containerElement: HTMLElement | null = null;
 
     constructor(
         container: HTMLElement | undefined,
-        datasetNameOrData: string | object,
-        visualizationMode: "compiled" | "logical",
+        data: object,
+        visualizationMode: 'compiled' | 'logical',
         onSlicesLoadedCallback?: (count: number, initialIndex: number) => void,
         onTooltipUpdate?: (data: TooltipData | null) => void,
         onModeSwitchedCallback?: (
             newSliceCount: number,
-            newCurrentSliceIndex: number,
-        ) => void,
+            newCurrentSliceIndex: number
+        ) => void
     ) {
         this.containerElement = container || null;
-        this.datasetName = typeof datasetNameOrData === 'string' 
-            ? datasetNameOrData 
-            : 'library_mode_circuit';
         this.instanceId = `PlaygroundInstance_${Math.random().toString(36).substr(2, 9)}`;
 
         console.log(
-            `Playground constructor called. Instance ID: ${this.instanceId}`,
+            `Playground constructor called. Instance ID: ${this.instanceId}`
         );
 
         // Initialize modules
@@ -65,7 +61,7 @@ export class Playground {
             this.containerElement,
             this.threeComponents.camera,
             this.threeComponents.scene,
-            onTooltipUpdate,
+            onTooltipUpdate
         );
 
         this.layoutManager = new LayoutParameterManager();
@@ -75,7 +71,7 @@ export class Playground {
             this.threeComponents.scene,
             this.threeComponents.camera,
             this.threeComponents.renderer,
-            this.threeComponents.controls,
+            this.threeComponents.controls
         );
 
         this.visualizationStateManager = new VisualizationStateManager(
@@ -84,13 +80,13 @@ export class Playground {
             0.99, // oneQubitFidelityBase
             0.98, // twoQubitFidelityBase
             onModeSwitchedCallback,
-            onSlicesLoadedCallback,
+            onSlicesLoadedCallback
         );
 
         this.eventManager = new EventManager(
             this.containerElement,
             this.threeComponents.camera,
-            this.threeComponents.renderer,
+            this.threeComponents.renderer
         );
 
         // Initialize event handlers
@@ -102,7 +98,7 @@ export class Playground {
             this.threeComponents.scene,
             this.mouseHandler.getMouse(),
             this.threeComponents.camera,
-            datasetNameOrData,  // Pass the original parameter (string or object)
+            data, // Pass the data object directly
             this.visualizationStateManager.getVisualizationMode(),
             this.visualizationStateManager.getMaxHeatmapSlices(),
             this.layoutManager.getRepelForce(),
@@ -111,7 +107,7 @@ export class Playground {
             this.layoutManager.getCoolingFactor(),
             this.appearanceManager.getConnectionThickness(),
             this.appearanceManager.getInactiveAlpha(),
-            onSlicesLoadedCallback,
+            onSlicesLoadedCallback
         );
 
         // Set up grid references in modules
@@ -124,10 +120,10 @@ export class Playground {
             qubitSize: this.appearanceManager.getQubitSize(),
         });
         this.grid.setBlochSpheresVisible(
-            this.appearanceManager.areBlochSpheresVisible(),
+            this.appearanceManager.areBlochSpheresVisible()
         );
         this.grid.setConnectionLinesVisible(
-            this.appearanceManager.areConnectionLinesVisible(),
+            this.appearanceManager.areConnectionLinesVisible()
         );
 
         // Set up heatmap aspect ratio
@@ -170,7 +166,7 @@ export class Playground {
     public animate(): void {
         // Animation is already started in constructor, this is for compatibility
         if (!this.animationController) {
-            console.warn("Animation controller not available");
+            console.warn('Animation controller not available');
         }
     }
 
@@ -230,7 +226,7 @@ export class Playground {
             iterations?: number;
             coolingFactor?: number;
         },
-        onLayoutComplete?: () => void,
+        onLayoutComplete?: () => void
     ) {
         const updatedParams = this.layoutManager.updateParameters(params);
         if (this.grid) {
@@ -240,13 +236,13 @@ export class Playground {
 
     public recompileLayout(onLayoutComplete?: () => void) {
         if (this.grid) {
-            console.log("Recompiling layout with new parameters.");
+            console.log('Recompiling layout with new parameters.');
             this.grid.updateLayoutParameters(
                 this.layoutManager.getParameters(),
                 () => {
-                    console.log("Layout recompile finished.");
+                    console.log('Layout recompile finished.');
                     onLayoutComplete?.();
-                },
+                }
             );
         } else {
             onLayoutComplete?.();
@@ -305,14 +301,14 @@ export class Playground {
     // Visualization methods
     public updateHeatmapSlices(slices: number) {
         console.log(
-            `Playground (${this.instanceId}): updateHeatmapSlices ENTERED with slices = ${slices}`,
+            `Playground (${this.instanceId}): updateHeatmapSlices ENTERED with slices = ${slices}`
         );
         this.visualizationStateManager.setMaxHeatmapSlices(slices);
         if (this.grid) {
             this.grid.updateHeatmapSlices(slices);
         } else {
             console.warn(
-                `Playground (${this.instanceId}): updateHeatmapSlices called, but this.grid is not available.`,
+                `Playground (${this.instanceId}): updateHeatmapSlices called, but this.grid is not available.`
             );
         }
     }
@@ -331,7 +327,7 @@ export class Playground {
             const newCurrentSliceIndex = this.grid.getActiveCurrentSliceIndex();
             this.visualizationStateManager.notifyModeSwitched(
                 newSliceCount,
-                newCurrentSliceIndex,
+                newCurrentSliceIndex
             );
         }
         console.log(`Playground switched to circuit: ${circuitIndex}`);
@@ -356,11 +352,11 @@ export class Playground {
     public triggerLegendRefresh(): void {
         if (this.grid) {
             console.log(
-                "Legend refresh triggered - handled internally by HeatmapManager",
+                'Legend refresh triggered - handled internally by HeatmapManager'
             );
         } else {
             console.warn(
-                "Playground: QubitGrid (this.grid) not ready for legend refresh.",
+                'Playground: QubitGrid (this.grid) not ready for legend refresh.'
             );
         }
     }
@@ -387,7 +383,7 @@ export class Playground {
                     if (object.material) {
                         if (Array.isArray(object.material)) {
                             object.material.forEach((material) =>
-                                material.dispose(),
+                                material.dispose()
                             );
                         } else {
                             object.material.dispose();
@@ -397,6 +393,6 @@ export class Playground {
             });
         }
 
-        console.log("Playground disposed");
+        console.log('Playground disposed');
     }
 }

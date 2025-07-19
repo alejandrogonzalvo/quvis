@@ -42,7 +42,7 @@ export class QubitGridController {
         scene: THREE.Scene,
         mouse: THREE.Vector2,
         camera: THREE.PerspectiveCamera,
-        datasetNameOrData: string | object,
+        data: any, // Change to 'any' to handle the object type
         visualizationMode: 'compiled' | 'logical',
         initialMaxSlicesForHeatmap: number = 10,
         initialKRepel: number = 0.3,
@@ -87,7 +87,7 @@ export class QubitGridController {
         );
 
         // Load initial data
-        this.loadData(datasetNameOrData);
+        this.loadData(data);
     }
 
     // Public API methods (maintaining backward compatibility)
@@ -477,19 +477,12 @@ export class QubitGridController {
 
     // Private methods
 
-    private async loadData(datasetNameOrData: string | object): Promise<void> {
+    private async loadData(data: any): Promise<void> {
+        console.log('loadData called with data:', data);
         try {
-            if (typeof datasetNameOrData === 'string') {
-                const dataUrl = datasetNameOrData.endsWith('.json')
-                    ? `/quvis/${datasetNameOrData}`
-                    : `/quvis/${datasetNameOrData}_viz_data.json`;
-                await this.dataManager.loadDataFile(dataUrl);
-            } else if (
-                datasetNameOrData &&
-                typeof datasetNameOrData === 'object'
-            ) {
+            if (data && typeof data === 'object') {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                this.dataManager.loadData(datasetNameOrData as any);
+                this.dataManager.loadData(data.circuits);
             }
 
             await this.initializeAfterDataLoad();

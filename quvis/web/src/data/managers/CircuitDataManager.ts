@@ -18,30 +18,25 @@ interface DeviceInfo {
     connectivity_graph_coupling_map: number[][];
 }
 
-// Multi-circuit data format
-interface MultiCircuitData {
-    circuits: Array<{
-        circuit_info: LogicalCircuitInfo | CompiledCircuitInfo;
-        device_info: DeviceInfo;
-        algorithm_name: string;
-        circuit_type: 'logical' | 'compiled';
-        circuit_stats: {
-            original_gates?: number;
-            transpiled_gates?: number;
-            depth: number;
-            qubits: number;
-            swap_count?: number;
-        };
-        routing_info?: any;
-        routing_analysis?: any;
-        algorithm_params?: any;
-    }>;
-    total_circuits: number;
+interface Circuit {
+    circuit_info: LogicalCircuitInfo | CompiledCircuitInfo;
+    device_info: DeviceInfo;
+    algorithm_name: string;
+    circuit_type: 'logical' | 'compiled';
+    circuit_stats: {
+        original_gates?: number;
+        transpiled_gates?: number;
+        depth: number;
+        qubits: number;
+        swap_count?: number;
+    };
+    routing_info?: any;
+    routing_analysis?: any;
+    algorithm_params?: any;
 }
 
 export class CircuitDataManager {
-    // Multi-circuit data stores
-    private multiCircuitData: MultiCircuitData | null = null;
+    private circuits: Circuit[] | null = null;
     private _currentCircuitIndex: number = 0;
 
     // Active data based on current circuit
@@ -81,9 +76,8 @@ export class CircuitDataManager {
     }
 
     get couplingMap(): number[][] {
-        if (this.multiCircuitData) {
-            const currentCircuit =
-                this.multiCircuitData.circuits[this._currentCircuitIndex];
+        if (this.circuits) {
+            const currentCircuit = this.circuits[this._currentCircuitIndex];
             return (
                 currentCircuit?.device_info?.connectivity_graph_coupling_map ||
                 []
@@ -93,9 +87,8 @@ export class CircuitDataManager {
     }
 
     get deviceQubitCount(): number {
-        if (this.multiCircuitData) {
-            const currentCircuit =
-                this.multiCircuitData.circuits[this._currentCircuitIndex];
+        if (this.circuits) {
+            const currentCircuit = this.circuits[this._currentCircuitIndex];
             return currentCircuit?.device_info?.num_qubits_on_device || 0;
         }
         return 0;
@@ -106,7 +99,7 @@ export class CircuitDataManager {
     }
 
     get totalCircuits(): number {
-        return this.multiCircuitData?.circuits.length || 0;
+        return this.circuits?.length || 0;
     }
 
     get currentCircuitIndex(): number {
@@ -114,12 +107,12 @@ export class CircuitDataManager {
     }
 
     get currentCircuitInfo() {
-        if (!this.multiCircuitData) return null;
-        return this.multiCircuitData.circuits[this._currentCircuitIndex];
+        if (!this.circuits) return null;
+        return this.circuits[this._currentCircuitIndex];
     }
 
     get allCircuitsInfo() {
-        return this.multiCircuitData?.circuits || [];
+        return this.circuits || [];
     }
 
     get processedSlicesCount(): number {
@@ -144,23 +137,22 @@ export class CircuitDataManager {
                 );
             }
             const jsonData = await response.json();
-            this.processMultiCircuitData(jsonData as MultiCircuitData);
+            this.processCircuitData(jsonData as Circuit[]);
         } catch (error) {
             console.error('Error loading data file:', error);
             throw error;
         }
     }
 
-    loadData(data: MultiCircuitData): void {
-        this.processMultiCircuitData(data);
+    loadData(data: Circuit[]): void {
+        this.processCircuitData(data);
     }
 
-    private processMultiCircuitData(data: MultiCircuitData): void {
+    private processCircuitData(data: Circuit[]): void {
         this.clearData();
 
-        console.log('Processing multi-circuit data:', data);
-
-        this.multiCircuitData = data;
+        console.log('data:', data);
+        this.circuits = data;
         this._currentCircuitIndex = 0;
 
         // Load the first circuit
@@ -168,27 +160,10 @@ export class CircuitDataManager {
     }
 
     switchToCircuit(circuitIndex: number): void {
-        if (!this.multiCircuitData) {
-            console.warn('No multi-circuit data available');
-            return;
-        }
-
-        if (
-            circuitIndex < 0 ||
-            circuitIndex >= this.multiCircuitData.circuits.length
-        ) {
-            console.warn('Invalid circuit index');
-            return;
-        }
-
         this._currentCircuitIndex = circuitIndex;
-        const circuit = this.multiCircuitData.circuits[circuitIndex];
+        const circuit = this.circuits[circuitIndex];
 
-        console.log(
-            `Switching to circuit ${circuitIndex}: ${circuit.algorithm_name} (${circuit.circuit_type})`
-        );
-
-        // Set qubit count based on circuit type
+        console.log('circuit:', circuit);
         if (circuit.circuit_type === 'logical') {
             this._qubit_count = (
                 circuit.circuit_info as LogicalCircuitInfo
@@ -493,7 +468,7 @@ export class CircuitDataManager {
     }
 
     clearData(): void {
-        this.multiCircuitData = null;
+        this.circuits = null;
         this._currentCircuitIndex = 0;
         this.allOperationsPerSlice = [];
         this._interactionPairsPerSlice = [];
