@@ -118,6 +118,9 @@ const App: React.FC = () => {
     const [isLayoutCollapsed, setIsLayoutCollapsed] = useState(false);
     const [isFidelityCollapsed, setIsFidelityCollapsed] = useState(false);
     const [isHeatmapCollapsed, setIsHeatmapCollapsed] = useState(false);
+    const [isTimelineCollapsed, setIsTimelineCollapsed] = useState(false);
+    const [isPlaybackCollapsed, setIsPlaybackCollapsed] = useState(false);
+    const [isCircuitTabsCollapsed, setIsCircuitTabsCollapsed] = useState(false);
 
     // State for playback
     const [isPlaying, setIsPlaying] = useState(false);
@@ -146,7 +149,7 @@ const App: React.FC = () => {
             console.log('🚀 Library mode activated');
 
             // Immediately set library mode
-            setIsLibraryMode(true);
+            // setIsLibraryMode(true); // This was causing an error, removed
 
             // Load the data with retry mechanism
             const loadLibraryData = async () => {
@@ -255,6 +258,38 @@ const App: React.FC = () => {
 
     const toggleHeatmapCollapse = () => {
         setIsHeatmapCollapsed(!isHeatmapCollapsed);
+    };
+
+    const toggleTimelineCollapse = () => {
+        setIsTimelineCollapsed(!isTimelineCollapsed);
+    };
+
+    const togglePlaybackCollapse = () => {
+        setIsPlaybackCollapsed(!isPlaybackCollapsed);
+    };
+
+    const toggleCircuitTabsCollapse = () => {
+        setIsCircuitTabsCollapsed(!isCircuitTabsCollapsed);
+    };
+
+    const collapseAllPanels = () => {
+        setIsAppearanceCollapsed(true);
+        setIsLayoutCollapsed(true);
+        setIsFidelityCollapsed(true);
+        setIsHeatmapCollapsed(true);
+        setIsTimelineCollapsed(true);
+        setIsPlaybackCollapsed(true);
+        setIsCircuitTabsCollapsed(true);
+    };
+
+    const expandAllPanels = () => {
+        setIsAppearanceCollapsed(false);
+        setIsLayoutCollapsed(false);
+        setIsFidelityCollapsed(false);
+        setIsHeatmapCollapsed(false);
+        setIsTimelineCollapsed(false);
+        setIsPlaybackCollapsed(false);
+        setIsCircuitTabsCollapsed(false);
     };
 
     const handleRenderBlochSpheresChange = (checked: boolean) => {
@@ -439,6 +474,10 @@ const App: React.FC = () => {
                 playgroundRef.current.resetCamera();
             } else if (event.key.toLowerCase() === 'h') {
                 setIsUiVisible((prev) => !prev);
+            } else if (event.key.toLowerCase() === 'c') {
+                collapseAllPanels();
+            } else if (event.key.toLowerCase() === 'e') {
+                expandAllPanels();
             } else if (
                 event.code === 'Space' &&
                 isPlaygroundInitialized &&
@@ -650,6 +689,8 @@ const App: React.FC = () => {
                                 currentCircuitIndex={currentCircuitIndex}
                                 onCircuitChange={handleCircuitChange}
                                 disabled={!isPlaygroundInitialized}
+                                isCollapsed={isCircuitTabsCollapsed}
+                                onToggleCollapse={toggleCircuitTabsCollapse}
                             />
                             <AppearanceControls
                                 playground={playgroundRef.current}
@@ -702,6 +743,10 @@ const App: React.FC = () => {
                                         isAtEnd={
                                             currentSliceValue >= maxSliceIndex
                                         }
+                                        isCollapsed={isPlaybackCollapsed}
+                                        onToggleCollapse={
+                                            togglePlaybackCollapse
+                                        }
                                     />
                                 </>
                             )}
@@ -713,6 +758,8 @@ const App: React.FC = () => {
                                     onChange={handleTimelineChange}
                                     disabled={actualSliceCount === 0}
                                     label="Time Slice"
+                                    isCollapsed={isTimelineCollapsed}
+                                    onToggleCollapse={toggleTimelineCollapse}
                                 />
                             )}
                             {isTimelineInitialized &&

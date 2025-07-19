@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import * as RCSlider from 'rc-slider'; // Import as namespace
 import 'rc-slider/assets/index.css';
 import { colors } from '../theme/colors.js';
@@ -10,6 +10,8 @@ interface TimelineSliderProps {
     onChange: (newValue: number) => void;
     disabled: boolean;
     label?: string;
+    isCollapsed: boolean;
+    onToggleCollapse: () => void;
 }
 
 // Determine the actual slider component, trying to access .default for CJS/ESM interop
@@ -26,12 +28,12 @@ const TimelineSlider: React.FC<TimelineSliderProps> = ({
     onChange,
     disabled,
     label,
+    isCollapsed,
+    onToggleCollapse,
 }) => {
-    const [isVisible, setIsVisible] = useState(true);
-
     const containerStyle: React.CSSProperties = {
         position: 'fixed',
-        bottom: isVisible ? '30px' : '10px',
+        bottom: isCollapsed ? '10px' : '30px',
         left: '50%',
         transform: 'translateX(-50%)',
         width: '80%',
@@ -61,9 +63,9 @@ const TimelineSlider: React.FC<TimelineSliderProps> = ({
 
     const contentWrapperStyle: React.CSSProperties = {
         transition: 'all 0.3s ease-in-out',
-        maxHeight: isVisible ? '100px' : '0',
+        maxHeight: isCollapsed ? '0' : '100px',
         overflow: 'hidden',
-        opacity: isVisible ? 1 : 0,
+        opacity: isCollapsed ? 0 : 1,
     };
 
     const topLabelStyle: React.CSSProperties = {
@@ -176,11 +178,8 @@ const TimelineSlider: React.FC<TimelineSliderProps> = ({
 
     return (
         <div style={containerStyle}>
-            <button
-                onClick={() => setIsVisible(!isVisible)}
-                style={toggleButtonStyle}
-            >
-                {isVisible ? '▼' : '▲'}
+            <button onClick={onToggleCollapse} style={toggleButtonStyle}>
+                {isCollapsed ? '▲' : '▼'}
             </button>
             <div style={contentWrapperStyle}>
                 {label && <span style={topLabelStyle}>{label}</span>}
