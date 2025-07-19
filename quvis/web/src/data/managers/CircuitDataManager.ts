@@ -24,7 +24,7 @@ interface MultiCircuitData {
         circuit_info: LogicalCircuitInfo | CompiledCircuitInfo;
         device_info: DeviceInfo;
         algorithm_name: string;
-        circuit_type: "logical" | "compiled";
+        circuit_type: 'logical' | 'compiled';
         circuit_stats: {
             original_gates?: number;
             transpiled_gates?: number;
@@ -36,7 +36,6 @@ interface MultiCircuitData {
         routing_analysis?: any;
         algorithm_params?: any;
     }>;
-    mode: "library_multi";
     total_circuits: number;
 }
 
@@ -47,10 +46,11 @@ export class CircuitDataManager {
 
     // Active data based on current circuit
     private allOperationsPerSlice: QubitOperation[][] = [];
-    private _interactionPairsPerSlice: Array<Array<{ q1: number; q2: number }>> =
-        [];
+    private _interactionPairsPerSlice: Array<
+        Array<{ q1: number; q2: number }>
+    > = [];
     private _qubit_count: number = 0;
-    private _visualizationMode: "compiled" | "logical" = "compiled";
+    private _visualizationMode: 'compiled' | 'logical' = 'compiled';
 
     // Cumulative data for performance calculations
     private cumulativeQubitInteractions: number[][] = [];
@@ -69,7 +69,7 @@ export class CircuitDataManager {
         return this._qubit_count;
     }
 
-    get visualizationMode(): "compiled" | "logical" {
+    get visualizationMode(): 'compiled' | 'logical' {
         return this._visualizationMode;
     }
 
@@ -83,15 +83,20 @@ export class CircuitDataManager {
 
     get couplingMap(): number[][] {
         if (this.multiCircuitData) {
-            const currentCircuit = this.multiCircuitData.circuits[this._currentCircuitIndex];
-            return currentCircuit?.device_info?.connectivity_graph_coupling_map || [];
+            const currentCircuit =
+                this.multiCircuitData.circuits[this._currentCircuitIndex];
+            return (
+                currentCircuit?.device_info?.connectivity_graph_coupling_map ||
+                []
+            );
         }
         return [];
     }
 
     get deviceQubitCount(): number {
         if (this.multiCircuitData) {
-            const currentCircuit = this.multiCircuitData.circuits[this._currentCircuitIndex];
+            const currentCircuit =
+                this.multiCircuitData.circuits[this._currentCircuitIndex];
             return currentCircuit?.device_info?.num_qubits_on_device || 0;
         }
         return 0;
@@ -135,12 +140,14 @@ export class CircuitDataManager {
             console.log(`Loading data file: ${filePath}`);
             const response = await fetch(filePath);
             if (!response.ok) {
-                throw new Error(`Failed to fetch ${filePath}: ${response.statusText}`);
+                throw new Error(
+                    `Failed to fetch ${filePath}: ${response.statusText}`
+                );
             }
             const jsonData = await response.json();
             this.processMultiCircuitData(jsonData as MultiCircuitData);
         } catch (error) {
-            console.error("Error loading data file:", error);
+            console.error('Error loading data file:', error);
             throw error;
         }
     }
@@ -151,44 +158,57 @@ export class CircuitDataManager {
 
     private processMultiCircuitData(data: MultiCircuitData): void {
         this.clearData();
-        
-        console.log("Processing multi-circuit data:", data);
-        
+
+        console.log('Processing multi-circuit data:', data);
+
         this.multiCircuitData = data;
         this._currentCircuitIndex = 0;
-        
+
         // Load the first circuit
         this.switchToCircuit(0);
     }
 
     switchToCircuit(circuitIndex: number): void {
         if (!this.multiCircuitData) {
-            console.warn("No multi-circuit data available");
+            console.warn('No multi-circuit data available');
             return;
         }
-        
-        if (circuitIndex < 0 || circuitIndex >= this.multiCircuitData.circuits.length) {
-            console.warn("Invalid circuit index");
+
+        if (
+            circuitIndex < 0 ||
+            circuitIndex >= this.multiCircuitData.circuits.length
+        ) {
+            console.warn('Invalid circuit index');
             return;
         }
-        
+
         this._currentCircuitIndex = circuitIndex;
         const circuit = this.multiCircuitData.circuits[circuitIndex];
-        
-        console.log(`Switching to circuit ${circuitIndex}: ${circuit.algorithm_name} (${circuit.circuit_type})`);
-        
+
+        console.log(
+            `Switching to circuit ${circuitIndex}: ${circuit.algorithm_name} (${circuit.circuit_type})`
+        );
+
         // Set qubit count based on circuit type
-        if (circuit.circuit_type === "logical") {
-            this._qubit_count = (circuit.circuit_info as LogicalCircuitInfo).num_qubits;
-            this.allOperationsPerSlice = (circuit.circuit_info as LogicalCircuitInfo).interaction_graph_ops_per_slice || [];
+        if (circuit.circuit_type === 'logical') {
+            this._qubit_count = (
+                circuit.circuit_info as LogicalCircuitInfo
+            ).num_qubits;
+            this.allOperationsPerSlice =
+                (circuit.circuit_info as LogicalCircuitInfo)
+                    .interaction_graph_ops_per_slice || [];
         } else {
-            this._qubit_count = (circuit.circuit_info as CompiledCircuitInfo).num_qubits;
-            this.allOperationsPerSlice = (circuit.circuit_info as CompiledCircuitInfo).compiled_interaction_graph_ops_per_slice || [];
+            this._qubit_count = (
+                circuit.circuit_info as CompiledCircuitInfo
+            ).num_qubits;
+            this.allOperationsPerSlice =
+                (circuit.circuit_info as CompiledCircuitInfo)
+                    .compiled_interaction_graph_ops_per_slice || [];
         }
-        
+
         // Set visualization mode based on circuit type
         this._visualizationMode = circuit.circuit_type;
-        
+
         this.processInteractionPairs();
         this.initializeCumulativeData();
         this.calculateCumulativeDataInBackground();
@@ -267,7 +287,7 @@ export class CircuitDataManager {
                             ? 0
                             : this.cumulativeQubitInteractions[qid][i - 1];
                     this.cumulativeQubitInteractions[qid].push(
-                        prevSum + hadInteraction,
+                        prevSum + hadInteraction
                     );
                 }
             }
@@ -278,7 +298,7 @@ export class CircuitDataManager {
                 this.processCouplingMapWeightedInteractions(
                     couplingMap,
                     startIndex,
-                    endIndex,
+                    endIndex
                 );
             }
 
@@ -288,7 +308,7 @@ export class CircuitDataManager {
             if (startIndex < totalSlices) {
                 setTimeout(processChunk, 0); // Yield to main thread
             } else {
-                console.log("Fully loaded all slice data in background.");
+                console.log('Fully loaded all slice data in background.');
                 this.isFullyLoaded = true;
             }
         };
@@ -299,7 +319,7 @@ export class CircuitDataManager {
     private processCouplingMapWeightedInteractions(
         couplingMap: number[][],
         startIndex: number,
-        endIndex: number,
+        endIndex: number
     ): void {
         const weight_base = this.heatmapWeightBase;
         for (const pair of couplingMap) {
@@ -324,7 +344,7 @@ export class CircuitDataManager {
                 const prevScaledSum =
                     i === 0 ? 0 : scaledCumulativeWeights[i - 1];
                 scaledCumulativeWeights.push(
-                    prevScaledSum / weight_base + hadInteraction,
+                    prevScaledSum / weight_base + hadInteraction
                 );
             }
         }
@@ -347,7 +367,7 @@ export class CircuitDataManager {
     private countGatesInRange(
         startIndex: number,
         endIndex: number,
-        qubitId: number,
+        qubitId: number
     ): [number, number] {
         let oneQubitCount = 0;
         let twoQubitCount = 0;
@@ -371,7 +391,7 @@ export class CircuitDataManager {
     getGateCountForQubit(
         qubitId: number,
         currentSliceIndex: number,
-        effectiveSlicesForHeatmap: number,
+        effectiveSlicesForHeatmap: number
     ): {
         oneQubitGatesInWindow: number;
         twoQubitGatesInWindow: number;
@@ -403,21 +423,21 @@ export class CircuitDataManager {
 
         const windowStartSliceIndex = Math.max(
             0,
-            currentSliceIndex - actualSlicesToIterateForWindow + 1,
+            currentSliceIndex - actualSlicesToIterateForWindow + 1
         );
         const currentSliceEndIndex = currentSliceIndex;
 
         [oneQubitGatesInWindow, twoQubitGatesInWindow] = this.countGatesInRange(
             windowStartSliceIndex,
             currentSliceEndIndex,
-            qubitId,
+            qubitId
         );
 
         // Count total gates up to current slice
         [totalOneQubitGates, totalTwoQubitGates] = this.countGatesInRange(
             0,
             currentSliceIndex,
-            qubitId,
+            qubitId
         );
 
         const reportedWindowForInWindowCounts =
