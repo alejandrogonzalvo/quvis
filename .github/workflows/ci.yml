@@ -1,185 +1,236 @@
 name: CI & Deploy
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
 
 jobs:
-  test:
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
+            - name: Install Poetry
+              run: |
+                  curl -sSL https://install.python-poetry.org | python3 -
+                  echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+            - name: Install Core dependencies
+              run: |
+                  poetry install
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20.x'
+                  cache: 'npm'
+                  cache-dependency-path: 'package-lock.json'
+
+            - name: Install Web dependencies
+              run: |
+                  npm ci
+
+            - name: Test Core library
+              run: |
+                  poetry run pytest || echo "Core tests not yet configured"
+
+            - name: Run Web tests with coverage
+              run: |
+                  npm run test:coverage || echo "Web tests not yet configured"
+
+            - name: Upload test results and coverage
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: test-results
+                  path: |
+                      coverage/
+                  retention-days: 7
+
+    release:
+        needs: test
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            issues: write
+            pull-requests: write
+            id-token: write
+        # Only run release on main branch pushes, not on PRs
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0 # Required for semantic-release to analyze history and for fetching tags
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20.x'
+                  cache: 'npm'
+                  cache-dependency-path: 'package-lock.json'
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
+            - name: Install Poetry
+              run: |
+                  curl -sSL https://install.python-poetry.org | python3 -
+                  echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+            - name: Install Web dependencies
+              run: |
+                  npm ci
+
+            - name: Semantic Release
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  npx semantic-release
+
+            - name: Get released version from Git tag
+              id: get_tag_version
+              run: |
+                  # Get the latest Git tag that was just created by semantic-release
+                  latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+                  if [ -n "$latest_tag" ]; then
+                    echo "tag_version=$latest_tag" >> $GITHUB_OUTPUT
+                    echo "Found latest Git tag: $latest_tag"
+                  else
+                    echo "tag_version=" >> $GITHUB_OUTPUT
+                    echo "No Git tag found after semantic-release"
+                  fi
+
+            - name: Update UI version display (if version was released)
+              if: steps.get_tag_version.outputs.tag_version != ''
+              run: |
+                  VERSION="${{ steps.get_tag_version.outputs.tag_version }}"
+                  echo "Updating UI to display version: $VERSION"
+
+                  # Update the version in the component
+                  UI_FILE="quvis/web/src/ui/components/PlaygroundParameterSelection.tsx"
+                  if [ -f "$UI_FILE" ]; then
+                    # Use sed to replace the version string in the UI component
+                    sed -i "s/const version = \"[^\"]*\"/const version = \"$VERSION\"/" "$UI_FILE"
+                    echo "Updated version in $UI_FILE to $VERSION"
+                  else
+                    echo "UI file $UI_FILE not found, skipping version update"
+                  fi
+
+            - name: Update Python package version (if version was released)
+              if: steps.get_tag_version.outputs.tag_version != ''
+              run: |
+                  VERSION="${{ steps.get_tag_version.outputs.tag_version }}"
+                  echo "Updating Python package version to: $VERSION"
+
+                  cd quvis/core
+
+                  # Update version in pyproject.toml using Poetry
+                  poetry version "$VERSION"
+
+                  # Update version in __init__.py files
+                  sed -i "s/__version__ = \"[^\"]*\"/__version__ = \"$VERSION\"/" src/quvis/__init__.py
+                  sed -i "s/__version__ = \"[^\"]*\"/__version__ = \"$VERSION\"/" src/__init__.py
+
+                  echo "Updated Python package version to $VERSION"
+
+            - name: Build Python package
+              if: steps.get_tag_version.outputs.tag_version != ''
+              run: |
+                  cd quvis/core
+                  poetry build
+                  echo "Python package built successfully"
+
+            - name: Publish to PyPI
+              if: steps.get_tag_version.outputs.tag_version != ''
+              env:
+                  POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }}
+              run: |
+                  cd quvis/core
+                  poetry publish
+                  echo "Python package published to PyPI successfully"
+
+            - name: Commit and push package.json and UI version update
+              run: |
+                  git config --global user.name 'github-actions[bot]'
+                  git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+                  # Add both package.json and the UI file
+                  git add package.json quvis/web/src/ui/components/PlaygroundParameterSelection.tsx quvis/web/index.html # Ensure index.html is also added if modified by previous steps, though it shouldn't be
+                  # Add Python package files
+                  git add pyproject.toml quvis/core/src/quvis/__init__.py quvis/core/src/__init__.py
+                  # Check if there are changes to commit to prevent empty commits
+                  if git diff --staged --quiet; then
+                    echo "No changes to UI version, package.json, or Python package files to commit."
+                  else
+                    git commit -m "chore(release): sync UI, package.json, and Python package to released version ${{ steps.get_tag_version.outputs.tag_version }} [skip ci]"
+                    # This push updates the main branch with package.json and UI reflecting the tagged version.
+                    git push
+                    echo "Committed and pushed synchronized UI, package.json, and Python package for version ${{ steps.get_tag_version.outputs.tag_version }}."
+                  fi
+
+  deploy-preview:
+    needs: [test]
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Install Core dependencies
-        run: |
-          poetry install
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-          cache: 'npm'
-          cache-dependency-path: 'package-lock.json'
-
-      - name: Install Web dependencies
-        run: |
-          npm ci
-
-      - name: Test Core library
-        run: |
-          poetry run pytest || echo "Core tests not yet configured"
-
-      - name: Run Web tests with coverage
-        run: |
-          npm run test:coverage || echo "Web tests not yet configured"
-
-      - name: Upload test results and coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results
-          path: |
-            coverage/
-          retention-days: 7
-
-  release:
-    needs: test
-    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
     permissions:
-      contents: write
-      issues: write
-      pull-requests: write
+      contents: read
+      pages: write
       id-token: write
-    # Only run release on main branch pushes, not on PRs
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Required for semantic-release to analyze history and for fetching tags
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-          cache: 'npm'
-          cache-dependency-path: 'package-lock.json'
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: 'quvis/web/package-lock.json'
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+    - name: Install Web dependencies
+      run: |
+        cd quvis/web
+        npm ci
 
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+    - name: Compile TypeScript
+      run: |
+        cd quvis/web
+        npx tsc
 
-      - name: Install Web dependencies
-        run: |
-          npm ci
+    - name: Build Vite application
+      run: |
+        cd quvis/web
+        npx vite build
 
-      - name: Semantic Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          npx semantic-release
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
 
-      - name: Get released version from Git tag
-        id: get_tag_version
-        run: |
-          # Get the latest Git tag that was just created by semantic-release
-          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -n "$latest_tag" ]; then
-            echo "tag_version=$latest_tag" >> $GITHUB_OUTPUT
-            echo "Found latest Git tag: $latest_tag"
-          else
-            echo "tag_version=" >> $GITHUB_OUTPUT
-            echo "No Git tag found after semantic-release"
-          fi
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: './quvis/web/dist'
 
-      - name: Update UI version display (if version was released)
-        if: steps.get_tag_version.outputs.tag_version != ''
-        run: |
-          VERSION="${{ steps.get_tag_version.outputs.tag_version }}"
-          echo "Updating UI to display version: $VERSION"
-          
-          # Update the version in the component
-          UI_FILE="quvis/web/src/ui/components/PlaygroundParameterSelection.tsx"
-          if [ -f "$UI_FILE" ]; then
-            # Use sed to replace the version string in the UI component
-            sed -i "s/const version = \"[^\"]*\"/const version = \"$VERSION\"/" "$UI_FILE"
-            echo "Updated version in $UI_FILE to $VERSION"
-          else
-            echo "UI file $UI_FILE not found, skipping version update"
-          fi
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
 
-      - name: Update Python package version (if version was released)
-        if: steps.get_tag_version.outputs.tag_version != ''
-        run: |
-          VERSION="${{ steps.get_tag_version.outputs.tag_version }}"
-          echo "Updating Python package version to: $VERSION"
-          
-          cd quvis/core
-          
-          # Update version in pyproject.toml using Poetry
-          poetry version "$VERSION"
-          
-          # Update version in __init__.py files
-          sed -i "s/__version__ = \"[^\"]*\"/__version__ = \"$VERSION\"/" src/quvis/__init__.py
-          sed -i "s/__version__ = \"[^\"]*\"/__version__ = \"$VERSION\"/" src/__init__.py
-          
-          echo "Updated Python package version to $VERSION"
-
-      - name: Build Python package
-        if: steps.get_tag_version.outputs.tag_version != ''
-        run: |
-          cd quvis/core
-          poetry build
-          echo "Python package built successfully"
-
-      - name: Publish to PyPI
-        if: steps.get_tag_version.outputs.tag_version != ''
-        env:
-          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          cd quvis/core
-          poetry publish
-          echo "Python package published to PyPI successfully"
-
-      - name: Commit and push package.json and UI version update
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          # Add both package.json and the UI file
-          git add package.json quvis/web/src/ui/components/PlaygroundParameterSelection.tsx quvis/web/index.html # Ensure index.html is also added if modified by previous steps, though it shouldn't be
-          # Add Python package files
-          git add pyproject.toml quvis/core/src/quvis/__init__.py quvis/core/src/__init__.py
-          # Check if there are changes to commit to prevent empty commits
-          if git diff --staged --quiet; then
-            echo "No changes to UI version, package.json, or Python package files to commit."
-          else
-            git commit -m "chore(release): sync UI, package.json, and Python package to released version ${{ steps.get_tag_version.outputs.tag_version }} [skip ci]"
-            # This push updates the main branch with package.json and UI reflecting the tagged version.
-            git push
-            echo "Committed and pushed synchronized UI, package.json, and Python package for version ${{ steps.get_tag_version.outputs.tag_version }}."
-          fi
-
-  build_and_deploy:
-    needs: [test, release]
+  deploy-production:
+    needs: [release]
     runs-on: ubuntu-latest
     # Only run deployment on main branch pushes, not on PRs
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
