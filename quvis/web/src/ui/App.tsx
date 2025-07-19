@@ -50,7 +50,6 @@ const App: React.FC = () => {
     const mountRef = useRef<HTMLDivElement>(null);
     const playgroundRef = useRef<Playground | null>(null);
 
-    // State for loading indicator
     const [isLoading, setIsLoading] = useState(false);
     const [loadingStage, setLoadingStage] = useState<string>('Loading');
     const [compilationProgress, setCompilationProgress] = useState<string[]>(
@@ -60,7 +59,6 @@ const App: React.FC = () => {
         null
     );
 
-    // State for multi-circuit mode
     const [currentCircuitIndex, setCurrentCircuitIndex] = useState<number>(0);
     const [circuitInfo, setCircuitInfo] = useState<
         Array<{
@@ -495,7 +493,7 @@ const App: React.FC = () => {
         if (!playgroundData) {
             return;
         }
-        
+
         if (playgroundRef.current) {
             return;
         }
@@ -512,7 +510,6 @@ const App: React.FC = () => {
         setIsPlaygroundInitialized(true);
         playgroundInstance.animate();
 
-        // Complete loading process
         if (isLoading) {
             setCompilationProgress((prev) => [
                 ...prev,
@@ -529,13 +526,10 @@ const App: React.FC = () => {
 
         setInitialAppearance({
             qubitSize: playgroundInstance.currentQubitSize,
-            connectionThickness:
-                playgroundInstance.currentConnectionThickness,
+            connectionThickness: playgroundInstance.currentConnectionThickness,
             inactiveAlpha: playgroundInstance.currentInactiveAlpha,
-            renderBlochSpheres:
-                playgroundInstance.areBlochSpheresVisible,
-            renderConnectionLines:
-                playgroundInstance.areConnectionLinesVisible,
+            renderBlochSpheres: playgroundInstance.areBlochSpheresVisible,
+            renderConnectionLines: playgroundInstance.areConnectionLinesVisible,
         });
         setInitialLayout({
             repelForce: playgroundInstance.currentRepelForce,
@@ -549,11 +543,9 @@ const App: React.FC = () => {
             baseSize: playgroundInstance.currentBaseSize,
         });
         setInitialFidelitySettings({
-            oneQubitBase:
-                playgroundInstance.currentOneQubitFidelityBase,
-            twoQubitBase:
-            playgroundInstance.currentTwoQubitFidelityBase,
-    });
+            oneQubitBase: playgroundInstance.currentOneQubitFidelityBase,
+            twoQubitBase: playgroundInstance.currentTwoQubitFidelityBase,
+        });
     }, [playgroundData]);
 
     // Effect specifically for dataset changes to dispose the old playground

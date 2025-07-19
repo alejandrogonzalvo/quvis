@@ -98,7 +98,7 @@ export class Playground {
             this.threeComponents.scene,
             this.mouseHandler.getMouse(),
             this.threeComponents.camera,
-            data, // Pass the data object directly
+            data, 
             this.visualizationStateManager.getVisualizationMode(),
             this.visualizationStateManager.getMaxHeatmapSlices(),
             this.layoutManager.getRepelForce(),
