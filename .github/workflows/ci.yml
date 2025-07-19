@@ -200,11 +200,10 @@ jobs:
               with:
                   node-version: '20.x'
                   cache: 'npm'
-                  cache-dependency-path: 'quvis/web/package-lock.json'
+                  cache-dependency-path: 'package-lock.json'
 
             - name: Install Web dependencies
               run: |
-                  cd quvis/web
                   npm ci
 
             - name: Compile TypeScript
@@ -254,11 +253,10 @@ jobs:
               with:
                   node-version: '20.x'
                   cache: 'npm'
-                  cache-dependency-path: 'quvis/web/package-lock.json'
+                  cache-dependency-path: 'package-lock.json'
 
             - name: Install Web dependencies
               run: |
-                  cd quvis/web
                   npm ci
 
             - name: Compile TypeScript
@@ -268,7 +266,6 @@ jobs:
 
             - name: Build Vite application
               run: |
-                  cd quvis/web
                   npx vite build
 
             - name: Setup Pages

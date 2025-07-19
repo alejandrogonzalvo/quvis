@@ -153,9 +153,9 @@ export default defineConfig({
         host: true,
     },
     build: {
-        outDir: 'quvis/web/dist',
+        outDir: 'dist',
         rollupOptions: {
-            input: 'quvis/web/index.html',
+            input: 'index.html',
             output: {
                 manualChunks: {
                     three: ['three'],
@@ -163,7 +163,7 @@ export default defineConfig({
             },
         },
     },
-    publicDir: 'quvis/web/public',
+    publicDir: 'public',
     root: 'quvis/web',
     define: {
         'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
