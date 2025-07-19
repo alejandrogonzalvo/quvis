@@ -54,8 +54,7 @@ export class CircuitDataManager {
 
     // Cumulative data for performance calculations
     private cumulativeQubitInteractions: number[][] = [];
-    private cumulativeWeightedPairInteractions: Map<string, number[]> =
-        new Map();
+    private cumulativePairInteractions: Map<string, number[]> = new Map();
     private slicesProcessedForHeatmap = 0;
     public isFullyLoaded = false;
 
@@ -132,7 +131,7 @@ export class CircuitDataManager {
     }
 
     get cumulativeWeightedPairInteractionData(): Map<string, number[]> {
-        return this.cumulativeWeightedPairInteractions;
+        return this.cumulativePairInteractions;
     }
 
     async loadDataFile(filePath: string): Promise<void> {
@@ -242,16 +241,15 @@ export class CircuitDataManager {
             () => []
         );
 
-        this.cumulativeWeightedPairInteractions.clear();
+        this.cumulativePairInteractions.clear();
 
-        // Initialize pair interactions based on coupling map
         const couplingMap = this.couplingMap;
         if (couplingMap && couplingMap.length > 0) {
             for (const pair of couplingMap) {
                 const q1 = Math.min(pair[0], pair[1]);
                 const q2 = Math.max(pair[0], pair[1]);
                 const key = `${q1}-${q2}`;
-                this.cumulativeWeightedPairInteractions.set(key, []);
+                this.cumulativePairInteractions.set(key, []);
             }
         }
 
@@ -272,9 +270,7 @@ export class CircuitDataManager {
         const processChunk = () => {
             const endIndex = Math.min(startIndex + chunkSize, totalSlices);
 
-            // Process cumulativeQubitInteractions for the chunk
             for (let i = startIndex; i < endIndex; i++) {
-                // Create a set of interacting qubits for this slice
                 const interactingQubits = new Set<number>();
                 this.allOperationsPerSlice[i].forEach((op) => {
                     op.qubits.forEach((qid) => interactingQubits.add(qid));
@@ -292,14 +288,8 @@ export class CircuitDataManager {
                 }
             }
 
-            // Process cumulativeWeightedPairInteractions for the chunk
-            const couplingMap = this.couplingMap;
-            if (couplingMap) {
-                this.processCouplingMapWeightedInteractions(
-                    couplingMap,
-                    startIndex,
-                    endIndex
-                );
+            if (this.couplingMap) {
+                this.processCouplingMapInteractions(startIndex, endIndex);
             }
 
             this.slicesProcessedForHeatmap = endIndex;
@@ -316,36 +306,27 @@ export class CircuitDataManager {
         setTimeout(processChunk, 0);
     }
 
-    private processCouplingMapWeightedInteractions(
-        couplingMap: number[][],
+    private processCouplingMapInteractions(
         startIndex: number,
         endIndex: number
     ): void {
-        const weight_base = this.heatmapWeightBase;
-        for (const pair of couplingMap) {
-            const q1 = Math.min(pair[0], pair[1]);
-            const q2 = Math.max(pair[0], pair[1]);
-            const key = `${q1}-${q2}`;
-            const scaledCumulativeWeights =
-                this.cumulativeWeightedPairInteractions.get(key)!;
+        for (let i = startIndex; i < endIndex; i++) {
+            const sliceInteractionPairs = this._interactionPairsPerSlice[i];
+            const interactionsInSlice = new Set<string>();
+            for (const interaction of sliceInteractionPairs) {
+                const q1 = Math.min(interaction.q1, interaction.q2);
+                const q2 = Math.max(interaction.q1, interaction.q2);
+                interactionsInSlice.add(`${q1}-${q2}`);
+            }
 
-            for (let i = startIndex; i < endIndex; i++) {
-                const sliceInteractionPairs = this._interactionPairsPerSlice[i];
-                let hadInteraction = 0;
-                for (const interaction of sliceInteractionPairs) {
-                    if (
-                        (interaction.q1 === q1 && interaction.q2 === q2) ||
-                        (interaction.q1 === q2 && interaction.q2 === q1)
-                    ) {
-                        hadInteraction = 1;
-                        break;
-                    }
-                }
+            for (const [
+                key,
+                scaledCumulativeWeights,
+            ] of this.cumulativePairInteractions.entries()) {
+                const hadInteraction = interactionsInSlice.has(key) ? 1 : 0;
                 const prevScaledSum =
                     i === 0 ? 0 : scaledCumulativeWeights[i - 1];
-                scaledCumulativeWeights.push(
-                    prevScaledSum / weight_base + hadInteraction
-                );
+                scaledCumulativeWeights.push(prevScaledSum + hadInteraction);
             }
         }
     }
@@ -452,6 +433,65 @@ export class CircuitDataManager {
         };
     }
 
+    getInteractionCountForPair(
+        pairKey: string, // e.g. "0-1"
+        currentSliceIndex: number,
+        maxSlicesForHeatmap: number
+    ): {
+        interactionsInWindow: number;
+        totalInteractions: number;
+        windowForCountsInWindow: number;
+    } {
+        const cumulativeData = this.cumulativePairInteractions.get(pairKey);
+
+        if (!cumulativeData || currentSliceIndex < 0) {
+            return {
+                interactionsInWindow: 0,
+                totalInteractions: 0,
+                windowForCountsInWindow: maxSlicesForHeatmap,
+            };
+        }
+
+        const totalInteractions = cumulativeData[currentSliceIndex] || 0;
+
+        let windowStartSliceIndex;
+        let windowForCountsInWindow;
+        let reportedWindowForInWindowCounts;
+
+        if (maxSlicesForHeatmap === -1) {
+            // "All" mode
+            windowStartSliceIndex = 0;
+            windowForCountsInWindow = currentSliceIndex + 1;
+            reportedWindowForInWindowCounts = windowForCountsInWindow;
+        } else {
+            windowForCountsInWindow = Math.max(0, maxSlicesForHeatmap);
+            let actualSlicesToIterateForWindow = windowForCountsInWindow;
+            if (windowForCountsInWindow === 0) {
+                actualSlicesToIterateForWindow = 1;
+            }
+
+            windowStartSliceIndex = Math.max(
+                0,
+                currentSliceIndex - actualSlicesToIterateForWindow + 1
+            );
+            reportedWindowForInWindowCounts =
+                windowForCountsInWindow === 0 ? 1 : windowForCountsInWindow;
+        }
+
+        const interactionsBeforeWindow =
+            windowStartSliceIndex > 0
+                ? cumulativeData[windowStartSliceIndex - 1] || 0
+                : 0;
+        const interactionsInWindow =
+            totalInteractions - interactionsBeforeWindow;
+
+        return {
+            interactionsInWindow,
+            totalInteractions,
+            windowForCountsInWindow: reportedWindowForInWindowCounts,
+        };
+    }
+
     clearData(): void {
         this.multiCircuitData = null;
         this._currentCircuitIndex = 0;
@@ -459,7 +499,7 @@ export class CircuitDataManager {
         this._interactionPairsPerSlice = [];
         this._qubit_count = 0;
         this.cumulativeQubitInteractions = [];
-        this.cumulativeWeightedPairInteractions.clear();
+        this.cumulativePairInteractions.clear();
         this.slicesProcessedForHeatmap = 0;
         this.isFullyLoaded = false;
     }

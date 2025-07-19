@@ -1,12 +1,12 @@
-import * as THREE from "three";
-import { CircuitDataManager } from "../../data/managers/CircuitDataManager.js";
-import { LayoutManager } from "../core/LayoutManager.js";
-import { RenderManager } from "../core/RenderManager.js";
-import { VisualizationStateManager } from "../core/VisualizationStateManager.js";
-import { HeatmapManager } from "../core/HeatmapManager.js";
+import * as THREE from 'three';
+import { CircuitDataManager } from '../../data/managers/CircuitDataManager.js';
+import { LayoutManager } from '../core/LayoutManager.js';
+import { RenderManager } from '../core/RenderManager.js';
+import { VisualizationStateManager } from '../core/VisualizationStateManager.js';
+import { HeatmapManager } from '../core/HeatmapManager.js';
 
 interface CircuitLayoutState {
-    layoutType: "grid" | "force";
+    layoutType: 'grid' | 'force';
     positions?: Map<number, THREE.Vector3>;
 }
 
@@ -26,12 +26,15 @@ export class QubitGridController {
     private scene: THREE.Scene;
     private camera: THREE.PerspectiveCamera;
     private mouse: THREE.Vector2;
-    private onSlicesLoadedCallback?: (count: number, initialIndex: number) => void;
+    private onSlicesLoadedCallback?: (
+        count: number,
+        initialIndex: number
+    ) => void;
 
     // State tracking
     public isFullyLoaded = false;
     private currentNumDeviceQubits: number = 0;
-    
+
     // Per-circuit layout state management
     private circuitLayoutStates: Map<number, CircuitLayoutState> = new Map();
 
@@ -40,7 +43,7 @@ export class QubitGridController {
         mouse: THREE.Vector2,
         camera: THREE.PerspectiveCamera,
         datasetNameOrData: string | object,
-        visualizationMode: "compiled" | "logical",
+        visualizationMode: 'compiled' | 'logical',
         initialMaxSlicesForHeatmap: number = 10,
         initialKRepel: number = 0.3,
         initialIdealDist: number = 5.0,
@@ -48,7 +51,7 @@ export class QubitGridController {
         initialCoolingFactor: number = 0.95,
         initialConnectionThickness: number = 0.05,
         initialInactiveElementAlpha: number = 0.1,
-        onSlicesLoadedCallback?: (count: number, initialIndex: number) => void,
+        onSlicesLoadedCallback?: (count: number, initialIndex: number) => void
     ) {
         this.scene = scene;
         this.mouse = mouse;
@@ -61,7 +64,7 @@ export class QubitGridController {
             initialKRepel,
             initialIdealDist,
             initialIterations,
-            initialCoolingFactor,
+            initialCoolingFactor
         );
         this.renderManager = new RenderManager(
             scene,
@@ -69,18 +72,18 @@ export class QubitGridController {
             initialConnectionThickness,
             initialInactiveElementAlpha,
             false,
-            true,
+            true
         );
         this.stateManager = new VisualizationStateManager(
             (sliceIndex) => this.loadStateFromSlice(sliceIndex),
             initialMaxSlicesForHeatmap,
-            visualizationMode,
+            visualizationMode
         );
         this.heatmapManager = new HeatmapManager(
             scene,
             camera,
             1, // initial qubit count (will be updated)
-            initialMaxSlicesForHeatmap,
+            initialMaxSlicesForHeatmap
         );
 
         // Load initial data
@@ -145,7 +148,7 @@ export class QubitGridController {
             iterations?: number;
             coolingFactor?: number;
         },
-        onLayoutComplete?: () => void,
+        onLayoutComplete?: () => void
     ): void {
         const changed = this.layoutManager.updateParameters(params);
 
@@ -159,18 +162,21 @@ export class QubitGridController {
                         this.renderManager.updateQubitPositions(positions);
                         this.heatmapManager.generateClusters(
                             positions,
-                            deviceQubitCount,
+                            deviceQubitCount
                         );
                         this.heatmapManager.clearPositionsCache();
                         this.updateVisualization();
-                        
+
                         // Save force layout state for current circuit
                         if (this.dataManager.isMultiCircuit) {
-                            this.saveCurrentLayoutState(this.dataManager.currentCircuitIndex, "force");
+                            this.saveCurrentLayoutState(
+                                this.dataManager.currentCircuitIndex,
+                                'force'
+                            );
                         }
-                        
+
                         onLayoutComplete?.();
-                    },
+                    }
                 );
             }
         } else {
@@ -188,7 +194,7 @@ export class QubitGridController {
         }
         if (params.connectionThickness !== undefined) {
             this.renderManager.setConnectionThickness(
-                params.connectionThickness,
+                params.connectionThickness
             );
         }
         if (params.inactiveAlpha !== undefined) {
@@ -202,7 +208,7 @@ export class QubitGridController {
         this.renderManager.updateQubitPositions(this.layoutManager.positions);
         this.heatmapManager.generateClusters(
             this.layoutManager.positions,
-            this.layoutManager.getQubitCount(),
+            this.layoutManager.getQubitCount()
         );
         this.heatmapManager.clearPositionsCache();
         this.updateVisualization();
@@ -216,28 +222,35 @@ export class QubitGridController {
         if (deviceQubitCount > 0) {
             this.heatmapManager.generateClusters(
                 this.layoutManager.positions,
-                deviceQubitCount,
+                deviceQubitCount
             );
             this.heatmapManager.clearPositionsCache();
         }
 
         this.updateVisualization();
-        
+
         // Save grid layout state for current circuit
         if (this.dataManager.isMultiCircuit) {
-            this.saveCurrentLayoutState(this.dataManager.currentCircuitIndex, "grid");
+            this.saveCurrentLayoutState(
+                this.dataManager.currentCircuitIndex,
+                'grid'
+            );
         }
     }
 
-    public setVisualizationMode(mode: "compiled" | "logical"): void {
+    public setVisualizationMode(mode: 'compiled' | 'logical'): void {
         // Since we're always in multi-circuit mode now, we need to switch to the appropriate circuit
         // rather than switching modes within the same circuit
-        console.warn("setVisualizationMode is deprecated. Use switchToCircuit instead for multi-circuit mode.");
-        
+        console.warn(
+            'setVisualizationMode is deprecated. Use switchToCircuit instead for multi-circuit mode.'
+        );
+
         // Try to find a circuit of the desired type
         const circuits = this.dataManager.allCircuitsInfo;
-        const targetCircuitIndex = circuits.findIndex(circuit => circuit.circuit_type === mode);
-        
+        const targetCircuitIndex = circuits.findIndex(
+            (circuit) => circuit.circuit_type === mode
+        );
+
         if (targetCircuitIndex !== -1) {
             this.switchToCircuit(targetCircuitIndex);
         }
@@ -245,14 +258,16 @@ export class QubitGridController {
 
     public switchToCircuit(circuitIndex: number): void {
         if (!this.dataManager.isMultiCircuit) {
-            console.warn("Not in multi-circuit mode");
+            console.warn('Not in multi-circuit mode');
             return;
         }
 
         const previousQubitCount = this.currentNumDeviceQubits;
-        
+
         this.dataManager.switchToCircuit(circuitIndex);
-        this.stateManager.setVisualizationMode(this.dataManager.visualizationMode);
+        this.stateManager.setVisualizationMode(
+            this.dataManager.visualizationMode
+        );
 
         // Reinitialize slices for new circuit
         this.stateManager.initializeSlices(this.dataManager.operationsPerSlice);
@@ -260,7 +275,7 @@ export class QubitGridController {
         // Get the new device info and qubit count
         const deviceQubitCount = this.dataManager.deviceQubitCount;
         if (deviceQubitCount === 0) {
-            console.warn("No device info available for circuit");
+            console.warn('No device info available for circuit');
             return;
         }
 
@@ -269,104 +284,123 @@ export class QubitGridController {
 
         // Check if we need to recreate the grid (different qubit count)
         if (newQubitCount !== previousQubitCount) {
-            console.log(`Qubit count changed from ${previousQubitCount} to ${newQubitCount}, recreating grid`);
-            
+            console.log(
+                `Qubit count changed from ${previousQubitCount} to ${newQubitCount}, recreating grid`
+            );
+
             // Recreate the grid with new qubit count
             this.recreateGridForNewQubitCount(newQubitCount);
         } else {
-            console.log(`Qubit count unchanged (${newQubitCount}), updating existing grid`);
+            console.log(
+                `Qubit count unchanged (${newQubitCount}), updating existing grid`
+            );
         }
 
         // Restore or initialize layout state for this circuit
         const savedLayoutState = this.circuitLayoutStates.get(circuitIndex);
         if (savedLayoutState) {
             // Restore saved layout state
-            if (savedLayoutState.layoutType === "grid") {
+            if (savedLayoutState.layoutType === 'grid') {
                 this.applyGridLayout();
             } else if (savedLayoutState.positions) {
                 // Restore force layout positions
                 this.restoreLayoutPositions(savedLayoutState.positions);
-                this.renderManager.updateQubitPositions(savedLayoutState.positions);
-                this.heatmapManager.generateClusters(savedLayoutState.positions, newQubitCount);
+                this.renderManager.updateQubitPositions(
+                    savedLayoutState.positions
+                );
+                this.heatmapManager.generateClusters(
+                    savedLayoutState.positions,
+                    newQubitCount
+                );
                 this.heatmapManager.clearPositionsCache();
             }
         } else {
             // Initialize with default grid layout for new circuit
             this.applyGridLayout();
             this.circuitLayoutStates.set(circuitIndex, {
-                layoutType: "grid"
+                layoutType: 'grid',
             });
         }
 
         // Update connections based on circuit type
-        if (this.dataManager.visualizationMode === "logical") {
+        if (this.dataManager.visualizationMode === 'logical') {
             let maxLogicalConnections = 0;
             this.dataManager.operationsPerSlice.forEach((ops_in_slice) => {
                 const twoQubitOps = ops_in_slice.filter(
-                    (op) => op.qubits.length === 2,
+                    (op) => op.qubits.length === 2
                 ).length;
                 if (twoQubitOps > maxLogicalConnections) {
                     maxLogicalConnections = twoQubitOps;
                 }
             });
             this.renderManager.initializeLogicalInstancedConnections(
-                maxLogicalConnections,
+                maxLogicalConnections
             );
         } else {
             const couplingMap = this.dataManager.couplingMap;
             if (couplingMap) {
                 this.renderManager.initializeInstancedConnections(
-                    couplingMap.length,
+                    couplingMap.length
                 );
             }
         }
 
         this.updateVisualization();
-        console.log(`Switched to circuit: ${circuitIndex} (${this.dataManager.visualizationMode})`);
+        console.log(
+            `Switched to circuit: ${circuitIndex} (${this.dataManager.visualizationMode})`
+        );
     }
 
     private recreateGridForNewQubitCount(newQubitCount: number): void {
         // Calculate new grid layout
         this.layoutManager.calculateGridLayout(newQubitCount);
-        
+
         // Create new grid of qubits
-        this.renderManager.createGrid(newQubitCount, this.layoutManager.positions);
-        
+        this.renderManager.createGrid(
+            newQubitCount,
+            this.layoutManager.positions
+        );
+
         // Update heatmap for new qubit count
         this.heatmapManager.initializeForSetup(
             this.camera,
             this.dataManager.qubitCount,
             this.layoutManager.positions,
-            newQubitCount,
+            newQubitCount
         );
-        
+
         // Update heatmap aspect ratio
         const renderWidth = this.camera.aspect || 1;
         const renderHeight = 1;
         this.heatmapManager.setAspectRatio(renderWidth / renderHeight);
     }
 
-    private restoreLayoutPositions(positions: Map<number, THREE.Vector3>): void {
+    private restoreLayoutPositions(
+        positions: Map<number, THREE.Vector3>
+    ): void {
         // Clear existing positions
         this.layoutManager.clearPositions();
-        
+
         // Restore each position
         positions.forEach((position, qubitId) => {
             this.layoutManager.setQubitPosition(qubitId, position);
         });
     }
 
-    public saveCurrentLayoutState(circuitIndex: number, layoutType: "grid" | "force"): void {
+    public saveCurrentLayoutState(
+        circuitIndex: number,
+        layoutType: 'grid' | 'force'
+    ): void {
         if (this.dataManager.isMultiCircuit) {
             const currentState: CircuitLayoutState = {
-                layoutType: layoutType
+                layoutType: layoutType,
             };
-            
-            if (layoutType === "force") {
+
+            if (layoutType === 'force') {
                 // Save current positions for force layout
                 currentState.positions = new Map(this.layoutManager.positions);
             }
-            
+
             this.circuitLayoutStates.set(circuitIndex, currentState);
         }
     }
@@ -382,8 +416,8 @@ export class QubitGridController {
         twoQubitBase?: number;
     }): void {
         console.log(
-            "Fidelity parameters received in QubitGridController:",
-            params,
+            'Fidelity parameters received in QubitGridController:',
+            params
         );
         // Future implementation for fidelity visualization
     }
@@ -391,14 +425,14 @@ export class QubitGridController {
     public updateLOD(cameraDistance: number): void {
         this.renderManager.updateLOD(
             cameraDistance,
-            this.layoutManager.areaSide,
+            this.layoutManager.areaSide
         );
 
-        let heatmapLOD: "high" | "low";
+        let heatmapLOD: 'high' | 'low';
         if (cameraDistance > this.layoutManager.areaSide * 5) {
-            heatmapLOD = "low";
+            heatmapLOD = 'low';
         } else {
-            heatmapLOD = "high";
+            heatmapLOD = 'high';
         }
         this.heatmapManager.setLOD(heatmapLOD);
     }
@@ -406,7 +440,7 @@ export class QubitGridController {
     public setBlochSpheresVisible(visible: boolean): void {
         this.renderManager.setBlochSpheresVisible(
             visible,
-            this.layoutManager.positions,
+            this.layoutManager.positions
         );
     }
 
@@ -424,12 +458,12 @@ export class QubitGridController {
         return this.dataManager.getGateCountForQubit(
             qubitId,
             this.stateManager.currentSlice,
-            this.stateManager.lastEffectiveSlicesForHeatmap,
+            this.stateManager.lastEffectiveSlicesForHeatmap
         );
     }
 
     public dispose(): void {
-        console.log("QubitGridController dispose called");
+        console.log('QubitGridController dispose called');
 
         // Dispose of all subsystems
         this.dataManager.clearData();
@@ -438,21 +472,21 @@ export class QubitGridController {
         this.stateManager.dispose();
         this.heatmapManager.dispose();
 
-        console.log("QubitGridController resources cleaned up");
+        console.log('QubitGridController resources cleaned up');
     }
 
     // Private methods
 
     private async loadData(datasetNameOrData: string | object): Promise<void> {
         try {
-            if (typeof datasetNameOrData === "string") {
-                const dataUrl = datasetNameOrData.endsWith(".json")
+            if (typeof datasetNameOrData === 'string') {
+                const dataUrl = datasetNameOrData.endsWith('.json')
                     ? `/quvis/${datasetNameOrData}`
                     : `/quvis/${datasetNameOrData}_viz_data.json`;
                 await this.dataManager.loadDataFile(dataUrl);
             } else if (
                 datasetNameOrData &&
-                typeof datasetNameOrData === "object"
+                typeof datasetNameOrData === 'object'
             ) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 this.dataManager.loadData(datasetNameOrData as any);
@@ -461,10 +495,10 @@ export class QubitGridController {
             await this.initializeAfterDataLoad();
             this.onSlicesLoadedCallback?.(
                 this.dataManager.getSliceCount(),
-                this.stateManager.currentSlice,
+                this.stateManager.currentSlice
             );
         } catch (error) {
-            console.error("Failed to load data:", error);
+            console.error('Failed to load data:', error);
             this.handleLoadError();
         }
     }
@@ -485,13 +519,13 @@ export class QubitGridController {
         // Create qubits in render manager
         this.renderManager.createGrid(
             deviceQubitCount,
-            this.layoutManager.positions,
+            this.layoutManager.positions
         );
 
         // Initialize connections
         if (couplingMap) {
             this.renderManager.initializeInstancedConnections(
-                couplingMap.length,
+                couplingMap.length
             );
         }
 
@@ -500,7 +534,7 @@ export class QubitGridController {
             this.camera,
             qubitCount,
             this.layoutManager.positions,
-            deviceQubitCount,
+            deviceQubitCount
         );
 
         // Update heatmap aspect ratio
@@ -516,7 +550,7 @@ export class QubitGridController {
     }
 
     private handleLoadError(): void {
-        console.error("Handling load error with fallback data");
+        console.error('Handling load error with fallback data');
 
         // Create fallback layout
         this.layoutManager.calculateGridLayout(9); // Default 9 qubits
@@ -547,32 +581,32 @@ export class QubitGridController {
         // Update qubit opacities
         this.renderManager.updateQubitOpacities(
             lastSliceChangeData,
-            maxSlicesForHeatmap,
+            maxSlicesForHeatmap
         );
 
         // Update heatmap
         const lastLoadedSlice = this.dataManager.processedSlicesCount - 1;
         const effectiveSliceIndex = Math.min(
             currentSliceIndex,
-            lastLoadedSlice,
+            lastLoadedSlice
         );
 
         const heatmapResult = this.heatmapManager.updateHeatmap(
             this.layoutManager.positions,
             effectiveSliceIndex,
-            this.dataManager.cumulativeQubitInteractionData,
+            this.dataManager.cumulativeQubitInteractionData
         );
 
         // Update state manager with heatmap results
         this.stateManager.updateHeatmapResults(
             heatmapResult.maxObservedRawWeightedSum,
-            heatmapResult.numSlicesEffectivelyUsed,
+            heatmapResult.numSlicesEffectivelyUsed
         );
 
         // Update connections
         const currentSliceInteractionPairs =
             this.stateManager.getCurrentSliceInteractionPairs(
-                this.dataManager.interactionPairsPerSlice,
+                this.dataManager.interactionPairsPerSlice
             );
 
         this.renderManager.drawConnections(
@@ -580,10 +614,9 @@ export class QubitGridController {
             this.layoutManager.positions,
             this.dataManager.couplingMap,
             currentSliceInteractionPairs,
-            this.dataManager.cumulativeWeightedPairInteractionData,
+            this.dataManager,
             currentSliceIndex,
-            maxSlicesForHeatmap,
-            this.dataManager.processedSlicesCount,
+            maxSlicesForHeatmap
         );
 
         // Update isFullyLoaded status

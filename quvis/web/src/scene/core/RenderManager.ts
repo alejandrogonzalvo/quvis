@@ -1,7 +1,8 @@
-import * as THREE from "three";
-import { Qubit } from "../../data/models/Qubit.js";
-import { State } from "../../data/models/State.js";
-import { BlochSphere } from "../objects/BlochSphere.js";
+import * as THREE from 'three';
+import { Qubit } from '../../data/models/Qubit.js';
+import { State } from '../../data/models/State.js';
+import { BlochSphere } from '../objects/BlochSphere.js';
+import { CircuitDataManager } from '../../data/managers/CircuitDataManager.js';
 
 const CYLINDER_VERTEX_SHADER = `
     varying vec3 vNormal;
@@ -60,7 +61,7 @@ export class RenderManager {
     private _areConnectionLinesVisible: boolean = true;
 
     // LOD management
-    private currentLOD: "high" | "medium" | "low" = "high";
+    private currentLOD: 'high' | 'medium' | 'low' = 'high';
 
     // Weight calculation constants
     private readonly heatmapWeightBase = 1.3;
@@ -72,7 +73,7 @@ export class RenderManager {
         initialConnectionThickness: number = 0.05,
         initialInactiveElementAlpha: number = 0.1,
         initialBlochSpheresVisible: boolean = false,
-        initialConnectionLinesVisible: boolean = true,
+        initialConnectionLinesVisible: boolean = true
     ) {
         this.scene = scene;
         this.renderParams = {
@@ -129,18 +130,18 @@ export class RenderManager {
         this.instancedConnectionMesh = new THREE.InstancedMesh(
             cylinderGeo,
             material,
-            maxConnections,
+            maxConnections
         );
         this.instancedConnectionMesh.instanceMatrix.setUsage(
-            THREE.DynamicDrawUsage,
+            THREE.DynamicDrawUsage
         );
         this.intensityAttribute = new THREE.InstancedBufferAttribute(
             new Float32Array(maxConnections),
-            1,
+            1
         );
         this.instancedConnectionMesh.geometry.setAttribute(
-            "instanceIntensity",
-            this.intensityAttribute,
+            'instanceIntensity',
+            this.intensityAttribute
         );
         this.scene.add(this.instancedConnectionMesh);
     }
@@ -168,10 +169,10 @@ export class RenderManager {
         this.logicalConnectionMesh = new THREE.InstancedMesh(
             cylinderGeo,
             material,
-            maxConnections,
+            maxConnections
         );
         this.logicalConnectionMesh.instanceMatrix.setUsage(
-            THREE.DynamicDrawUsage,
+            THREE.DynamicDrawUsage
         );
         this.scene.add(this.logicalConnectionMesh);
     }
@@ -195,7 +196,7 @@ export class RenderManager {
      */
     createGrid(
         numQubitsToCreate: number,
-        qubitPositions: Map<number, THREE.Vector3>,
+        qubitPositions: Map<number, THREE.Vector3>
     ): void {
         // Clean up existing qubits
         this.qubitInstances.forEach((qubit) => {
@@ -210,7 +211,7 @@ export class RenderManager {
         this._isQubitRenderEnabled = numQubitsToCreate <= 1000;
         if (!this._isQubitRenderEnabled) {
             console.warn(
-                `Device has ${numQubitsToCreate} qubits. Not rendering qubit spheres to maintain performance.`,
+                `Device has ${numQubitsToCreate} qubits. Not rendering qubit spheres to maintain performance.`
             );
         }
 
@@ -244,13 +245,13 @@ export class RenderManager {
      */
     private createBlochSphereForQubit(
         qubit: Qubit,
-        position: THREE.Vector3,
+        position: THREE.Vector3
     ): void {
         if (!qubit.blochSphere) {
             const blochSphere = new BlochSphere(
                 position.x,
                 position.y,
-                position.z,
+                position.z
             );
             qubit.blochSphere = blochSphere;
             blochSphere.blochSphere.userData.qubitId = qubit.id;
@@ -264,14 +265,13 @@ export class RenderManager {
      * Draw connections based on mode and data
      */
     drawConnections(
-        visualizationMode: "compiled" | "logical",
+        visualizationMode: 'compiled' | 'logical',
         qubitPositions: Map<number, THREE.Vector3>,
         couplingMap: number[][] | null,
         currentSliceInteractionPairs: Array<{ q1: number; q2: number }>,
-        cumulativeWeightedPairInteractions: Map<string, number[]>,
+        dataManager: CircuitDataManager,
         currentSliceIndex: number,
-        maxSlicesForHeatmap: number,
-        processedSlicesCount: number,
+        maxSlicesForHeatmap: number
     ): void {
         const yAxis = new THREE.Vector3(0, 1, 0);
 
@@ -285,11 +285,11 @@ export class RenderManager {
             return;
         }
 
-        if (visualizationMode === "logical") {
+        if (visualizationMode === 'logical') {
             this.drawLogicalConnections(
                 currentSliceInteractionPairs,
                 qubitPositions,
-                yAxis,
+                yAxis
             );
             if (this.instancedConnectionMesh) {
                 this.instancedConnectionMesh.count = 0;
@@ -299,11 +299,10 @@ export class RenderManager {
             this.drawCompiledConnections(
                 couplingMap,
                 qubitPositions,
-                cumulativeWeightedPairInteractions,
+                dataManager,
                 currentSliceIndex,
                 maxSlicesForHeatmap,
-                processedSlicesCount,
-                yAxis,
+                yAxis
             );
             if (this.logicalConnectionMesh) {
                 this.logicalConnectionMesh.count = 0;
@@ -318,7 +317,7 @@ export class RenderManager {
     private drawLogicalConnections(
         currentSliceInteractionPairs: Array<{ q1: number; q2: number }>,
         qubitPositions: Map<number, THREE.Vector3>,
-        yAxis: THREE.Vector3,
+        yAxis: THREE.Vector3
     ): void {
         if (
             !this.logicalConnectionMesh ||
@@ -351,12 +350,12 @@ export class RenderManager {
                     scale.set(
                         this.renderParams.connectionThickness * 0.8,
                         distance,
-                        this.renderParams.connectionThickness * 0.8,
+                        this.renderParams.connectionThickness * 0.8
                     );
                     matrix.compose(position, quaternion, scale);
                     this.logicalConnectionMesh.setMatrixAt(
                         instanceCount,
-                        matrix,
+                        matrix
                     );
                     instanceCount++;
                 }
@@ -373,11 +372,10 @@ export class RenderManager {
     private drawCompiledConnections(
         couplingMap: number[][] | null,
         qubitPositions: Map<number, THREE.Vector3>,
-        cumulativeWeightedPairInteractions: Map<string, number[]>,
+        dataManager: CircuitDataManager,
         currentSliceIndex: number,
         maxSlicesForHeatmap: number,
-        processedSlicesCount: number,
-        yAxis: THREE.Vector3,
+        yAxis: THREE.Vector3
     ): void {
         if (
             !couplingMap ||
@@ -393,206 +391,115 @@ export class RenderManager {
             return;
         }
 
-        const lastLoadedSlice = processedSlicesCount - 1;
+        const lastLoadedSlice = dataManager.processedSlicesCount - 1;
         const effectiveSliceIndex = Math.min(
             currentSliceIndex,
-            lastLoadedSlice,
+            lastLoadedSlice
         );
 
         // Debug logging for "All" slices mode
         if (maxSlicesForHeatmap === -1) {
             console.log(`Connection heatmap debug - All slices mode:
                 currentSliceIndex: ${currentSliceIndex}
-                processedSlicesCount: ${processedSlicesCount}
+                processedSlicesCount: ${dataManager.processedSlicesCount}
                 lastLoadedSlice: ${lastLoadedSlice}
                 effectiveSliceIndex: ${effectiveSliceIndex}
-                cumulativeData available pairs: ${cumulativeWeightedPairInteractions.size}`);
+                cumulativeData available pairs: ${dataManager.cumulativeWeightedPairInteractionData.size}`);
         }
 
         const weight_base = this.heatmapWeightBase;
 
-        const windowEndSlice = effectiveSliceIndex + 1;
-        let windowStartSlice;
-        if (maxSlicesForHeatmap === -1) {
-            windowStartSlice = 0;
-            console.log(`Window calculation (All slices):
-                effectiveSliceIndex: ${effectiveSliceIndex}
-                windowEndSlice: ${windowEndSlice}
-                windowStartSlice: ${windowStartSlice}
-                numSlicesInWindow: ${windowEndSlice - windowStartSlice}`);
-        } else {
-            windowStartSlice = Math.max(
-                0,
-                windowEndSlice - maxSlicesForHeatmap,
-            );
-        }
-        const numSlicesInWindow = windowEndSlice - windowStartSlice;
+        let maxInteractionCountInWindow = 0;
+        const interactionCounts = new Map<string, number>();
 
-        const pairData: Array<{
-            idA: number;
-            idB: number;
-            rawSum: number;
-            posA?: THREE.Vector3;
-            posB?: THREE.Vector3;
-        }> = [];
-
-        // Calculate pair interaction intensities
         for (const pair of couplingMap) {
-            if (pair.length === 2) {
-                const qubitIdA = pair[0];
-                const qubitIdB = pair[1];
-                const posA = qubitPositions.get(qubitIdA);
-                const posB = qubitPositions.get(qubitIdB);
+            const q1 = Math.min(pair[0], pair[1]);
+            const q2 = Math.max(pair[0], pair[1]);
+            const key = `${q1}-${q2}`;
 
-                if (!posA || !posB || posA.distanceTo(posB) === 0) {
-                    pairData.push({ idA: qubitIdA, idB: qubitIdB, rawSum: 0 });
-                    continue;
-                }
-
-                const q1 = Math.min(qubitIdA, qubitIdB);
-                const q2 = Math.max(qubitIdA, qubitIdB);
-                const key = `${q1}-${q2}`;
-
-                let currentPairWeightedSum = 0;
-                if (
-                    numSlicesInWindow > 0 &&
-                    cumulativeWeightedPairInteractions.has(key)
-                ) {
-                    const scaledCumulativeWeights =
-                        cumulativeWeightedPairInteractions.get(key)!;
-                    const C = windowEndSlice - 1;
-
-                    if (C >= 0 && C < scaledCumulativeWeights.length) {
-                        const S_prime_C = scaledCumulativeWeights[C];
-                        const S_prime_Start_minus_1 =
-                            windowStartSlice > 0
-                                ? scaledCumulativeWeights[windowStartSlice - 1]
-                                : 0;
-                        const numSlicesInWindow = C - windowStartSlice + 1;
-                        if (numSlicesInWindow > 0) {
-                            currentPairWeightedSum =
-                                S_prime_C -
-                                S_prime_Start_minus_1 *
-                                    Math.pow(weight_base, -numSlicesInWindow);
-                        }
-
-                        // Debug logging for first pair when in "All" mode
-                        if (
-                            maxSlicesForHeatmap === -1 &&
-                            qubitIdA === 0 &&
-                            qubitIdB === 1
-                        ) {
-                            console.log(`Sample pair 0-1 calculation details:
-                                C (windowEndSlice-1): ${C}
-                                scaledCumulativeWeights.length: ${scaledCumulativeWeights.length}
-                                S_prime_C: ${S_prime_C.toFixed(4)}
-                                S_prime_Start_minus_1: ${S_prime_Start_minus_1.toFixed(4)}
-                                weight_base: ${weight_base}
-                                numSlicesInWindow: ${numSlicesInWindow}
-                                Math.pow(weight_base, -numSlicesInWindow): ${Math.pow(weight_base, -numSlicesInWindow).toFixed(4)}
-                                Final currentPairWeightedSum: ${currentPairWeightedSum.toFixed(4)}`);
-                        }
-                    }
-                }
-
-                pairData.push({
-                    idA: qubitIdA,
-                    idB: qubitIdB,
-                    rawSum: currentPairWeightedSum,
-                    posA,
-                    posB,
-                });
-            }
-        }
-
-        const maxObservedRawPairSum = Math.max(
-            ...pairData.map((p) => p.rawSum),
-            0,
-        );
-
-        // Debug logging for "All" slices mode - show sample calculations
-        if (maxSlicesForHeatmap === -1 && pairData.length > 0) {
-            console.log(`Connection intensity calculations (All slices):
-                Total pairs: ${pairData.length}
-                Max observed raw sum: ${maxObservedRawPairSum}
-                Sample pair calculations:`);
-
-            // Show first 3 pairs with non-zero sums
-            const nonZeroPairs = pairData
-                .filter((p) => p.rawSum > 0)
-                .slice(0, 3);
-            nonZeroPairs.forEach((pair, index) => {
-                console.log(
-                    `  Pair ${index + 1} (${pair.idA}-${pair.idB}): rawSum=${pair.rawSum.toFixed(4)}, normalized=${(pair.rawSum / maxObservedRawPairSum).toFixed(4)}`,
+            const { interactionsInWindow } =
+                dataManager.getInteractionCountForPair(
+                    key,
+                    effectiveSliceIndex,
+                    maxSlicesForHeatmap
                 );
-            });
 
-            if (nonZeroPairs.length === 0) {
-                console.log("  No pairs with non-zero interaction sums found!");
+            interactionCounts.set(key, interactionsInWindow);
+            if (interactionsInWindow > maxInteractionCountInWindow) {
+                maxInteractionCountInWindow = interactionsInWindow;
             }
         }
 
-        // Render connections
-        let instanceCount = 0;
+        const denominator =
+            maxInteractionCountInWindow > 0 ? maxInteractionCountInWindow : 1;
+        let visibleConnectionCount = 0;
         const matrix = new THREE.Matrix4();
-        const position = new THREE.Vector3();
-        const quaternion = new THREE.Quaternion();
-        const scale = new THREE.Vector3();
-        const direction = new THREE.Vector3();
+        const position1 = new THREE.Vector3();
+        const position2 = new THREE.Vector3();
 
-        if (!this.intensityAttribute) return;
+        for (const pair of couplingMap) {
+            const q1 = pair[0];
+            const q2 = pair[1];
 
-        for (const data of pairData) {
-            if (!data.posA || !data.posB) continue;
+            const pos1 = qubitPositions.get(q1);
+            const pos2 = qubitPositions.get(q2);
 
-            const distance = data.posA.distanceTo(data.posB);
-            if (distance === 0) continue;
+            if (pos1 && pos2) {
+                position1.set(pos1.x, pos1.y, pos1.z);
+                position2.set(pos2.x, pos2.y, pos2.z);
 
-            let calculatedNormalizedIntensity = 0;
-            if (maxObservedRawPairSum > 0) {
-                calculatedNormalizedIntensity =
-                    data.rawSum / maxObservedRawPairSum;
-            } else if (maxSlicesForHeatmap === 0 && data.rawSum === 1.0) {
-                calculatedNormalizedIntensity = 1.0;
-            }
+                const key = `${Math.min(q1, q2)}-${Math.max(q1, q2)}`;
+                const interactionCount = interactionCounts.get(key) || 0;
+                const normalizedIntensity = interactionCount / denominator;
 
-            let finalConnectionIntensity = calculatedNormalizedIntensity;
-            if (data.rawSum > 0.0001) {
-                finalConnectionIntensity = Math.max(
-                    calculatedNormalizedIntensity,
-                    0.002,
+                this.setConnectionTransform(
+                    position1,
+                    position2,
+                    yAxis,
+                    matrix
                 );
-            } else {
-                finalConnectionIntensity = 0;
+                this.instancedConnectionMesh.setMatrixAt(
+                    visibleConnectionCount,
+                    matrix
+                );
+                this.intensityAttribute?.setX(
+                    visibleConnectionCount,
+                    normalizedIntensity
+                );
+
+                visibleConnectionCount++;
             }
-
-            position.copy(data.posA).add(data.posB).multiplyScalar(0.5);
-            direction.subVectors(data.posB, data.posA).normalize();
-            quaternion.setFromUnitVectors(yAxis, direction);
-            scale.set(
-                this.renderParams.connectionThickness,
-                distance,
-                this.renderParams.connectionThickness,
-            );
-            matrix.compose(position, quaternion, scale);
-            this.instancedConnectionMesh.setMatrixAt(instanceCount, matrix);
-
-            this.intensityAttribute.setX(
-                instanceCount,
-                finalConnectionIntensity,
-            );
-            instanceCount++;
         }
 
-        // Update shader uniforms
-        (
-            this.instancedConnectionMesh.material as THREE.ShaderMaterial
-        ).uniforms.uInactiveAlpha.value =
-            this.renderParams.inactiveElementAlpha;
-
-        this.instancedConnectionMesh.count = instanceCount;
+        this.instancedConnectionMesh.count = visibleConnectionCount;
         this.instancedConnectionMesh.instanceMatrix.needsUpdate = true;
-        this.intensityAttribute.needsUpdate = true;
+        if (this.intensityAttribute) {
+            this.intensityAttribute.needsUpdate = true;
+        }
+    }
+
+    private setConnectionTransform(
+        position1: THREE.Vector3,
+        position2: THREE.Vector3,
+        yAxis: THREE.Vector3,
+        matrix: THREE.Matrix4
+    ): void {
+        const direction = new THREE.Vector3().subVectors(position2, position1);
+        const distance = direction.length();
+        const quaternion = new THREE.Quaternion().setFromUnitVectors(
+            yAxis,
+            direction.normalize()
+        );
+        const scale = new THREE.Vector3(
+            this.renderParams.connectionThickness,
+            distance,
+            this.renderParams.connectionThickness
+        );
+        const position = new THREE.Vector3()
+            .addVectors(position1, position2)
+            .multiplyScalar(0.5);
+
+        matrix.compose(position, quaternion, scale);
     }
 
     /**
@@ -600,18 +507,18 @@ export class RenderManager {
      */
     updateQubitOpacities(
         lastCalculatedSlicesChangeIDs: Array<Set<number>>,
-        maxSlicesForHeatmap: number,
+        maxSlicesForHeatmap: number
     ): void {
         this.qubitInstances.forEach((qubit, qubitId) => {
             if (qubit.blochSphere) {
                 const intensity = this.getQubitInteractionIntensity(
                     qubitId,
                     lastCalculatedSlicesChangeIDs,
-                    maxSlicesForHeatmap,
+                    maxSlicesForHeatmap
                 );
                 if (intensity <= 0.001) {
                     qubit.blochSphere.setOpacity(
-                        this.renderParams.inactiveElementAlpha,
+                        this.renderParams.inactiveElementAlpha
                     );
                 } else {
                     qubit.blochSphere.setOpacity(1.0);
@@ -626,7 +533,7 @@ export class RenderManager {
     private getQubitInteractionIntensity(
         qubitId: number,
         slicesChangeData: Array<Set<number>>,
-        maxSlicesForHeatmap: number,
+        maxSlicesForHeatmap: number
     ): number {
         let interactionCount = 0;
         if (!slicesChangeData || !Array.isArray(slicesChangeData)) return 0;
@@ -680,7 +587,7 @@ export class RenderManager {
                 qubit.blochSphere.blochSphere.position.set(
                     position.x,
                     position.y,
-                    position.z,
+                    position.z
                 );
             }
         });
@@ -717,7 +624,7 @@ export class RenderManager {
      */
     setBlochSpheresVisible(
         visible: boolean,
-        qubitPositions: Map<number, THREE.Vector3>,
+        qubitPositions: Map<number, THREE.Vector3>
     ): void {
         this._areBlochSpheresVisible = visible;
 
@@ -762,13 +669,13 @@ export class RenderManager {
     updateLOD(cameraDistance: number, layoutAreaSide: number): void {
         if (layoutAreaSide === 0) return;
 
-        let level: "high" | "medium" | "low";
+        let level: 'high' | 'medium' | 'low';
         if (cameraDistance > layoutAreaSide * 5) {
-            level = "low";
+            level = 'low';
         } else if (cameraDistance > layoutAreaSide * 3) {
-            level = "medium";
+            level = 'medium';
         } else {
-            level = "high";
+            level = 'high';
         }
 
         if (level !== this.currentLOD) {
@@ -779,7 +686,7 @@ export class RenderManager {
     /**
      * Set Level of Detail
      */
-    private setLOD(level: "high" | "medium" | "low"): void {
+    private setLOD(level: 'high' | 'medium' | 'low'): void {
         if (this.currentLOD === level) return;
         this.currentLOD = level;
 
@@ -813,7 +720,7 @@ export class RenderManager {
      * Dispose of all rendering resources
      */
     dispose(): void {
-        console.log("RenderManager dispose called");
+        console.log('RenderManager dispose called');
 
         // Dispose qubits
         this.qubitInstances.forEach((qubit) => {
@@ -833,6 +740,6 @@ export class RenderManager {
             this.logicalConnectionMesh = null;
         }
 
-        console.log("RenderManager resources cleaned up");
+        console.log('RenderManager resources cleaned up');
     }
 }
