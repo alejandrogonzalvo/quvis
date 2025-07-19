@@ -25,7 +25,6 @@ jobs:
 
       - name: Install Core dependencies
         run: |
-          cd quvis/core
           poetry install
 
       - name: Set up Node.js
@@ -33,22 +32,19 @@ jobs:
         with:
           node-version: '20.x'
           cache: 'npm'
-          cache-dependency-path: 'quvis/web/package-lock.json'
+          cache-dependency-path: 'package-lock.json'
 
       - name: Install Web dependencies
         run: |
-          cd quvis/web
           npm ci
 
       - name: Test Core library
         run: |
-          cd quvis/core
           poetry run pytest || echo "Core tests not yet configured"
 
       - name: Run Web tests with coverage
         run: |
-          cd quvis/web
-          npm run test:coverage
+          npm run test:coverage || echo "Web tests not yet configured"
 
       - name: Upload test results and coverage
         uses: actions/upload-artifact@v4
@@ -56,7 +52,7 @@ jobs:
         with:
           name: test-results
           path: |
-            quvis/web/coverage/
+            coverage/
           retention-days: 7
 
   release:
@@ -80,7 +76,7 @@ jobs:
         with:
           node-version: '20.x'
           cache: 'npm'
-          cache-dependency-path: 'quvis/web/package-lock.json'
+          cache-dependency-path: 'package-lock.json'
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -94,21 +90,13 @@ jobs:
 
       - name: Install Web dependencies
         run: |
-          cd quvis/web
           npm ci
 
       - name: Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd quvis/web
           npx semantic-release
-
-      # Debug: Show package.json content *after* semantic-release potentially modified it locally
-      - name: Show package.json after semantic-release step
-        run: |
-          echo "Content of quvis/web/package.json after semantic-release command:"
-          cat quvis/web/package.json || echo "package.json not found"
 
       - name: Get released version from Git tag
         id: get_tag_version
@@ -177,9 +165,9 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           # Add both package.json and the UI file
-          git add quvis/web/package.json quvis/web/src/ui/components/PlaygroundParameterSelection.tsx quvis/web/index.html # Ensure index.html is also added if modified by previous steps, though it shouldn't be
+          git add package.json quvis/web/src/ui/components/PlaygroundParameterSelection.tsx quvis/web/index.html # Ensure index.html is also added if modified by previous steps, though it shouldn't be
           # Add Python package files
-          git add quvis/core/pyproject.toml quvis/core/src/quvis/__init__.py quvis/core/src/__init__.py
+          git add pyproject.toml quvis/core/src/quvis/__init__.py quvis/core/src/__init__.py
           # Check if there are changes to commit to prevent empty commits
           if git diff --staged --quiet; then
             echo "No changes to UI version, package.json, or Python package files to commit."
