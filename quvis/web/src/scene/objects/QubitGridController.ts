@@ -150,35 +150,34 @@ export class QubitGridController {
         },
         onLayoutComplete?: () => void
     ): void {
-        const changed = this.layoutManager.updateParameters(params);
+        // Always update parameters and trigger layout recalculation
+        this.layoutManager.updateParameters(params);
 
-        if (changed) {
-            const deviceQubitCount = this.dataManager.deviceQubitCount;
-            if (deviceQubitCount > 0) {
-                this.layoutManager.calculateForceDirectedLayout(
-                    deviceQubitCount,
-                    this.dataManager.couplingMap,
-                    (positions) => {
-                        this.renderManager.updateQubitPositions(positions);
-                        this.heatmapManager.generateClusters(
-                            positions,
-                            deviceQubitCount
+        const deviceQubitCount = this.dataManager.deviceQubitCount;
+        if (deviceQubitCount > 0) {
+            this.layoutManager.calculateForceDirectedLayout(
+                deviceQubitCount,
+                this.dataManager.couplingMap,
+                (positions) => {
+                    this.renderManager.updateQubitPositions(positions);
+                    this.heatmapManager.generateClusters(
+                        positions,
+                        deviceQubitCount
+                    );
+                    this.heatmapManager.clearPositionsCache();
+                    this.updateVisualization();
+
+                    // Save force layout state for current circuit
+                    if (this.dataManager.isMultiCircuit) {
+                        this.saveCurrentLayoutState(
+                            this.dataManager.currentCircuitIndex,
+                            'force'
                         );
-                        this.heatmapManager.clearPositionsCache();
-                        this.updateVisualization();
-
-                        // Save force layout state for current circuit
-                        if (this.dataManager.isMultiCircuit) {
-                            this.saveCurrentLayoutState(
-                                this.dataManager.currentCircuitIndex,
-                                'force'
-                            );
-                        }
-
-                        onLayoutComplete?.();
                     }
-                );
-            }
+
+                    onLayoutComplete?.();
+                }
+            );
         } else {
             onLayoutComplete?.();
         }
