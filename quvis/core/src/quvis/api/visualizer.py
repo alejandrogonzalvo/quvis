@@ -12,7 +12,7 @@ import json
 import subprocess
 from typing import Dict, Any, Optional, Union, List
 from pathlib import Path
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 
 from qiskit import QuantumCircuit
 from qiskit.transpiler import CouplingMap
@@ -27,24 +27,54 @@ from ..compiler.utils import (
 )
 
 
-class CircuitEntry:
-    """Internal class to store circuit data before visualization."""
+@dataclass
+class CircuitStats:
+    """Statistics about a quantum circuit."""
+    original_gates: int
+    depth: int
+    qubits: int
+    transpiled_gates: Optional[int] = None
+    swap_count: Optional[int] = None
 
-    def __init__(
-        self,
-        circuit: QuantumCircuit,
-        coupling_map: Optional[
-            Union[List[List[int]], CouplingMap, Dict[str, Any]]
-        ] = None,
-        algorithm_name: str = "Circuit",
-        topology_type: str = "custom",
-        **kwargs,
-    ):
-        self.circuit = circuit
-        self.coupling_map = coupling_map
-        self.algorithm_name = algorithm_name
-        self.topology_type = topology_type
-        self.kwargs = kwargs
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        result = {
+            "original_gates": self.original_gates,
+            "depth": self.depth,
+            "qubits": self.qubits,
+        }
+        if self.transpiled_gates is not None:
+            result["transpiled_gates"] = self.transpiled_gates
+        if self.swap_count is not None:
+            result["swap_count"] = self.swap_count
+        return result
+
+
+@dataclass
+class CircuitVisualizationData:
+    """Data structure for quantum circuit visualization."""
+    circuit_info: Union[LogicalCircuitInfo, CompiledCircuitInfo]
+    device_info: DeviceInfo
+    algorithm_name: str
+    circuit_type: str
+    algorithm_params: Dict[str, Any]
+    circuit_stats: CircuitStats
+    routing_info: Optional[RoutingCircuitInfo] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        result = {
+            "circuit_info": asdict(self.circuit_info),
+            "device_info": asdict(self.device_info),
+            "algorithm_name": self.algorithm_name,
+            "circuit_type": self.circuit_type,
+            "algorithm_params": self.algorithm_params,
+            "circuit_stats": self.circuit_stats.to_dict(),
+        }
+        if self.routing_info is not None:
+            result["routing_info"] = asdict(self.routing_info)
+        return result
+
 
 
 class QuvisVisualizer:
@@ -66,7 +96,7 @@ class QuvisVisualizer:
         """
         self.auto_open_browser = auto_open_browser
         self.port = port
-        self.circuits: List[CircuitEntry] = []
+        self.circuits: List[CircuitVisualizationData] = []
 
         # Frontend path is always relative to this file when installed via pip
         # From quvis/core/src/quvis/api/visualizer.py to quvis/web/
@@ -105,10 +135,12 @@ class QuvisVisualizer:
             circuit_type = "Logical" if coupling_map is None else "Compiled"
             algorithm_name = f"{circuit_type} Circuit {len(self.circuits) + 1}"
 
-        entry = CircuitEntry(
+        print(f"📊 Processing circuit: '{algorithm_name}'")
+        
+        circuit_data = self._process_circuit(
             circuit, coupling_map, algorithm_name, topology_type, **kwargs
         )
-        self.circuits.append(entry)
+        self.circuits.append(circuit_data)
 
     def visualize(self) -> Dict[str, Any]:
         """
@@ -122,32 +154,26 @@ class QuvisVisualizer:
                 "No circuits added. Use add_circuit() to add circuits before visualizing."
             )
 
-        print(f"🔄 Processing {len(self.circuits)} circuits for visualization...")
-
-        all_circuit_data = []
-        for i, entry in enumerate(self.circuits):
-            print(
-                f"📊 Processing circuit {i + 1}/{len(self.circuits)}: '{entry.algorithm_name}'"
-            )
-            circuit_data = self._process_circuit(entry)
-            all_circuit_data.append(circuit_data)
+        print(f"🌐 Launching visualization for {len(self.circuits)} circuits...")
 
         frontend_data = {
-            "circuits": all_circuit_data,
-            "total_circuits": len(all_circuit_data),
+            "circuits": [circuit.to_dict() for circuit in self.circuits],
+            "total_circuits": len(self.circuits),
         }
 
         self._launch_visualization(frontend_data)
 
         return frontend_data
 
-    def _process_circuit(self, entry: CircuitEntry) -> Dict[str, Any]:
-        """Process a circuit entry into visualization data."""
-        circuit = entry.circuit
-        coupling_map = entry.coupling_map
-        algorithm_name = entry.algorithm_name
-        topology_type = entry.topology_type
-        transpile_kwargs = entry.kwargs
+    def _process_circuit(
+        self,
+        circuit: QuantumCircuit,
+        coupling_map: Optional[Union[List[List[int]], CouplingMap, Dict[str, Any]]] = None,
+        algorithm_name: str = "Circuit",
+        topology_type: str = "custom",
+        **transpile_kwargs,
+    ) -> CircuitVisualizationData:
+        """Process a circuit into visualization data."""
 
         if coupling_map is not None:
             if isinstance(coupling_map, dict):
@@ -190,18 +216,20 @@ class QuvisVisualizer:
                 connectivity_graph_coupling_map=[],
             )
 
-            return {
-                "circuit_info": asdict(circuit_info),
-                "device_info": asdict(device_info),
-                "algorithm_name": algorithm_name,
-                "circuit_type": "logical",
-                "algorithm_params": transpile_kwargs,
-                "circuit_stats": {
-                    "original_gates": len(circuit.data),
-                    "depth": len(operations_per_slice),
-                    "qubits": circuit.num_qubits,
-                },
-            }
+            circuit_stats = CircuitStats(
+                original_gates=len(circuit.data),
+                depth=len(operations_per_slice),
+                qubits=circuit.num_qubits,
+            )
+
+            return CircuitVisualizationData(
+                circuit_info=circuit_info,
+                device_info=device_info,
+                algorithm_name=algorithm_name,
+                circuit_type="logical",
+                algorithm_params=transpile_kwargs,
+                circuit_stats=circuit_stats,
+            )
         else:
             compiled_operations_per_slice = extract_operations_per_slice(circuit)
 
@@ -228,24 +256,26 @@ class QuvisVisualizer:
                 connectivity_graph_coupling_map=list(coupling_map_list),
             )
 
-            return {
-                "circuit_info": asdict(circuit_info),
-                "routing_info": asdict(routing_info),
-                "device_info": asdict(device_info),
-                "algorithm_name": algorithm_name,
-                "circuit_type": "compiled",
-                "algorithm_params": transpile_kwargs,
-                "circuit_stats": {
-                    "original_gates": len(circuit.data),
-                    "transpiled_gates": len(circuit.data),
-                    "depth": len(compiled_operations_per_slice),
-                    "qubits": circuit.num_qubits,
-                    "swap_count": total_swap_count,
-                },
-            }
+            circuit_stats = CircuitStats(
+                original_gates=len(circuit.data),
+                depth=len(compiled_operations_per_slice),
+                qubits=circuit.num_qubits,
+                transpiled_gates=len(circuit.data),
+                swap_count=total_swap_count,
+            )
+
+            return CircuitVisualizationData(
+                circuit_info=circuit_info,
+                device_info=device_info,
+                algorithm_name=algorithm_name,
+                circuit_type="compiled",
+                algorithm_params=transpile_kwargs,
+                circuit_stats=circuit_stats,
+                routing_info=routing_info,
+            )
 
     def clear_circuits(self) -> None:
-        """Clear all added circuits."""
+        """Clear all processed circuits from the visualizer."""
         self.circuits.clear()
 
     def _launch_visualization(self, data: Dict[str, Any]):
