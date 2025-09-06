@@ -81,7 +81,7 @@ class CircuitVisualizationData:
 
 
 
-class QuvisVisualizer:
+class Visualizer:
     """
     Main Quvis visualization class for multiple quantum circuits.
     """
@@ -406,7 +406,7 @@ def visualize_circuit(
     Returns:
         Dictionary containing multi-circuit visualization data (logical + compiled)
     """
-    visualizer = QuvisVisualizer(verbose=verbose)
+    visualizer = Visualizer(verbose=verbose)
     visualizer.add_circuit(
         circuit, coupling_map, algorithm_name=algorithm_name, **kwargs
     )

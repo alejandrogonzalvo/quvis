@@ -53,11 +53,11 @@ python examples/library_usage.py
 ### Basic Usage
 
 ```python
-from quvis import QuvisVisualizer
+from quvis import Visualizer
 from qiskit import QuantumCircuit
 
 # Create visualizer
-quvis = QuvisVisualizer()
+quvis = Visualizer()
 
 # Add any quantum circuit
 circuit = QuantumCircuit(4)
@@ -74,11 +74,11 @@ quvis.visualize()
 ### Multi-Circuit Comparison
 
 ```python
-from quvis import QuvisVisualizer
+from quvis import Visualizer
 from qiskit.circuit.library import QFT
 from qiskit import transpile
 
-quvis = QuvisVisualizer()
+quvis = Visualizer()
 
 # Add logical circuit
 logical_qft = QFT(4)

@@ -8,14 +8,14 @@ Run with: python examples/library_usage.py
 from qiskit import QuantumCircuit, transpile
 from qiskit.circuit.library import QFT, EfficientSU2
 from qiskit.transpiler import CouplingMap
-from quvis import QuvisVisualizer
+from quvis import Visualizer
 
 
 def basic_usage():
     """Basic circuit visualization - generates both logical and compiled versions."""
     print("=== Basic Usage ===")
     
-    quvis = QuvisVisualizer()
+    quvis = Visualizer()
     
     # Create a simple Bell state circuit
     circuit = QuantumCircuit(2)
@@ -30,7 +30,7 @@ def multi_circuit_comparison():
     """Compare logical vs compiled circuits."""
     print("\n=== Multi-Circuit Comparison ===")
     
-    quvis = QuvisVisualizer()
+    quvis = Visualizer()
     
     # Create QFT circuit
     qft = QFT(4)
@@ -60,7 +60,7 @@ def variational_circuit_example():
     """Visualize variational quantum circuits."""
     print("\n=== Variational Circuit Example ===")
     
-    quvis = QuvisVisualizer()
+    quvis = Visualizer()
     
     # Create EfficientSU2 ansatz
     ansatz = EfficientSU2(num_qubits=6, reps=2)
@@ -85,7 +85,7 @@ def custom_circuit_collection():
     """Multiple custom circuits in one visualization."""
     print("\n=== Custom Circuit Collection ===")
     
-    quvis = QuvisVisualizer()
+    quvis = Visualizer()
     
     # Circuit 1: GHZ state
     ghz = QuantumCircuit(4)

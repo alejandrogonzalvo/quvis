@@ -6,7 +6,7 @@ This package provides universal quantum circuit visualization with automatic com
 ## Usage
 
 ```python
-from quvis import visualize_circuit, QuvisVisualizer
+from quvis import visualize_circuit, Visualizer
 from qiskit import QuantumCircuit
 from qiskit.circuit.library import QFT, QAOAAnsatz
 
@@ -23,7 +23,7 @@ visualize_circuit(qft, coupling_map, algorithm_name="My QFT")
 """
 
 # Main Library Mode Interfaces
-from .api.visualizer import QuvisVisualizer, visualize_circuit
+from .api.visualizer import Visualizer, visualize_circuit
 
 # Interactive Playground API
 from .api.playground import PlaygroundAPI
@@ -44,7 +44,7 @@ __version__ = "3.0.0"
 
 __all__ = [
     # Main Interfaces
-    "QuvisVisualizer",
+    "Visualizer",
     "visualize_circuit", 
     
     # Playground API
