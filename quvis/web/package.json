@@ -1,6 +1,6 @@
 {
     "name": "quvis",
-    "version": "1.0.0",
+    "version": "3.0.0",
     "description": "Quvis Web Interface - Interactive quantum circuit visualization",
     "type": "module",
     "scripts": {
@@ -25,10 +25,11 @@
         "three": "^0.161.0"
     },
     "devDependencies": {
+        "@eslint/js": "^9.8.0",
         "@types/node": "^20.0.0",
         "@types/three": "^0.161.2",
         "@vitejs/plugin-react": "^4.0.0",
-        "eslint": "^8.0.0",
+        "eslint": "^9.8.0",
         "eslint-plugin-react": "^7.35.0",
         "eslint-plugin-react-hooks": "^4.6.0",
         "eslint-plugin-react-refresh": "^0.4.9",
@@ -41,20 +42,21 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/alejandrogonzalvo/quvis.git",
+        "url": "https://github.com/your-org/quvis.git",
         "directory": "quvis/web"
     },
-    "homepage": "https://github.com/alejandrogonzalvo/quvis",
+    "homepage": "https://github.com/your-org/quvis",
     "bugs": {
-        "url": "https://github.com/alejandrogonzalvo/quvis/issues"
+        "url": "https://github.com/your-org/quvis/issues"
     },
     "keywords": [
         "quantum",
         "visualization",
+        "qiskit",
         "threejs",
         "react",
         "circuits"
     ],
-    "author": "Alejandro Gonzalvo Hidalgo <alejandro@gonzalvo.org>",
+    "author": "Alejandro Gonzalvo Hidalgo <alejandro.gonzalvo.hidalgo@cern.ch>",
     "license": "MIT"
 }

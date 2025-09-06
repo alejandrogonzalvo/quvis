@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "quvis"
+version = "1.0.0"
+description = "Quvis - Quantum Circuit Visualization System"
+authors = ["Alejandro Gonzalvo Hidalgo <alejandro@gonzalvo.org>"]
+readme = "README.md"
+packages = [{include = "quvis", from = "quvis/core/src"}]
+include = ["quvis/web/**/*"]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+qiskit = "^2.1.0"
+numpy = "^1.24.0"
+ipykernel = "^6.29.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api" 
