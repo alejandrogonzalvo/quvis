@@ -9,6 +9,7 @@ the visualization with tabs for each circuit.
 
 import os
 import json
+import logging
 import subprocess
 from typing import Dict, Any, Optional, Union, List
 from pathlib import Path
@@ -25,6 +26,9 @@ from ..compiler.utils import (
     RoutingCircuitInfo,
     DeviceInfo,
 )
+
+# Create module logger
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -86,6 +90,7 @@ class QuvisVisualizer:
         self,
         auto_open_browser: bool = True,
         port: int = 5173,
+        verbose: bool = False,
     ):
         """
         Initialize the Quvis visualizer.
@@ -93,10 +98,18 @@ class QuvisVisualizer:
         Args:
             auto_open_browser: Whether to automatically open the browser
             port: Port for the development server (default: 5173)
+            verbose: Whether to enable verbose logging
         """
         self.auto_open_browser = auto_open_browser
         self.port = port
+        self.verbose = verbose
         self.circuits: List[CircuitVisualizationData] = []
+        
+        # Configure logging based on verbose setting
+        if verbose:
+            logging.basicConfig(level=logging.INFO, format='%(message)s')
+        else:
+            logging.basicConfig(level=logging.WARNING, format='%(message)s')
 
         # Frontend path is always relative to this file when installed via pip
         # From quvis/core/src/quvis/api/visualizer.py to quvis/web/
@@ -135,7 +148,7 @@ class QuvisVisualizer:
             circuit_type = "Logical" if coupling_map is None else "Compiled"
             algorithm_name = f"{circuit_type} Circuit {len(self.circuits) + 1}"
 
-        print(f"📊 Processing circuit: '{algorithm_name}'")
+        logger.info(f"📊 Processing circuit: '{algorithm_name}'")
         
         circuit_data = self._process_circuit(
             circuit, coupling_map, algorithm_name, topology_type, **kwargs
@@ -154,7 +167,7 @@ class QuvisVisualizer:
                 "No circuits added. Use add_circuit() to add circuits before visualizing."
             )
 
-        print(f"🌐 Launching visualization for {len(self.circuits)} circuits...")
+        logger.info(f"🌐 Launching visualization for {len(self.circuits)} circuits...")
 
         frontend_data = {
             "circuits": [circuit.to_dict() for circuit in self.circuits],
@@ -297,7 +310,7 @@ class QuvisVisualizer:
                 json.load(f)
 
         except Exception as e:
-            print(f"❌ Error creating data file: {e}")
+            logger.error(f"❌ Error creating data file: {e}")
             return
 
         # Change to frontend directory
@@ -322,13 +335,13 @@ class QuvisVisualizer:
                 return False
 
         if is_port_in_use(self.port):
-            print(
+            logger.warning(
                 f"⚠️  Port {self.port} is already in use. Please stop the existing server and try again."
             )
 
             return
         try:
-            print(f"🌐 Starting development server on port {self.port}...")
+            logger.info(f"🌐 Starting development server on port {self.port}...")
 
             env = os.environ.copy()
             env["VITE_LIBRARY_MODE"] = "true"
@@ -351,20 +364,20 @@ class QuvisVisualizer:
             )
 
             if not self.auto_open_browser:
-                print(f"🌐 Open your browser to: http://localhost:{self.port}")
+                logger.info(f"🌐 Open your browser to: http://localhost:{self.port}")
 
-            print(f"✅ Quvis is running! Press Ctrl+C to stop.")
+            logger.info(f"✅ Quvis is running! Press Ctrl+C to stop.")
 
             try:
                 process.wait()
             except KeyboardInterrupt:
-                print("\n🛑 Stopping...")
+                logger.info("\n🛑 Stopping...")
                 process.terminate()
                 process.wait()
 
         except Exception as e:
-            print(f"❌ Error launching visualization: {e}")
-            print(
+            logger.error(f"❌ Error launching visualization: {e}")
+            logger.info(
                 f"💡 Try running manually: VITE_LIBRARY_MODE=true npx vite --port {self.port} --base /"
             )
 
@@ -376,6 +389,7 @@ def visualize_circuit(
     circuit: QuantumCircuit,
     coupling_map: Optional[Union[List[List[int]], CouplingMap, Dict[str, Any]]] = None,
     algorithm_name: str = "Custom Circuit",
+    verbose: bool = False,
     **kwargs,
 ) -> Dict[str, Any]:
     """
@@ -386,12 +400,13 @@ def visualize_circuit(
         circuit: The quantum circuit to visualize
         coupling_map: Device coupling map (optional)
         algorithm_name: Name for the circuit (displayed in UI)
+        verbose: Whether to enable verbose logging
         **kwargs: Additional arguments for visualization
 
     Returns:
         Dictionary containing multi-circuit visualization data (logical + compiled)
     """
-    visualizer = QuvisVisualizer()
+    visualizer = QuvisVisualizer(verbose=verbose)
     visualizer.add_circuit(
         circuit, coupling_map, algorithm_name=algorithm_name, **kwargs
     )

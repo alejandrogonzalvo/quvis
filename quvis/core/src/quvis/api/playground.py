@@ -5,7 +5,7 @@ This module provides the backend for the interactive playground mode,
 generating quantum circuits on-demand based on user selections.
 """
 
-import sys, math, json, os, argparse
+import sys, math, json, os, argparse, logging
 from typing import Any, Dict, List
 from pathlib import Path
 from qiskit import QuantumCircuit
@@ -22,6 +22,9 @@ from ..compiler.utils import (
     RoutingCircuitInfo,
     DeviceInfo,
 )
+
+# Create module logger
+logger = logging.getLogger(__name__)
 
 
 class PlaygroundAPI:
@@ -65,14 +68,14 @@ class PlaygroundAPI:
 
         basis_gates = ["id", "rz", "sx", "x", "cx", "swap"]
 
-        print("Processing circuit for playground visualization...", file=sys.stderr)
+        logger.info("Processing circuit for playground visualization...")
 
         # Process logical circuit
-        print("Processing logical circuit...", file=sys.stderr)
+        logger.info("Processing logical circuit...")
         logical_circuit_data = self._process_logical_circuit(circuit, algorithm, kwargs)
 
         # Process compiled circuit
-        print("Processing compiled circuit...", file=sys.stderr)
+        logger.info("Processing compiled circuit...")
         compiled_circuit_data = self._process_compiled_circuit(
             circuit,
             coupling_map,
@@ -88,8 +91,8 @@ class PlaygroundAPI:
             "total_circuits": 2,
         }
 
-        print("Playground circuit generation completed successfully!", file=sys.stderr)
-        print("Generated logical and compiled versions", file=sys.stderr)
+        logger.info("Playground circuit generation completed successfully!")
+        logger.info("Generated logical and compiled versions")
 
         return result
 
@@ -102,9 +105,8 @@ class PlaygroundAPI:
         """Process the logical version of the circuit."""
         decomposed_circuit = circuit.decompose()
         logical_operations_per_slice = extract_operations_per_slice(decomposed_circuit)
-        print(
-            f"   ✓ Extracted {len(logical_operations_per_slice)} time slices from logical circuit",
-            file=sys.stderr,
+        logger.info(
+            f"   ✓ Extracted {len(logical_operations_per_slice)} time slices from logical circuit"
         )
 
         logical_info = LogicalCircuitInfo(
@@ -143,9 +145,8 @@ class PlaygroundAPI:
         kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Process the compiled version of the circuit."""
-        print(
-            f"🔧 Transpiling for optimization level {optimization_level}...",
-            file=sys.stderr,
+        logger.info(
+            f"🔧 Transpiling for optimization level {optimization_level}..."
         )
         transpile_options = {
             "basis_gates": basis_gates,
@@ -155,31 +156,27 @@ class PlaygroundAPI:
             transpile_options["coupling_map"] = qiskit_coupling_map
 
         transpiled_circuit = transpile(circuit, **transpile_options)
-        print(
-            f"   ✓ Transpilation complete: {len(transpiled_circuit.data)} gates total",
-            file=sys.stderr,
+        logger.info(
+            f"   ✓ Transpilation complete: {len(transpiled_circuit.data)} gates total"
         )
 
         compiled_operations_per_slice = extract_operations_per_slice(transpiled_circuit)
-        print(
-            f"   ✓ Extracted {len(compiled_operations_per_slice)} time slices from compiled circuit",
-            file=sys.stderr,
+        logger.info(
+            f"   ✓ Extracted {len(compiled_operations_per_slice)} time slices from compiled circuit"
         )
 
         routing_operations_per_slice, total_swap_count, routing_depth = (
             extract_routing_operations_per_slice(transpiled_circuit)
         )
-        print(
-            f"   ✓ Found {total_swap_count} SWAP gates for qubit routing",
-            file=sys.stderr,
+        logger.info(
+            f"   ✓ Found {total_swap_count} SWAP gates for qubit routing"
         )
 
         routing_analysis = analyze_routing_overhead(
             circuit.decompose(), transpiled_circuit
         )
-        print(
-            f"   ✓ Routing overhead: {routing_analysis['routing_overhead_percentage']:.1f}%",
-            file=sys.stderr,
+        logger.info(
+            f"   ✓ Routing overhead: {routing_analysis['routing_overhead_percentage']:.1f}%"
         )
 
         compiled_info = CompiledCircuitInfo(
@@ -381,13 +378,21 @@ def main():
     parser.add_argument(
         "--optimization-level", type=int, default=1, help="The optimization level."
     )
+    parser.add_argument(
+        "--verbose", action="store_true", help="Enable verbose logging."
+    )
     args = parser.parse_args()
+    
+    # Configure logging based on verbose setting
+    if args.verbose:
+        logging.basicConfig(level=logging.INFO, format='%(message)s', stream=sys.stderr)
+    else:
+        logging.basicConfig(level=logging.WARNING, format='%(message)s', stream=sys.stderr)
 
     # Generate circuit with the API
     try:
-        print(
-            f"INFO: Generating circuit - algorithm: {args.algorithm}, qubits: {args.num_qubits}, topology: {args.topology}",
-            file=sys.stderr,
+        logger.info(
+            f"INFO: Generating circuit - algorithm: {args.algorithm}, qubits: {args.num_qubits}, topology: {args.topology}"
         )
 
         result = generate_playground_circuit(
@@ -408,23 +413,22 @@ def main():
             output_path.parent.mkdir(parents=True, exist_ok=True)
             with open(output_path, "w") as f:
                 json.dump(result, f, separators=(",", ":"))
-            print(f"INFO: Saved circuit data to: {output_path}", file=sys.stderr)
+            logger.info(f"INFO: Saved circuit data to: {output_path}")
         except (OSError, IOError) as e:
-            print(
-                f"WARNING: Could not save circuit data to {output_path}: {e}",
-                file=sys.stderr,
+            logger.warning(
+                f"WARNING: Could not save circuit data to {output_path}: {e}"
             )
 
-        print(f"INFO: Circuit generation completed successfully", file=sys.stderr)
+        logger.info(f"INFO: Circuit generation completed successfully")
 
         # Output result to stdout (this MUST be the last print to stdout)
         print(json.dumps(result, separators=(",", ":")))
 
     except Exception as e:
-        print(f"ERROR: Circuit generation failed: {e}", file=sys.stderr)
+        logger.error(f"ERROR: Circuit generation failed: {e}")
         import traceback
 
-        print(f"ERROR: Traceback: {traceback.format_exc()}", file=sys.stderr)
+        logger.error(f"ERROR: Traceback: {traceback.format_exc()}")
         error_result = {"generation_successful": False, "error": str(e)}
         print(json.dumps(error_result, separators=(",", ":")))
         sys.exit(1)
