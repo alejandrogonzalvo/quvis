@@ -300,9 +300,6 @@ export class Playground {
 
     // Visualization methods
     public updateHeatmapSlices(slices: number) {
-        console.log(
-            `Playground (${this.instanceId}): updateHeatmapSlices ENTERED with slices = ${slices}`
-        );
         this.visualizationStateManager.setMaxHeatmapSlices(slices);
         if (this.grid) {
             this.grid.updateHeatmapSlices(slices);
@@ -311,6 +308,67 @@ export class Playground {
                 `Playground (${this.instanceId}): updateHeatmapSlices called, but this.grid is not available.`
             );
         }
+    }
+
+    public setLightBackground(lightMode: boolean) {
+        if (this.threeSetup) {
+            this.threeSetup.setLightBackground(lightMode);
+        } else {
+            console.warn(
+                `Playground (${this.instanceId}): setLightBackground called, but threeSetup is not available.`
+            );
+        }
+        
+        // Update heatmap border color based on background mode
+        if (this.grid) {
+            this.grid.updateHeatmapLightBackground(lightMode);
+        }
+    }
+
+
+    public isLightBackground(): boolean {
+        if (this.threeSetup) {
+            return this.threeSetup.isLightBackground();
+        }
+        return false;
+    }
+
+    public updateHeatmapColorParameters(params: {
+        fadeThreshold?: number;
+        greenThreshold?: number;
+        yellowThreshold?: number;
+        intensityPower?: number;
+        minIntensity?: number;
+        borderWidth?: number;
+    }) {
+        if (this.grid) {
+            this.grid.updateHeatmapColorParameters(params);
+        } else {
+            console.warn(
+                `Playground (${this.instanceId}): updateHeatmapColorParameters called, but grid is not available.`
+            );
+        }
+    }
+
+    public getHeatmapColorParameters(): {
+        fadeThreshold: number;
+        greenThreshold: number;
+        yellowThreshold: number;
+        intensityPower: number;
+        minIntensity: number;
+        borderWidth: number;
+    } {
+        if (this.grid) {
+            return this.grid.getHeatmapColorParameters();
+        }
+        return {
+            fadeThreshold: 0.1,
+            greenThreshold: 0.3,
+            yellowThreshold: 0.7,
+            intensityPower: 0.3,
+            minIntensity: 0.01,
+            borderWidth: 0.0,
+        };
     }
 
     public setCurrentSlice(sliceIndex: number) {

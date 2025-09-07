@@ -8,6 +8,13 @@ export class Heatmap {
     qubitPositions: THREE.Vector3[] = [];
     camera: THREE.PerspectiveCamera;
     maxSlices: number;
+    
+    // Two-pass rendering system
+    private renderTarget: THREE.WebGLRenderTarget;
+    private intensityScene: THREE.Scene;
+    private colorMappingScene: THREE.Scene;
+    private colorMappingMaterial: THREE.ShaderMaterial;
+    private colorMappingMesh: THREE.Mesh;
 
     clusteredMesh: THREE.Points<
         THREE.BufferGeometry,
@@ -23,6 +30,23 @@ export class Heatmap {
     ) {
         this.camera = camera;
         this.maxSlices = maxSlices;
+        
+        // Create render target for intensity accumulation
+        this.renderTarget = new THREE.WebGLRenderTarget(
+            window.innerWidth,
+            window.innerHeight,
+            {
+                minFilter: THREE.LinearFilter,
+                magFilter: THREE.LinearFilter,
+                format: THREE.RGBAFormat,
+                type: THREE.FloatType,
+            }
+        );
+        
+        // Create scenes for two-pass rendering
+        this.intensityScene = new THREE.Scene();
+        this.colorMappingScene = new THREE.Scene();
+        
         const geometry = new THREE.BufferGeometry();
         this.positions = new Float32Array(qubit_number * 3);
         this.intensities = new Float32Array(qubit_number);
@@ -36,6 +60,7 @@ export class Heatmap {
             new THREE.BufferAttribute(this.intensities, 1),
         );
 
+        // First pass: intensity accumulation shader
         this.material = new THREE.ShaderMaterial({
             uniforms: {
                 aspect: { value: window.innerWidth / window.innerHeight },
@@ -61,55 +86,32 @@ export class Heatmap {
                 }
             `,
             fragmentShader: `
-            uniform float radius;
-            varying vec3 vPosition;
-            varying float vIntensity; // This is now correctly normalized: 0 to 1 based on max_in_window
-            
-            void main() {
-                vec2 coord = gl_PointCoord * 2.0 - vec2(1.0); // For circular points
-                float distance = length(coord);
+                uniform float radius;
+                varying vec3 vPosition;
+                varying float vIntensity;
                 
-                // Alpha for particle shape (soft edges)
-                float particleAlpha = smoothstep(radius, radius * 0.1, distance);
-                if (particleAlpha < 0.001) discard; // Optimization: discard fully transparent fragments
-
-                // Clamp vIntensity to [0,1] as good practice, though it should be already.
-                float clampedIntensity = clamp(vIntensity, 0.0, 1.0);
-
-                float intensityBasedAlpha;
-                vec3 colorValue;
-
-                // Threshold for an interaction to be considered \\"zero\\" for display
-                const float zeroThreshold = 0.001; 
-                // Threshold below which alpha ramps up (e.g., 10% of max interactions)
-                // This means intensities from 0 to 0.1 of max will ramp up their alpha.
-                const float alphaRampUpThreshold = 0.1; 
-
-                if (clampedIntensity < zeroThreshold) {
-                    intensityBasedAlpha = 0.0; // Fully transparent for zero interactions
-                    // colorValue is irrelevant if alpha is 0, but set it to avoid undefined behavior
-                    colorValue = vec3(0.0, 1.0, 0.0); // Default to Green
-                } else {
-                    // Ramp up alpha for low intensities, then solid alpha for higher intensities
-                    intensityBasedAlpha = smoothstep(0.0, alphaRampUpThreshold, clampedIntensity);
+                void main() {
+                    vec2 coord = gl_PointCoord * 2.0 - vec2(1.0);
+                    float distance = length(coord);
                     
-                    // Color transitions: Green -> Yellow -> Red based on clampedIntensity
-                    if (clampedIntensity <= 0.5) {
-                        // Transition from Green (0,1,0) towards Yellow (1,1,0) as intensity goes from 0 to 0.5
-                        // At intensity 0 (or very near it), color is (0,1,0) -> Green
-                        // At intensity 0.5, color is (1,1,0) -> Yellow
-                        colorValue = vec3(clampedIntensity * 2.0, 1.0, 0.0);
-                    } else {
-                        // Transition from Yellow (1,1,0) towards Red (1,0,0) as intensity goes from 0.5 to 1.0
-                        // At intensity 0.5, color is (1,1,0) -> Yellow
-                        // At intensity 1.0, color is (1,0,0) -> Red
-                        colorValue = vec3(1.0, 1.0 - (clampedIntensity - 0.5) * 2.0, 0.0);
+                    // Alpha for particle shape (soft edges)
+                    float particleAlpha = smoothstep(radius, radius * 0.1, distance);
+                    if (particleAlpha < 0.001) discard;
+                    
+                    // Clamp vIntensity to [0,1]
+                    float clampedIntensity = clamp(vIntensity, 0.0, 1.0);
+                    
+                    // Threshold for zero interactions
+                    const float zeroThreshold = 0.001;
+                    if (clampedIntensity < zeroThreshold) {
+                        discard;
                     }
+                    
+                    // Output white intensity that will be accumulated
+                    float outputIntensity = clampedIntensity * particleAlpha;
+                    gl_FragColor = vec4(outputIntensity, outputIntensity, outputIntensity, outputIntensity);
                 }
-                
-                gl_FragColor = vec4(colorValue, particleAlpha * intensityBasedAlpha);
-            }
-        `,
+            `,
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthTest: false,
@@ -117,6 +119,123 @@ export class Heatmap {
 
         this.mesh = new THREE.Points(geometry, this.material);
         this.mesh.visible = true;
+        this.intensityScene.add(this.mesh);
+        
+        // Second pass: color mapping shader
+        const quadGeometry = new THREE.PlaneGeometry(2, 2);
+        this.colorMappingMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                tIntensity: { value: this.renderTarget.texture },
+                maxIntensity: { value: 1.0 },
+                // Color transition thresholds
+                fadeThreshold: { value: 0.1 }, // New fade threshold
+                greenThreshold: { value: 0.3 },
+                yellowThreshold: { value: 0.7 },
+                // Power curve for smoothIntensity
+                intensityPower: { value: 0.3 },
+                // Min intensity threshold for discarding pixels
+                minIntensity: { value: 0.01 },
+                // Border width for black contour
+                borderWidth: { value: 0.0 },
+                // Light background mode for border color
+                isLightBackground: { value: false },
+                // Fixed colors
+                greenColor: { value: new THREE.Vector3(0.0, 1.0, 0.0) },
+                yellowColor: { value: new THREE.Vector3(1.0, 1.0, 0.0) },
+                redColor: { value: new THREE.Vector3(1.0, 0.0, 0.0) },
+            },
+            vertexShader: `
+                void main() {
+                    gl_Position = vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tIntensity;
+                uniform float maxIntensity;
+                uniform float minIntensity;
+                uniform float fadeThreshold;
+                uniform float greenThreshold;
+                uniform float yellowThreshold;
+                uniform float intensityPower;
+                uniform float borderWidth;
+                uniform bool isLightBackground;
+                uniform vec3 greenColor;
+                uniform vec3 yellowColor;
+                uniform vec3 redColor;
+                varying vec2 vUv;
+                
+                void main() {
+                    vec2 uv = gl_FragCoord.xy / vec2(textureSize(tIntensity, 0));
+                    vec4 intensityData = texture2D(tIntensity, uv);
+                    float intensity = intensityData.r; // Use red channel for intensity
+                    
+                    // Normalize intensity based on expected max
+                    float normalizedIntensity = clamp(intensity / maxIntensity, 0.0, 1.0);
+                    
+                    // Discard pixels below minimum intensity threshold
+                    if (normalizedIntensity < minIntensity) {
+                        discard;
+                    }
+                    
+                    // Configurable color mapping
+                    vec3 colorValue;
+                    
+                    // Use configurable power curve
+                    float smoothIntensity = pow(normalizedIntensity, intensityPower);
+                    
+                    // Calculate alpha based on fadeThreshold for green zones
+                    float alpha = 1.0;
+                    
+                    // Normal color mapping with border zone (offset by minIntensity)
+                    float effectiveBorderThreshold = minIntensity + borderWidth;
+                    if (borderWidth > 0.0 && smoothIntensity >= minIntensity && smoothIntensity <= effectiveBorderThreshold) {
+                        // Border zone: solid border color for low intensities (ignores fade threshold)
+                        colorValue = isLightBackground ? vec3(0.0, 0.0, 0.0) : vec3(1.0, 1.0, 1.0);
+                        alpha = 1.0;
+                    } else if (smoothIntensity <= greenThreshold) {
+                        // Pure green for low values (borderWidth - greenThreshold)
+                        colorValue = greenColor;
+                        
+                        // Apply fade effect: 0% opacity at fadeThreshold, 100% opacity at greenThreshold
+                        // But only if we're not in the border zone
+                        if (borderWidth > 0.0 && smoothIntensity <= borderWidth) {
+                            // Skip fade logic for border zone
+                            alpha = 1.0;
+                        } else if (smoothIntensity <= fadeThreshold) {
+                            alpha = 0.0;
+                        } else if (smoothIntensity < greenThreshold) {
+                            float fadeRange = greenThreshold - fadeThreshold;
+                            if (fadeRange > 0.0001) {
+                                alpha = (smoothIntensity - fadeThreshold) / fadeRange;
+                            } else {
+                                alpha = 1.0;
+                            }
+                        }
+                    } else if (smoothIntensity <= yellowThreshold) {
+                        // Green to Yellow transition (greenThreshold - yellowThreshold)
+                        float range = yellowThreshold - greenThreshold;
+                        float t = range > 0.0001 ? (smoothIntensity - greenThreshold) / range : 0.0;
+                        colorValue = mix(greenColor, yellowColor, t);
+                        // Full opacity for yellow and above
+                        alpha = 1.0;
+                    } else {
+                        // Yellow to Red transition (yellowThreshold - 1.0)
+                        float range = 1.0 - yellowThreshold;
+                        float t = range > 0.0001 ? (smoothIntensity - yellowThreshold) / range : 0.0;
+                        colorValue = mix(yellowColor, redColor, t);
+                        // Full opacity for red
+                        alpha = 1.0;
+                    }
+                    
+                    gl_FragColor = vec4(colorValue, alpha);
+                }
+            `,
+            transparent: true,
+            depthTest: false,
+        });
+        
+        this.colorMappingMesh = new THREE.Mesh(quadGeometry, this.colorMappingMaterial);
+        this.colorMappingScene.add(this.colorMappingMesh);
     }
 
     public generateClusters(
@@ -285,7 +404,7 @@ export class Heatmap {
 
         let maxObservedRawWeightedSum = 0;
         const windowEndSlice = currentSliceIndex + 1;
-        let windowStartSlice;
+        let windowStartSlice: number;
         if (this.maxSlices === -1) {
             // "All slices" mode
             windowStartSlice = 0;
@@ -454,6 +573,107 @@ export class Heatmap {
         };
     }
 
+    public render(renderer: THREE.WebGLRenderer, targetScene?: THREE.Scene): void {
+        // Update max intensity for proper normalization
+        let maxIntensity = 0;
+        for (let i = 0; i < this.intensities.length; i++) {
+            if (this.intensities[i] > maxIntensity) {
+                maxIntensity = this.intensities[i];
+            }
+        }
+        this.colorMappingMaterial.uniforms.maxIntensity.value = Math.max(maxIntensity, 0.1);
+        
+        // First pass: Render intensity accumulation to render target
+        renderer.setRenderTarget(this.renderTarget);
+        renderer.clear();
+        renderer.render(this.intensityScene, this.camera);
+        
+        // Second pass: Render color-mapped result to final target
+        renderer.setRenderTarget(null);
+        if (targetScene) {
+            // If we have a target scene, add our color mapping mesh temporarily
+            targetScene.add(this.colorMappingMesh);
+            renderer.render(targetScene, this.camera);
+            targetScene.remove(this.colorMappingMesh);
+        } else {
+            // Direct render of color mapping
+            renderer.render(this.colorMappingScene, this.camera);
+        }
+    }
+
+    public resize(width: number, height: number): void {
+        this.renderTarget.setSize(width, height);
+        this.material.uniforms.aspect.value = width / height;
+    }
+
+    public updateColorParameters(params: {
+        fadeThreshold?: number;
+        greenThreshold?: number;
+        yellowThreshold?: number;
+        intensityPower?: number;
+        minIntensity?: number;
+        borderWidth?: number;
+    }): void {
+        if (!this.colorMappingMaterial || !this.colorMappingMaterial.uniforms) return;
+
+        if (params.fadeThreshold !== undefined) {
+            this.colorMappingMaterial.uniforms.fadeThreshold.value = params.fadeThreshold;
+        }
+        if (params.greenThreshold !== undefined) {
+            this.colorMappingMaterial.uniforms.greenThreshold.value = params.greenThreshold;
+        }
+        if (params.yellowThreshold !== undefined) {
+            this.colorMappingMaterial.uniforms.yellowThreshold.value = params.yellowThreshold;
+        }
+        if (params.intensityPower !== undefined) {
+            this.colorMappingMaterial.uniforms.intensityPower.value = params.intensityPower;
+        }
+        if (params.minIntensity !== undefined) {
+            this.colorMappingMaterial.uniforms.minIntensity.value = params.minIntensity;
+        }
+        if (params.borderWidth !== undefined) {
+            this.colorMappingMaterial.uniforms.borderWidth.value = params.borderWidth;
+        }
+    }
+
+    public updateLightBackground(isLight: boolean): void {
+        if (this.colorMappingMaterial && this.colorMappingMaterial.uniforms) {
+            this.colorMappingMaterial.uniforms.isLightBackground.value = isLight;
+        }
+    }
+
+
+    public getColorParameters(): {
+        fadeThreshold: number;
+        greenThreshold: number;
+        yellowThreshold: number;
+        intensityPower: number;
+        minIntensity: number;
+        borderWidth: number;
+    } {
+        if (!this.colorMappingMaterial || !this.colorMappingMaterial.uniforms) {
+            return {
+                fadeThreshold: 0.1,
+                greenThreshold: 0.3,
+                yellowThreshold: 0.7,
+                intensityPower: 0.3,
+                minIntensity: 0.01,
+                borderWidth: 0.0,
+            };
+        }
+
+        const uniforms = this.colorMappingMaterial.uniforms;
+        return {
+            fadeThreshold: uniforms.fadeThreshold.value,
+            greenThreshold: uniforms.greenThreshold.value,
+            yellowThreshold: uniforms.yellowThreshold.value,
+            intensityPower: uniforms.intensityPower.value,
+            minIntensity: uniforms.minIntensity.value,
+            borderWidth: uniforms.borderWidth.value,
+        };
+    }
+
+
     public dispose(): void {
         if (this.mesh.geometry) {
             this.mesh.geometry.dispose();
@@ -468,6 +688,18 @@ export class Heatmap {
             this.clusteredMesh.material.dispose();
             this.clusteredMesh = null;
         }
+        
+        // Clean up two-pass rendering resources
+        if (this.renderTarget) {
+            this.renderTarget.dispose();
+        }
+        if (this.colorMappingMaterial) {
+            this.colorMappingMaterial.dispose();
+        }
+        if (this.colorMappingMesh && this.colorMappingMesh.geometry) {
+            this.colorMappingMesh.geometry.dispose();
+        }
+        
         // this.mesh is removed from the scene by QubitGrid
         console.log("Heatmap disposed");
     }
