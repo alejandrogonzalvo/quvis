@@ -13,6 +13,7 @@ import HeatmapControls from './components/HeatmapControls.js';
 import Tooltip from './components/Tooltip.js';
 import PlaybackControls from './components/PlaybackControls.js';
 import DebugInfo from './components/DebugInfo.js';
+import LightBackgroundToggle from './components/LightBackgroundToggle.js';
 import { colors } from './theme/colors.js';
 
 const BASE_TOP_MARGIN_PX = 20;
@@ -132,6 +133,9 @@ const App: React.FC = () => {
 
     // State for UI visibility
     const [isUiVisible, setIsUiVisible] = useState(true);
+
+    // State for light background mode
+    const [lightMode, setLightMode] = useState(false);
 
     // State for Playground data (for library mode)
     const [playgroundData, setPlaygroundData] = useState<any>(null);
@@ -585,6 +589,8 @@ const App: React.FC = () => {
             oneQubitBase: playgroundInstance.currentOneQubitFidelityBase,
             twoQubitBase: playgroundInstance.currentTwoQubitFidelityBase,
         });
+        // Initialize light mode from playground background state
+        setLightMode(playgroundInstance.isLightBackground());
     }, [playgroundData]);
 
     // Effect specifically for dataset changes to dispose the old playground
@@ -651,6 +657,13 @@ const App: React.FC = () => {
 
     const handleSpeedChange = (newSpeed: number) => {
         setPlaybackSpeed(newSpeed);
+    };
+
+    const handleLightModeToggle = (newLightMode: boolean) => {
+        setLightMode(newLightMode);
+        if (playgroundRef.current) {
+            playgroundRef.current.setLightBackground(newLightMode);
+        }
     };
 
     const fidelityPanelTop = isAppearanceCollapsed
@@ -727,6 +740,11 @@ const App: React.FC = () => {
                             />
                             {isTimelineInitialized && actualSliceCount > 0 && (
                                 <>
+                                    <LightBackgroundToggle
+                                        lightMode={lightMode}
+                                        onToggle={handleLightModeToggle}
+                                        playground={playgroundRef.current}
+                                    />
                                     <DebugInfo
                                         fps={fps}
                                         layoutTime={layoutTime}

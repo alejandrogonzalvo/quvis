@@ -9,7 +9,7 @@ interface DebugInfoProps {
 const DebugInfo: React.FC<DebugInfoProps> = ({ fps, layoutTime }) => {
     const containerStyle: React.CSSProperties = {
         position: "fixed",
-        bottom: "220px", // Positioned above the playback controls
+        bottom: "160px", // Positioned above the playback controls
         right: "20px",
         width: "250px",
         padding: "15px",
