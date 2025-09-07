@@ -67,14 +67,35 @@ export class AnimationController {
             this.grid.updateLOD(distance);
         }
 
-        // Render the scene
-        this.renderer.render(this.scene, this.camera);
-
         // Update camera position uniform for heatmap shader
         if (this.grid && this.grid.heatmap) {
             this.grid.heatmap.material.uniforms.cameraPosition.value.copy(
                 this.camera.position,
             );
+        }
+
+        // Render heatmap if present (two-pass rendering)
+        if (this.grid && this.grid.heatmap) {
+            // Temporarily remove heatmap mesh from scene to avoid double rendering
+            const heatmapMesh = this.grid.heatmap.mesh;
+            const wasInScene = heatmapMesh.parent === this.scene;
+            if (wasInScene) {
+                this.scene.remove(heatmapMesh);
+            }
+            
+            // Render the main scene without heatmap
+            this.renderer.render(this.scene, this.camera);
+            
+            // Render heatmap with two-pass system over the main scene
+            this.grid.heatmap.render(this.renderer, this.scene);
+            
+            // Restore heatmap mesh to scene for other operations
+            if (wasInScene) {
+                this.scene.add(heatmapMesh);
+            }
+        } else {
+            // Standard single-pass rendering when no heatmap
+            this.renderer.render(this.scene, this.camera);
         }
     }
 

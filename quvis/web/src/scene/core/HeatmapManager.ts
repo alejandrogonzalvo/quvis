@@ -31,7 +31,7 @@ export class HeatmapManager {
             qubitCount,
             this.maxSlicesForHeatmap,
         );
-        this.scene.add(this.heatmap.mesh);
+        // Note: Heatmap mesh is not added to scene as it uses two-pass rendering
 
         // Initialize legend
         this.heatmapLegend = new HeatmapLegend(
@@ -116,9 +116,6 @@ export class HeatmapManager {
      */
     updateLegend(): void {
         if (this.heatmapLegend) {
-            console.log(
-                `HeatmapManager.updateLegend: Updating legend with maxSlicesForHeatmap=${this.maxSlicesForHeatmap}, lastEffectiveSlicesForHeatmap=${this.lastEffectiveSlicesForHeatmap}, lastMaxObservedRawHeatmapSum=${this.lastMaxObservedRawHeatmapSum}`,
-            );
             this.heatmapLegend.update(
                 this.maxSlicesForHeatmap,
                 this.lastEffectiveSlicesForHeatmap,
@@ -193,9 +190,8 @@ export class HeatmapManager {
         camera: THREE.PerspectiveCamera,
         newQubitCount: number,
     ): void {
-        // Remove old heatmap from scene
-        if (this.heatmap && this.heatmap.mesh) {
-            this.scene.remove(this.heatmap.mesh);
+        // Dispose old heatmap
+        if (this.heatmap) {
             this.heatmap.dispose();
         }
 
@@ -205,7 +201,7 @@ export class HeatmapManager {
             newQubitCount,
             this.maxSlicesForHeatmap,
         );
-        this.scene.add(this.heatmap.mesh);
+        // Note: Heatmap mesh is not added to scene as it uses two-pass rendering
 
         // Clear cached data
         this.lastMaxObservedRawHeatmapSum = 0;
@@ -280,6 +276,57 @@ export class HeatmapManager {
         };
     }
 
+
+    /**
+     * Update heatmap color parameters
+     */
+    updateColorParameters(params: {
+        fadeThreshold?: number;
+        greenThreshold?: number;
+        yellowThreshold?: number;
+        intensityPower?: number;
+        minIntensity?: number;
+        borderWidth?: number;
+    }): void {
+        if (this.heatmap) {
+            this.heatmap.updateColorParameters(params);
+        }
+    }
+
+    /**
+     * Update light background state for border color
+     */
+    updateLightBackground(isLight: boolean): void {
+        if (this.heatmap) {
+            this.heatmap.updateLightBackground(isLight);
+        }
+    }
+
+
+    /**
+     * Get current color parameters
+     */
+    getColorParameters(): {
+        fadeThreshold: number;
+        greenThreshold: number;
+        yellowThreshold: number;
+        intensityPower: number;
+        minIntensity: number;
+        borderWidth: number;
+    } {
+        if (this.heatmap) {
+            return this.heatmap.getColorParameters();
+        }
+        return {
+            fadeThreshold: 0.1,
+            greenThreshold: 0.3,
+            yellowThreshold: 0.7,
+            intensityPower: 0.3,
+            minIntensity: 0.01,
+            borderWidth: 0.0,
+        };
+    }
+
     /**
      * Force refresh of all heatmap components
      */
@@ -308,9 +355,8 @@ export class HeatmapManager {
     dispose(): void {
         console.log("HeatmapManager dispose called");
 
-        // Remove heatmap from scene and dispose
-        if (this.heatmap && this.heatmap.mesh) {
-            this.scene.remove(this.heatmap.mesh);
+        // Dispose heatmap
+        if (this.heatmap) {
             this.heatmap.dispose();
         }
 

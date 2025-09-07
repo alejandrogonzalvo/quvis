@@ -42,6 +42,8 @@ export class EventManager {
         if (this.grid && this.grid.heatmap) {
             this.grid.heatmap.material.uniforms.aspect.value =
                 renderWidth / renderHeight;
+            // Update heatmap render target size for two-pass rendering
+            this.grid.heatmap.resize(renderWidth, renderHeight);
         }
     }
 

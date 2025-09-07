@@ -121,6 +121,22 @@ export class ThreeSceneSetup {
         this.components.renderer.setSize(renderWidth, renderHeight);
     }
 
+    public setLightBackground(lightMode: boolean): void {
+        if (!this.components) return;
+        
+        // Dark background: #121212, Light background: #ffffff (very light gray)
+        const backgroundColor = lightMode ? 0xffffff: 0x121212;
+        this.components.scene.background = new THREE.Color(backgroundColor);
+    }
+
+    public isLightBackground(): boolean {
+        if (!this.components || !this.components.scene.background) return false;
+        
+        const bgColor = this.components.scene.background as THREE.Color;
+        // Check if closer to light color (0xf5f5f5) than dark (0x121212)
+        return bgColor.r > 0.5;
+    }
+
     public dispose(): void {
         if (!this.components) return;
 

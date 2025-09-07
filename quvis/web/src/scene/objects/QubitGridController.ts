@@ -421,6 +421,32 @@ export class QubitGridController {
         // Future implementation for fidelity visualization
     }
 
+    public updateHeatmapColorParameters(params: {
+        fadeThreshold?: number;
+        greenThreshold?: number;
+        yellowThreshold?: number;
+        intensityPower?: number;
+        minIntensity?: number;
+        borderWidth?: number;
+    }): void {
+        this.heatmapManager.updateColorParameters(params);
+    }
+
+    public updateHeatmapLightBackground(isLight: boolean): void {
+        this.heatmapManager.updateLightBackground(isLight);
+    }
+
+    public getHeatmapColorParameters(): {
+        fadeThreshold: number;
+        greenThreshold: number;
+        yellowThreshold: number;
+        intensityPower: number;
+        minIntensity: number;
+        borderWidth: number;
+    } {
+        return this.heatmapManager.getColorParameters();
+    }
+
     public updateLOD(cameraDistance: number): void {
         this.renderManager.updateLOD(
             cameraDistance,
