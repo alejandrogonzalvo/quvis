@@ -6,12 +6,14 @@ interface LightBackgroundToggleProps {
     lightMode: boolean;
     onToggle: (lightMode: boolean) => void;
     playground?: Playground | null;
+    bottomPosition: string;
 }
 
 const LightBackgroundToggle: React.FC<LightBackgroundToggleProps> = ({
     lightMode,
     onToggle,
     playground,
+    bottomPosition,
 }) => {
     const [isHovered, setIsHovered] = useState(false);
     const [showTooltip, setShowTooltip] = useState(false);
@@ -26,8 +28,8 @@ const LightBackgroundToggle: React.FC<LightBackgroundToggleProps> = ({
 
     const containerStyle: React.CSSProperties = {
         position: 'fixed',
-        bottom: '240px', // Positioned above DebugInfo component
-        right: '20px', // Aligned with DebugInfo component
+        bottom: bottomPosition,
+        right: '20px',
         zIndex: 10,
         fontFamily: 'Inter, system-ui, sans-serif',
     };

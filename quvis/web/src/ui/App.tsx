@@ -47,6 +47,13 @@ const FIDELITY_PANEL_EXPANDED_HEIGHT_PX =
 const FIDELITY_PANEL_COLLAPSED_HEIGHT_PX =
     COLLAPSED_PANEL_HEADER_HEIGHT_PX + PANEL_BOTTOM_PADDING_PX;
 
+// Constants for right-side components
+const PLAYBACK_CONTROLS_EXPANDED_HEIGHT_PX = 143;  // Container padding (30px) + header (24px) + content (70px)
+const PLAYBACK_CONTROLS_COLLAPSED_HEIGHT_PX = 54;  // Container padding (30px) + header (24px) only
+const DEBUG_INFO_HEIGHT_PX = 80;
+const LIGHT_TOGGLE_HEIGHT_PX = 48;
+const BASE_BOTTOM_MARGIN_PX = 20;
+
 const App: React.FC = () => {
     const mountRef = useRef<HTMLDivElement>(null);
     const playgroundRef = useRef<Playground | null>(null);
@@ -666,12 +673,21 @@ const App: React.FC = () => {
         }
     };
 
+    // Left-side panel positioning (existing logic)
     const fidelityPanelTop = isAppearanceCollapsed
         ? `${BASE_TOP_MARGIN_PX + APPEARANCE_PANEL_COLLAPSED_HEIGHT_PX + INTER_PANEL_SPACING_PX}px`
         : `${BASE_TOP_MARGIN_PX + APPEARANCE_PANEL_EXPANDED_HEIGHT_PX + INTER_PANEL_SPACING_PX}px`;
     const layoutPanelTop = isFidelityCollapsed
         ? `${parseInt(fidelityPanelTop) + FIDELITY_PANEL_COLLAPSED_HEIGHT_PX + INTER_PANEL_SPACING_PX}px`
         : `${parseInt(fidelityPanelTop) + FIDELITY_PANEL_EXPANDED_HEIGHT_PX + INTER_PANEL_SPACING_PX}px`;
+
+    // Right-side component positioning (new unified system)
+    const playbackControlsHeight = isPlaybackCollapsed 
+        ? PLAYBACK_CONTROLS_COLLAPSED_HEIGHT_PX 
+        : PLAYBACK_CONTROLS_EXPANDED_HEIGHT_PX;
+    
+    const debugInfoBottom = `${BASE_BOTTOM_MARGIN_PX + playbackControlsHeight + INTER_PANEL_SPACING_PX}px`;
+    const lightToggleBottom = `${parseInt(debugInfoBottom) + DEBUG_INFO_HEIGHT_PX + INTER_PANEL_SPACING_PX}px`;
 
     return (
         <div className="App">
@@ -744,10 +760,12 @@ const App: React.FC = () => {
                                         lightMode={lightMode}
                                         onToggle={handleLightModeToggle}
                                         playground={playgroundRef.current}
+                                        bottomPosition={lightToggleBottom}
                                     />
                                     <DebugInfo
                                         fps={fps}
                                         layoutTime={layoutTime}
+                                        bottomPosition={debugInfoBottom}
                                     />
                                     <PlaybackControls
                                         isPlaying={isPlaying}
