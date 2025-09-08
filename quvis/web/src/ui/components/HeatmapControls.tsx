@@ -21,7 +21,6 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
     const [isHovered, setIsHovered] = useState(false);
     const [maxSlices, setMaxSlices] = useState(initialValues.maxSlices);
     const [baseSize, setBaseSize] = useState(initialValues.baseSize);
-    const [lightMode, setLightMode] = useState(false);
     
     // Color parameters state
     const [fadeThreshold, setFadeThreshold] = useState(0.1);
@@ -30,15 +29,58 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
     const [intensityPower, setIntensityPower] = useState(0.3);
     const [minIntensity, setMinIntensity] = useState(0.01);
     const [borderWidth, setBorderWidth] = useState(0.0);
+    const [showColorTooltip, setShowColorTooltip] = useState(false);
+    const [showSlicesTooltip, setShowSlicesTooltip] = useState(false);
+    const [showBaseSizeTooltip, setShowBaseSizeTooltip] = useState(false);
+    const [colorTooltipFading, setColorTooltipFading] = useState(false);
+    const [slicesTooltipFading, setSlicesTooltipFading] = useState(false);
+    const [baseSizeTooltipFading, setBaseSizeTooltipFading] = useState(false);
+    const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+    const [slicesTooltipPosition, setSlicesTooltipPosition] = useState({ top: 0, left: 0 });
+    const [baseSizeTooltipPosition, setBaseSizeTooltipPosition] = useState({ top: 0, left: 0 });
+
+    const helpIconMarginTop = "-8px"; // Align helper icons with text baseline
+
+    // CSS animation styles for tooltip fade in/out
+    const fadeInKeyframes = `
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-100%) translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(-100%) translateY(0px);
+            }
+        }
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+                transform: translateY(-100%) translateY(0px);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(-100%) translateY(-10px);
+            }
+        }
+    `;
+
+    // Inject animation styles into the document head
+    React.useEffect(() => {
+        const styleId = 'tooltip-animations';
+        if (!document.getElementById(styleId)) {
+            const style = document.createElement('style');
+            style.id = styleId;
+            style.textContent = fadeInKeyframes;
+            document.head.appendChild(style);
+        }
+    }, []);
 
     useEffect(() => {
         setMaxSlices(initialValues.maxSlices);
         setBaseSize(initialValues.baseSize);
-        // Initialize light mode from playground background state
+        // Initialize color parameters from playground
         if (playground) {
-            setLightMode(playground.isLightBackground());
-            
-            // Initialize color parameters from playground
             const colorParams = playground.getHeatmapColorParameters();
             setFadeThreshold(colorParams.fadeThreshold);
             setGreenThreshold(colorParams.greenThreshold);
@@ -69,15 +111,6 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
         }
     };
 
-    const handleLightModeChange = (
-        event: React.ChangeEvent<HTMLInputElement>,
-    ) => {
-        const value = event.target.checked;
-        setLightMode(value);
-        if (playground) {
-            playground.setLightBackground(value);
-        }
-    };
 
     const handleFadeThresholdChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const value = parseFloat(event.target.value);
@@ -228,25 +261,7 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
         color: colors.text.primary,
     };
 
-    const descriptionStyle: React.CSSProperties = {
-        fontSize: "0.8em",
-        color: colors.text.secondary,
-        marginTop: "8px",
-        lineHeight: "1.4",
-    };
 
-    const checkboxContainerStyle: React.CSSProperties = {
-        display: "flex",
-        alignItems: "center",
-        marginTop: "4px",
-    };
-
-    const checkboxStyle: React.CSSProperties = {
-        marginRight: "8px",
-        cursor: "pointer",
-        width: "16px",
-        height: "16px",
-    };
 
     const colorControlsStyle: React.CSSProperties = {
         marginTop: "12px",
@@ -284,9 +299,48 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
 
             <div style={isCollapsed ? collapsedContentStyle : contentStyle}>
                 <div style={controlGroupStyle}>
-                    <label htmlFor="max-slices" style={labelStyle}>
-                        Max Heatmap Slices
-                    </label>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <label htmlFor="max-slices" style={labelStyle}>
+                            Max Heatmap Slices
+                        </label>
+                        <div 
+                            style={{
+                                position: "relative",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                cursor: "help",
+                                fontSize: "12px",
+                                fontWeight: "bold",
+                                color: colors.text.secondary,
+                                width: "18px",
+                                height: "18px",
+                                borderRadius: "50%",
+                                border: `1.5px solid ${colors.text.secondary}`,
+                                transition: "all 0.2s ease",
+                                backgroundColor: showSlicesTooltip ? colors.ui.surface : "transparent",
+                                marginTop: helpIconMarginTop,
+                            }}
+                            onMouseEnter={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setSlicesTooltipPosition({ 
+                                    top: rect.top - 10, 
+                                    left: Math.max(20, rect.left - 150) 
+                                });
+                                setSlicesTooltipFading(false);
+                                setShowSlicesTooltip(true);
+                            }}
+                            onMouseLeave={() => {
+                                setSlicesTooltipFading(true);
+                                setTimeout(() => {
+                                    setShowSlicesTooltip(false);
+                                    setSlicesTooltipFading(false);
+                                }, 150);
+                            }}
+                        >
+                            ?
+                        </div>
+                    </div>
                     <div style={sliderContainerStyle}>
                         <input
                             type="range"
@@ -302,15 +356,51 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
                             {maxSlices === -1 ? "All" : maxSlices}
                         </span>
                     </div>
-                    <div style={descriptionStyle}>
-                        Controls the time window for heat accumulation visualization. Set to "All" for cumulative view.
-                    </div>
                 </div>
 
                 <div style={controlGroupStyle}>
-                    <label htmlFor="heatmap-base-size" style={labelStyle}>
-                        Heatmap Base Size
-                    </label>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <label htmlFor="heatmap-base-size" style={labelStyle}>
+                            Heatmap Base Size
+                        </label>
+                        <div 
+                            style={{
+                                position: "relative",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                cursor: "help",
+                                fontSize: "12px",
+                                fontWeight: "bold",
+                                color: colors.text.secondary,
+                                width: "18px",
+                                height: "18px",
+                                borderRadius: "50%",
+                                border: `1.5px solid ${colors.text.secondary}`,
+                                transition: "all 0.2s ease",
+                                backgroundColor: showBaseSizeTooltip ? colors.ui.surface : "transparent",
+                                marginTop: helpIconMarginTop,
+                            }}
+                            onMouseEnter={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setBaseSizeTooltipPosition({ 
+                                    top: rect.top - 10, 
+                                    left: Math.max(20, rect.left - 150) 
+                                });
+                                setBaseSizeTooltipFading(false);
+                                setShowBaseSizeTooltip(true);
+                            }}
+                            onMouseLeave={() => {
+                                setBaseSizeTooltipFading(true);
+                                setTimeout(() => {
+                                    setShowBaseSizeTooltip(false);
+                                    setBaseSizeTooltipFading(false);
+                                }, 150);
+                            }}
+                        >
+                            ?
+                        </div>
+                    </div>
                     <div style={sliderContainerStyle}>
                         <input
                             type="range"
@@ -326,36 +416,151 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
                             {baseSize.toFixed(0)}
                         </span>
                     </div>
-                    <div style={descriptionStyle}>
-                        Controls the size of heatmap visualization elements
-                    </div>
                 </div>
 
-                <div style={controlGroupStyle}>
-                    <label htmlFor="background-light-mode" style={labelStyle}>
-                        Background
-                    </label>
-                    <div style={checkboxContainerStyle}>
-                        <input
-                            type="checkbox"
-                            id="background-light-mode"
-                            checked={lightMode}
-                            onChange={handleLightModeChange}
-                            style={checkboxStyle}
-                        />
-                        <span style={{ fontSize: "0.9em", color: colors.text.primary }}>
-                            Light Background
-                        </span>
-                    </div>
-                    <div style={descriptionStyle}>
-                        Switch between dark and light backgrounds while keeping classic heatmap colors (Green → Yellow → Red)
-                    </div>
-                </div>
 
                 <div style={controlGroupStyle}>
-                    <label style={labelStyle}>
-                        Color Controls
-                    </label>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <label style={labelStyle}>
+                            Color Controls
+                        </label>
+                        <div 
+                            style={{
+                                position: "relative",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                cursor: "help",
+                                fontSize: "12px",
+                                fontWeight: "bold",
+                                color: colors.text.secondary,
+                                width: "18px",
+                                height: "18px",
+                                borderRadius: "50%",
+                                border: `1.5px solid ${colors.text.secondary}`,
+                                transition: "all 0.2s ease",
+                                backgroundColor: showColorTooltip ? colors.ui.surface : "transparent",
+                                marginTop: helpIconMarginTop, // Align with text baseline
+                            }}
+                            onMouseEnter={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setTooltipPosition({ 
+                                    top: rect.top - 10, 
+                                    left: Math.max(20, rect.left - 150) 
+                                });
+                                setColorTooltipFading(false);
+                                setShowColorTooltip(true);
+                            }}
+                            onMouseLeave={() => {
+                                setColorTooltipFading(true);
+                                setTimeout(() => {
+                                    setShowColorTooltip(false);
+                                    setColorTooltipFading(false);
+                                }, 150);
+                            }}
+                        >
+                            ?
+                        </div>
+                    </div>
+                    {showColorTooltip && (
+                        <div style={{
+                            position: "fixed",
+                            top: `${tooltipPosition.top}px`,
+                            left: `${tooltipPosition.left}px`,
+                            padding: "12px 16px",
+                            backgroundColor: colors.background.panelSolid,
+                            color: colors.text.primary,
+                            fontSize: "13px",
+                            borderRadius: "8px",
+                            whiteSpace: "normal",
+                            width: "320px",
+                            maxWidth: "calc(100vw - 40px)",
+                            boxShadow: `0 4px 20px ${colors.shadow.medium}`,
+                            zIndex: 10000,
+                            lineHeight: "1.5",
+                            border: `1px solid ${colors.border.light}`,
+                            transform: "translateY(-100%)",
+                            animation: `${colorTooltipFading ? 'fadeOut' : 'fadeIn'} 0.15s ease-out`,
+                        }}>
+                            Adjust color transition thresholds and intensity parameters. Fade Start controls green opacity (0% to 100%), Power curve controls smoothness, Min Intensity controls pixel visibility threshold, Border Width adds black contours for shape definition.
+                            <div style={{
+                                position: "absolute",
+                                top: "100%",
+                                left: "150px",
+                                width: "0",
+                                height: "0",
+                                borderLeft: "6px solid transparent",
+                                borderRight: "6px solid transparent",
+                                borderTop: `6px solid ${colors.background.panelSolid}`,
+                            }} />
+                        </div>
+                    )}
+                    {showSlicesTooltip && (
+                        <div style={{
+                            position: "fixed",
+                            top: `${slicesTooltipPosition.top}px`,
+                            left: `${slicesTooltipPosition.left}px`,
+                            padding: "12px 16px",
+                            backgroundColor: colors.background.panelSolid,
+                            color: colors.text.primary,
+                            fontSize: "13px",
+                            borderRadius: "8px",
+                            whiteSpace: "normal",
+                            width: "280px",
+                            maxWidth: "calc(100vw - 40px)",
+                            boxShadow: `0 4px 20px ${colors.shadow.medium}`,
+                            zIndex: 10000,
+                            lineHeight: "1.5",
+                            border: `1px solid ${colors.border.light}`,
+                            transform: "translateY(-100%)",
+                            animation: `${slicesTooltipFading ? 'fadeOut' : 'fadeIn'} 0.15s ease-out`,
+                        }}>
+                            Controls the time window for heat accumulation visualization. Set to "All" for cumulative view across all time slices.
+                            <div style={{
+                                position: "absolute",
+                                top: "100%",
+                                left: "150px",
+                                width: "0",
+                                height: "0",
+                                borderLeft: "6px solid transparent",
+                                borderRight: "6px solid transparent",
+                                borderTop: `6px solid ${colors.background.panelSolid}`,
+                            }} />
+                        </div>
+                    )}
+                    {showBaseSizeTooltip && (
+                        <div style={{
+                            position: "fixed",
+                            top: `${baseSizeTooltipPosition.top}px`,
+                            left: `${baseSizeTooltipPosition.left}px`,
+                            padding: "12px 16px",
+                            backgroundColor: colors.background.panelSolid,
+                            color: colors.text.primary,
+                            fontSize: "13px",
+                            borderRadius: "8px",
+                            whiteSpace: "normal",
+                            width: "280px",
+                            maxWidth: "calc(100vw - 40px)",
+                            boxShadow: `0 4px 20px ${colors.shadow.medium}`,
+                            zIndex: 10000,
+                            lineHeight: "1.5",
+                            border: `1px solid ${colors.border.light}`,
+                            transform: "translateY(-100%)",
+                            animation: `${baseSizeTooltipFading ? 'fadeOut' : 'fadeIn'} 0.15s ease-out`,
+                        }}>
+                            Controls the base size of heatmap visualization elements. Higher values make the heatmap spheres and visual indicators larger and more prominent.
+                            <div style={{
+                                position: "absolute",
+                                top: "100%",
+                                left: "150px",
+                                width: "0",
+                                height: "0",
+                                borderLeft: "6px solid transparent",
+                                borderRight: "6px solid transparent",
+                                borderTop: `6px solid ${colors.background.panelSolid}`,
+                            }} />
+                        </div>
+                    )}
                     <div style={colorControlsStyle}>
                         {/* Threshold Controls */}
                         <div style={controlGroupStyle}>
@@ -472,9 +677,6 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
                                 </span>
                             </div>
                         </div>
-                    </div>
-                    <div style={descriptionStyle}>
-                        Adjust color transition thresholds and intensity parameters. Fade Start controls green opacity (0% to 100%), Power curve controls smoothness, Min Intensity controls pixel visibility threshold, Border Width adds black contours for shape definition.
                     </div>
                 </div>
             </div>

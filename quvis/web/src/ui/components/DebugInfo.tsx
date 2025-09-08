@@ -4,12 +4,13 @@ import { colors } from "../theme/colors.js";
 interface DebugInfoProps {
     fps: number;
     layoutTime: number;
+    bottomPosition: string;
 }
 
-const DebugInfo: React.FC<DebugInfoProps> = ({ fps, layoutTime }) => {
+const DebugInfo: React.FC<DebugInfoProps> = ({ fps, layoutTime, bottomPosition }) => {
     const containerStyle: React.CSSProperties = {
         position: "fixed",
-        bottom: "220px", // Positioned above the playback controls
+        bottom: bottomPosition,
         right: "20px",
         width: "250px",
         padding: "15px",

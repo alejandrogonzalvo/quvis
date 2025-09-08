@@ -37,7 +37,7 @@ const PlaybackControls: React.FC<PlaybackControlsProps> = ({
         position: 'fixed',
         bottom: '20px',
         right: '20px',
-        width: isCollapsed ? '200px' : '250px',
+        width: '250px',
         padding: '15px',
         boxSizing: 'border-box',
         zIndex: 10,
