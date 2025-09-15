@@ -51,7 +51,8 @@ export class QubitGridController {
         initialCoolingFactor: number = 0.95,
         initialConnectionThickness: number = 0.05,
         initialInactiveElementAlpha: number = 0.1,
-        onSlicesLoadedCallback?: (count: number, initialIndex: number) => void
+        onSlicesLoadedCallback?: (count: number, initialIndex: number) => void,
+        isLightBackground?: () => boolean
     ) {
         this.scene = scene;
         this.mouse = mouse;
@@ -72,7 +73,8 @@ export class QubitGridController {
             initialConnectionThickness,
             initialInactiveElementAlpha,
             false,
-            true
+            true,
+            isLightBackground
         );
         this.stateManager = new VisualizationStateManager(
             (sliceIndex) => this.loadStateFromSlice(sliceIndex),
@@ -200,6 +202,13 @@ export class QubitGridController {
             this.renderManager.setInactiveElementAlpha(params.inactiveAlpha);
         }
         this.updateVisualization();
+    }
+
+    /**
+     * Update connection colors based on current background mode
+     */
+    public updateConnectionColors(): void {
+        this.renderManager.updateConnectionColors();
     }
 
     public updateIdealDistance(distance: number): void {

@@ -4,20 +4,24 @@ import { colors, colorHelpers } from "../../ui/theme/colors.js";
 export class BlochSphere {
     blochSphere: THREE.Group;
     private readonly maxMainSphereOpacity: number = 0.25;
+    private isLightBackground: () => boolean;
+    private sphereMaterial: THREE.MeshPhongMaterial;
 
-    constructor(x: number, y: number, z: number) {
+    constructor(x: number, y: number, z: number, isLightBackground: () => boolean = () => false) {
+        this.isLightBackground = isLightBackground;
         this.blochSphere = new THREE.Group();
         this.blochSphere.position.set(x, y, z);
 
-        // Main sphere (transparent)
+        // Main sphere (transparent) - use theme-aware color
         const sphereGeometry = new THREE.SphereGeometry(0.4, 32, 32);
-        const sphereMaterial = new THREE.MeshPhongMaterial({
-            color: colorHelpers.cssColorToHex(colors.text.primary),
+        const sphereColor = this.isLightBackground() ? 0x333333 : colorHelpers.cssColorToHex(colors.text.primary);
+        this.sphereMaterial = new THREE.MeshPhongMaterial({
+            color: sphereColor,
             transparent: true,
             opacity: this.maxMainSphereOpacity,
             side: THREE.DoubleSide,
         });
-        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+        const sphere = new THREE.Mesh(sphereGeometry, this.sphereMaterial);
         sphere.name = "mainBlochSphere";
         this.blochSphere.add(sphere);
 
@@ -129,6 +133,12 @@ export class BlochSphere {
         if (this.blochSphere) {
             this.blochSphere.scale.set(scale, scale, scale);
         }
+    }
+
+    public updateColors(): void {
+        // Update main sphere color based on background mode
+        const sphereColor = this.isLightBackground() ? 0x333333 : colorHelpers.cssColorToHex(colors.text.primary);
+        this.sphereMaterial.color.setHex(sphereColor);
     }
 
     dispose() {

@@ -107,7 +107,8 @@ export class Playground {
             this.layoutManager.getCoolingFactor(),
             this.appearanceManager.getConnectionThickness(),
             this.appearanceManager.getInactiveAlpha(),
-            onSlicesLoadedCallback
+            onSlicesLoadedCallback,
+            () => this.threeSetup.isLightBackground()
         );
 
         // Set up grid references in modules
@@ -322,6 +323,8 @@ export class Playground {
         // Update heatmap border color based on background mode
         if (this.grid) {
             this.grid.updateHeatmapLightBackground(lightMode);
+            // Update connection colors based on background mode
+            this.grid.updateConnectionColors();
         }
     }
 
