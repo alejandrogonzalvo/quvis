@@ -73,7 +73,8 @@ export class RenderManager {
         initialConnectionThickness: number = 0.05,
         initialInactiveElementAlpha: number = 0.1,
         initialBlochSpheresVisible: boolean = false,
-        initialConnectionLinesVisible: boolean = true
+        initialConnectionLinesVisible: boolean = true,
+        private isLightBackground: () => boolean = () => false
     ) {
         this.scene = scene;
         this.renderParams = {
@@ -160,8 +161,10 @@ export class RenderManager {
         if (maxConnections === 0) return;
 
         const cylinderGeo = new THREE.CylinderGeometry(1, 1, 1, 8, 1);
+        // Choose color based on background mode - dark color for light background, light color for dark background
+        const color = this.isLightBackground() ? 0x0066cc : 0x00ffff; // Dark blue for light mode, cyan for dark mode
         const material = new THREE.MeshBasicMaterial({
-            color: 0x00ffff,
+            color: color,
             transparent: true,
             opacity: 0.75,
         });
@@ -251,7 +254,8 @@ export class RenderManager {
             const blochSphere = new BlochSphere(
                 position.x,
                 position.y,
-                position.z
+                position.z,
+                this.isLightBackground
             );
             qubit.blochSphere = blochSphere;
             blochSphere.blochSphere.userData.qubitId = qubit.id;
@@ -661,6 +665,24 @@ export class RenderManager {
         if (this.logicalConnectionMesh) {
             this.logicalConnectionMesh.visible = visible;
         }
+    }
+
+    /**
+     * Update connection colors and sphere colors based on background mode
+     */
+    updateConnectionColors(): void {
+        if (this.logicalConnectionMesh && this.logicalConnectionMesh.material instanceof THREE.MeshBasicMaterial) {
+            // Choose color based on background mode - dark color for light background, light color for dark background
+            const color = this.isLightBackground() ? 0x0044bb : 0x00ffff; // Dark blue for light mode, cyan for dark mode
+            this.logicalConnectionMesh.material.color.setHex(color);
+        }
+        
+        // Update all qubit sphere colors
+        this.qubitInstances.forEach((qubit) => {
+            if (qubit.blochSphere) {
+                qubit.blochSphere.updateColors();
+            }
+        });
     }
 
     /**
