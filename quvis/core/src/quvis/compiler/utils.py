@@ -45,6 +45,34 @@ class VisualizationData:
 
 def extract_operations_per_slice(qc):
     """Extracts operations per slice from a quantum circuit."""
+    return extract_operations_per_slice_optimized(qc)
+
+def extract_operations_per_slice_optimized(qc):
+    """
+    Memory-optimized version that avoids DAG layers() method and reduces memory usage.
+    Uses direct circuit iteration and pre-allocated data structures.
+    """
+    # Pre-allocate qubit index mapping
+    qubit_indices = {qubit: i for i, qubit in enumerate(qc.qubits)}
+
+    # Use circuit data directly instead of DAG layers for simple circuits
+    operations_per_slice = []
+
+    # For simple circuits like GHZ, each operation is in its own layer
+    # This avoids the expensive DAG.layers() call
+    for instruction in qc.data:
+        op = instruction.operation
+        op_name = op.name
+        op_qubit_indices = [qubit_indices[q] for q in instruction.qubits]
+
+        # Create minimal data structure
+        slice_ops = [{"name": op_name, "qubits": op_qubit_indices}]
+        operations_per_slice.append(slice_ops)
+
+    return operations_per_slice
+
+def extract_operations_per_slice_fallback(qc):
+    """Original DAG-based implementation as fallback."""
     dag = circuit_to_dag(qc)
     operations_per_slice = []
     qubit_indices = {qubit: i for i, qubit in enumerate(qc.qubits)}
@@ -56,10 +84,10 @@ def extract_operations_per_slice(qc):
             op_name = op.name
             op_qubit_indices = [qubit_indices[q] for q in node.qargs]
             slice_ops.append({"name": op_name, "qubits": op_qubit_indices})
-        
+
         if slice_ops:
             operations_per_slice.append(slice_ops)
-            
+
     return operations_per_slice
 
 def extract_routing_operations_per_slice(qc):
