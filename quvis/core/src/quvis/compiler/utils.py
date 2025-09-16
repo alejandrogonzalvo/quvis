@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """
-Optimized utils that can handle 10,000+ qubit circuits efficiently.
-These implementations use O(n) memory instead of O(n²) or worse.
+Utils for quantum circuit compilation and visualization data extraction.
 """
 
 import json
 from dataclasses import dataclass, asdict
-from typing import List, Dict, Tuple, Any
-import sys
 import gc
+from qiskit.converters import circuit_to_dag
 
 @dataclass
 class LogicalCircuitInfo:
@@ -51,42 +49,39 @@ class VisualizationData:
         with open(filepath, 'w') as f:
             json.dump(asdict(self), f, separators=(',', ':'))
 
-def extract_operations_per_slice_optimized(qc):
+def extract_operations_per_slice(qc):
     """
-    Ultra-optimized version that minimizes memory usage.
-    Uses direct circuit iteration and minimal data structures.
+    Extracts operations per slice from a quantum circuit.
+    Uses circuit DAG layers for efficient processing.
     """
-    # Pre-allocate qubit index mapping
+    dag = circuit_to_dag(qc)
+    operations_per_slice = []
     qubit_indices = {qubit: i for i, qubit in enumerate(qc.qubits)}
 
-    # Pre-allocate result list
-    operations_per_slice = []
-
-    # Process each instruction directly - no intermediate structures
-    for instruction in qc.data:
-        op_name = instruction.operation.name
-        op_qubits = [qubit_indices[q] for q in instruction.qubits]
-
-        # Create minimal slice with single operation
-        slice_ops = [{"name": op_name, "qubits": op_qubits}]
-        operations_per_slice.append(slice_ops)
+    for layer in dag.layers():
+        slice_ops = []
+        for node in layer['graph'].op_nodes():
+            op = node.op
+            op_name = op.name
+            op_qubit_indices = [qubit_indices[q] for q in node.qargs]
+            slice_ops.append({"name": op_name, "qubits": op_qubit_indices})
+        if slice_ops:
+            operations_per_slice.append(slice_ops)
 
     return operations_per_slice
 
-def extract_routing_operations_per_slice_optimized(qc):
+def extract_routing_operations_per_slice(qc):
     """
-    Memory-efficient routing extraction that avoids DAG conversion.
-    Only processes routing operations, skipping unnecessary empty slices.
+    Extracts routing operations (SWAP, bridge, iSWAP) from a quantum circuit.
+    Returns routing operations per slice, swap count, and routing depth.
     """
     routing_op_names = {'swap', 'bridge', 'iswap'}
     qubit_indices = {qubit: i for i, qubit in enumerate(qc.qubits)}
 
-    # Use sparse representation - only store non-empty slices
-    routing_operations = []  # List of (slice_index, operations) tuples
+    routing_operations = []
     total_swap_count = 0
     max_routing_depth = 0
 
-    # Process circuit data directly - no DAG conversion
     for slice_idx, instruction in enumerate(qc.data):
         op_name = instruction.operation.name.lower()
 
@@ -99,15 +94,13 @@ def extract_routing_operations_per_slice_optimized(qc):
                 "routing_type": "swap" if op_name == "swap" else "other"
             }
 
-            # Store as (slice_index, [operations]) for sparse representation
             routing_operations.append((slice_idx, [routing_op]))
             max_routing_depth = slice_idx + 1
 
             if op_name == "swap":
                 total_swap_count += 1
 
-    # Convert sparse to dense representation only if needed for compatibility
-    # For most applications, sparse representation is much more efficient
+    # Convert to dense representation
     routing_ops_per_slice = []
     routing_idx = 0
 
@@ -117,54 +110,22 @@ def extract_routing_operations_per_slice_optimized(qc):
             routing_ops_per_slice.append(routing_operations[routing_idx][1])
             routing_idx += 1
         else:
-            routing_ops_per_slice.append([])  # Empty slice
+            routing_ops_per_slice.append([])
 
     return routing_ops_per_slice, total_swap_count, max_routing_depth
 
-def extract_routing_operations_sparse(qc):
+
+def analyze_routing_overhead(logical_circuit, compiled_circuit):
     """
-    Super-efficient sparse routing extraction for very large circuits.
-    Returns only non-empty routing operations with their positions.
+    Analyzes routing overhead by comparing logical and compiled circuits.
+    Returns metrics about circuit depth, operation counts, and routing overhead.
     """
-    routing_op_names = {'swap', 'bridge', 'iswap'}
-    qubit_indices = {qubit: i for i, qubit in enumerate(qc.qubits)}
-
-    routing_operations = []
-    total_swap_count = 0
-
-    for slice_idx, instruction in enumerate(qc.data):
-        op_name = instruction.operation.name.lower()
-
-        if op_name in routing_op_names:
-            op_qubits = [qubit_indices[q] for q in instruction.qubits]
-
-            routing_operations.append({
-                "slice_index": slice_idx,
-                "name": instruction.operation.name,
-                "qubits": op_qubits,
-                "routing_type": "swap" if op_name == "swap" else "other"
-            })
-
-            if op_name == "swap":
-                total_swap_count += 1
-
-    routing_depth = routing_operations[-1]["slice_index"] + 1 if routing_operations else 0
-
-    return routing_operations, total_swap_count, routing_depth
-
-def analyze_routing_overhead_optimized(logical_circuit, compiled_circuit):
-    """
-    Memory-efficient routing analysis that processes circuits directly.
-    Avoids creating large intermediate data structures.
-    """
-    # Direct circuit analysis - no intermediate lists
     logical_depth = len(logical_circuit.data)
     compiled_depth = len(compiled_circuit.data)
-
     logical_op_count = len(logical_circuit.data)
     compiled_op_count = len(compiled_circuit.data)
 
-    # Count routing operations efficiently
+    # Count routing operations
     routing_op_names = {'swap', 'bridge', 'iswap'}
     routing_op_count = 0
     swap_count = 0
@@ -177,8 +138,7 @@ def analyze_routing_overhead_optimized(logical_circuit, compiled_circuit):
                 swap_count += 1
 
     routing_overhead_depth = max(0, compiled_depth - logical_depth)
-    routing_depth = compiled_depth  # For simple circuits
-
+    routing_depth = compiled_depth
     routing_overhead_percentage = (routing_op_count / compiled_op_count * 100) if compiled_op_count > 0 else 0
 
     return {
@@ -193,15 +153,13 @@ def analyze_routing_overhead_optimized(logical_circuit, compiled_circuit):
         "routing_overhead_percentage": routing_overhead_percentage
     }
 
-def create_visualization_data_optimized(logical_circuit, compiled_circuit, device_info_dict=None):
+def create_visualization_data(logical_circuit, compiled_circuit, device_info_dict=None):
     """
-    Create visualization data with optimized memory usage.
-    Uses streaming processing to minimize peak memory usage.
+    Creates visualization data from logical and compiled quantum circuits.
     """
 
     # Process logical circuit
-    print("Processing logical circuit...")
-    logical_ops = extract_operations_per_slice_optimized(logical_circuit)
+    logical_ops = extract_operations_per_slice(logical_circuit)
 
     logical_info = LogicalCircuitInfo(
         num_qubits=logical_circuit.num_qubits,
@@ -213,8 +171,7 @@ def create_visualization_data_optimized(logical_circuit, compiled_circuit, devic
     gc.collect()
 
     # Process compiled circuit
-    print("Processing compiled circuit...")
-    compiled_ops = extract_operations_per_slice_optimized(compiled_circuit)
+    compiled_ops = extract_operations_per_slice(compiled_circuit)
 
     compiled_info = CompiledCircuitInfo(
         num_qubits=compiled_circuit.num_qubits,
@@ -225,9 +182,8 @@ def create_visualization_data_optimized(logical_circuit, compiled_circuit, devic
     del compiled_ops
     gc.collect()
 
-    # Process routing information efficiently
-    print("Processing routing information...")
-    routing_ops, swap_count, routing_depth = extract_routing_operations_per_slice_optimized(compiled_circuit)
+    # Process routing information
+    routing_ops, swap_count, routing_depth = extract_routing_operations_per_slice(compiled_circuit)
 
     routing_info = RoutingCircuitInfo(
         num_qubits=compiled_circuit.num_qubits,
@@ -261,90 +217,4 @@ def create_visualization_data_optimized(logical_circuit, compiled_circuit, devic
 
     return viz_data
 
-# Compatibility functions that delegate to optimized versions
-def extract_operations_per_slice(qc):
-    """Main entry point - uses optimized version."""
-    return extract_operations_per_slice_optimized(qc)
 
-def extract_routing_operations_per_slice(qc):
-    """Main entry point - uses optimized version."""
-    return extract_routing_operations_per_slice_optimized(qc)
-
-def analyze_routing_overhead(logical_circuit, compiled_circuit):
-    """Main entry point - uses optimized version."""
-    return analyze_routing_overhead_optimized(logical_circuit, compiled_circuit)
-
-if __name__ == "__main__":
-    # Test the optimized functions
-    import time
-    import psutil
-    import os
-    from qiskit import QuantumCircuit, transpile
-
-    def create_ghz_circuit(num_qubits):
-        qc = QuantumCircuit(num_qubits)
-        qc.h(0)
-        for i in range(1, num_qubits):
-            qc.cx(0, i)
-        return qc
-
-    def test_optimized_version(size):
-        process = psutil.Process(os.getpid())
-
-        print(f"\\n=== Testing optimized version with {size} qubits ===")
-
-        initial_memory = process.memory_info().rss / 1024 / 1024
-        print(f"Initial memory: {initial_memory:.1f}MB")
-
-        # Create circuit
-        circuit = create_ghz_circuit(size)
-        compiled_circuit = transpile(circuit, optimization_level=2)
-
-        after_circuit_memory = process.memory_info().rss / 1024 / 1024
-        print(f"After circuit creation: {after_circuit_memory:.1f}MB (+{after_circuit_memory - initial_memory:.1f}MB)")
-
-        # Test optimized functions
-        start_time = time.perf_counter()
-
-        logical_ops = extract_operations_per_slice_optimized(circuit)
-
-        after_logical = process.memory_info().rss / 1024 / 1024
-        print(f"After logical extract: {after_logical:.1f}MB (+{after_logical - after_circuit_memory:.1f}MB)")
-
-        compiled_ops = extract_operations_per_slice_optimized(compiled_circuit)
-
-        after_compiled = process.memory_info().rss / 1024 / 1024
-        print(f"After compiled extract: {after_compiled:.1f}MB (+{after_compiled - after_logical:.1f}MB)")
-
-        routing_ops, swap_count, routing_depth = extract_routing_operations_per_slice_optimized(compiled_circuit)
-
-        after_routing = process.memory_info().rss / 1024 / 1024
-        print(f"After routing extract: {after_routing:.1f}MB (+{after_routing - after_compiled:.1f}MB)")
-
-        overhead_result = analyze_routing_overhead_optimized(circuit, compiled_circuit)
-
-        after_overhead = process.memory_info().rss / 1024 / 1024
-        processing_time = time.perf_counter() - start_time
-
-        print(f"After overhead analysis: {after_overhead:.1f}MB (+{after_overhead - after_routing:.1f}MB)")
-        print(f"Total processing time: {processing_time:.3f}s")
-        print(f"Total memory increase: {after_overhead - initial_memory:.1f}MB")
-        print(f"Memory per qubit: {(after_overhead - initial_memory) * 1024 / size:.1f}KB")
-
-        # Clean up
-        del logical_ops, compiled_ops, routing_ops
-        gc.collect()
-
-        return True
-
-    # Test with progressively larger circuits
-    test_sizes = [1000, 2000, 5000, 10000]
-
-    for size in test_sizes:
-        try:
-            test_optimized_version(size)
-        except Exception as e:
-            print(f"Failed at {size} qubits: {e}")
-            break
-
-    print("\\n✅ Optimized version testing completed!")
