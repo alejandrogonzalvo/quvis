@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { colors } from '../theme/colors.js';
 
 const MAX_QUBITS = 1000;
-const version = "0.19.0";
+const version = "v0.19.1";
 
 interface PlaygroundParameterSelectionProps {
     onGenerate: (params: PlaygroundParams) => void;
