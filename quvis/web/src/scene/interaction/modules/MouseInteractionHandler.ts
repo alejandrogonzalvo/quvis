@@ -136,7 +136,7 @@ export class MouseInteractionHandler {
                 intersectedObject = intersectedObject.parent;
             }
 
-            if (targetBlochSphereGroup) {
+            if (targetBlochSphereGroup && targetBlochSphereGroup.visible) {
                 const qubitId = targetBlochSphereGroup.userData
                     .qubitId as number;
 
@@ -164,10 +164,23 @@ export class MouseInteractionHandler {
                     finalFidelity = Math.min(1.0, calculatedFidelity);
                 }
 
+                // Get the world position of the qubit and convert to screen coordinates
+                const worldPosition = targetBlochSphereGroup.position.clone();
+                const screenPosition = worldPosition.clone().project(this.camera);
+
+                // Convert normalized device coordinates to screen coordinates
+                const canvasRect = this.containerElement?.getBoundingClientRect();
+                const screenX = canvasRect ?
+                    (screenPosition.x * 0.5 + 0.5) * canvasRect.width + canvasRect.left :
+                    event.clientX;
+                const screenY = canvasRect ?
+                    (-screenPosition.y * 0.5 + 0.5) * canvasRect.height + canvasRect.top - 120 :
+                    event.clientY - 120;
+
                 hoveredQubitData = {
                     id: qubitId,
-                    x: event.clientX,
-                    y: event.clientY,
+                    x: screenX,
+                    y: screenY,
                     oneQubitGatesInWindow: gateInfo.oneQubitGatesInWindow,
                     twoQubitGatesInWindow: gateInfo.twoQubitGatesInWindow,
                     sliceWindowForGateCount: gateInfo.windowForCountsInWindow,
