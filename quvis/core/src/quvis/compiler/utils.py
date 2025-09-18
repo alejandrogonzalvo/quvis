@@ -49,26 +49,27 @@ def extract_operations_per_slice(qc):
     operations_per_slice = []
     qubit_indices = {qubit: i for i, qubit in enumerate(qc.qubits)}
 
-    for layer in dag.layers():
+    for layer in dag.multigraph_layers():
         slice_ops = []
-        for node in layer['graph'].op_nodes():
-            op = node.op
-            op_name = op.name
-            op_qubit_indices = [qubit_indices[q] for q in node.qargs]
-            slice_ops.append({"name": op_name, "qubits": op_qubit_indices})
-        
+        for node in layer:
+            if hasattr(node, 'op'):
+                op = node.op
+                op_name = op.name
+                op_qubit_indices = [qubit_indices[q] for q in node.qargs]
+                slice_ops.append({"name": op_name, "qubits": op_qubit_indices})
+
         if slice_ops:
             operations_per_slice.append(slice_ops)
-            
+
     return operations_per_slice
 
 def extract_routing_operations_per_slice(qc):
     """
     Extracts only routing operations (SWAP gates and other routing-related operations) per slice.
-    
+
     Args:
         qc: Quantum circuit (typically the transpiled circuit)
-    
+
     Returns:
         tuple: (routing_ops_per_slice, total_swap_count, routing_depth)
     """
@@ -77,30 +78,31 @@ def extract_routing_operations_per_slice(qc):
     qubit_indices = {qubit: i for i, qubit in enumerate(qc.qubits)}
     total_swap_count = 0
     routing_depth = 0
-    
+
     # Operations that are typically inserted for routing
     routing_op_names = {'swap', 'bridge', 'iswap'}  # Can be extended
-    
-    for layer_idx, layer in enumerate(dag.layers()):
+
+    for layer_idx, layer in enumerate(dag.multigraph_layers()):
         slice_routing_ops = []
         has_routing_ops = False
-        
-        for node in layer['graph'].op_nodes():
-            op = node.op
-            op_name = op.name.lower()
-            
-            if op_name in routing_op_names:
-                op_qubit_indices = [qubit_indices[q] for q in node.qargs]
-                slice_routing_ops.append({
-                    "name": op.name,
-                    "qubits": op_qubit_indices,
-                    "routing_type": "swap" if op_name == "swap" else "other"
-                })
-                has_routing_ops = True
-                
-                if op_name == "swap":
-                    total_swap_count += 1
-        
+
+        for node in layer:
+            if hasattr(node, 'op'):
+                op = node.op
+                op_name = op.name.lower()
+
+                if op_name in routing_op_names:
+                    op_qubit_indices = [qubit_indices[q] for q in node.qargs]
+                    slice_routing_ops.append({
+                        "name": op.name,
+                        "qubits": op_qubit_indices,
+                        "routing_type": "swap" if op_name == "swap" else "other"
+                    })
+                    has_routing_ops = True
+
+                    if op_name == "swap":
+                        total_swap_count += 1
+
         # Only add slices that contain routing operations
         if has_routing_ops:
             routing_ops_per_slice.append(slice_routing_ops)
@@ -108,7 +110,7 @@ def extract_routing_operations_per_slice(qc):
         else:
             # Add empty slice to maintain time alignment with other views
             routing_ops_per_slice.append([])
-    
+
     return routing_ops_per_slice, total_swap_count, routing_depth
 
 def analyze_routing_overhead(logical_circuit, compiled_circuit):
