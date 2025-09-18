@@ -12,7 +12,6 @@ export class BlochSphere {
         this.blochSphere = new THREE.Group();
         this.blochSphere.position.set(x, y, z);
 
-        // Simplified sphere for performance - use low poly count
         const sphereGeometry = new THREE.SphereGeometry(0.4, 8, 6);
         const sphereColor = this.isLightBackground() ? 0x333333 : colorHelpers.cssColorToHex(colors.text.primary);
         this.sphereMaterial = new THREE.MeshBasicMaterial({
@@ -26,8 +25,7 @@ export class BlochSphere {
     }
 
     public setLOD(_level: "high" | "medium" | "low"): void {
-        // With simplified geometry, LOD only affects visibility
-        // All detail elements have been removed for performance
+        // LOD not implemented for simplified geometry
     }
 
     public setOpacity(opacity: number): void {

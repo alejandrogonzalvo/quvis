@@ -211,7 +211,6 @@ export class RenderManager {
         this.qubitInstances.clear();
 
         // Determine if we should render qubit spheres
-        // Increased threshold due to simplified mesh geometry (8x6 segments vs 32x32)
         this._isQubitRenderEnabled = numQubitsToCreate <= 2000;
         if (!this._isQubitRenderEnabled) {
             console.warn(
