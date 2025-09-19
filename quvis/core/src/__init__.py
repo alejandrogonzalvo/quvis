@@ -40,7 +40,7 @@ from .compiler_utils import (
     analyze_routing_overhead
 )
 
-__version__ = "v0.24.0"
+__version__ = "v0.23.1"
 
 __all__ = [
     # Main Interfaces
