@@ -59,7 +59,7 @@ class PlaygroundAPI:
             Dictionary containing visualization data in library_multi format
         """
         circuit = self._create_circuit(algorithm, num_qubits, **kwargs)
-        coupling_map = self._create_coupling_map(topology, num_qubits, **kwargs)
+        coupling_map = self._create_coupling_map(topology, num_qubits)
 
         if coupling_map["coupling_map"]:
             qiskit_coupling_map = QiskitCouplingMap(coupling_map["coupling_map"])
@@ -248,7 +248,7 @@ class PlaygroundAPI:
         else:
             raise ValueError(f"Unsupported algorithm: {algorithm}")
 
-    def _create_coupling_map(self, topology: str, num_qubits: int, **kwargs) -> Dict[str, Any]:
+    def _create_coupling_map(self, topology: str, num_qubits: int) -> Dict[str, Any]:
         """Create a coupling map using Qiskit's built-in topology generators."""
 
         if topology == "line":
