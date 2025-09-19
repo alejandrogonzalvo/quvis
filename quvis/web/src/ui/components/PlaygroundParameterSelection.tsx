@@ -32,6 +32,10 @@ const PlaygroundParameterSelection: React.FC<
     const [physicalQubitsInput, setPhysicalQubitsInput] = useState<string>(
         physicalQubits.toString()
     );
+    const [distance, setDistance] = useState<number>(3);
+    const [distanceInput, setDistanceInput] = useState<string>(
+        distance.toString()
+    );
 
     useEffect(() => {
         if (physicalQubits < logicalQubits) {
@@ -46,6 +50,27 @@ const PlaygroundParameterSelection: React.FC<
     useEffect(() => {
         setPhysicalQubitsInput(physicalQubits.toString());
     }, [physicalQubits]);
+
+    useEffect(() => {
+        setDistanceInput(distance.toString());
+    }, [distance]);
+
+    // Auto-calculate minimum distance for heavy hex based on logical qubits
+    useEffect(() => {
+        if (topology === 'heavy_hex') {
+            // Calculate minimum distance needed for logical qubits
+            // Heavy hex with distance d has approximately (5*d^2 - 2*d - 1)/2 qubits
+            // Solving for d: d >= (2 + sqrt(24 + 40*logicalQubits)) / 10
+            const minDistance = Math.ceil((2 + Math.sqrt(24 + 40 * logicalQubits)) / 10);
+
+            // Ensure distance is odd (IBM requirement)
+            const adjustedMinDistance = minDistance % 2 === 0 ? minDistance + 1 : minDistance;
+
+            if (distance < adjustedMinDistance) {
+                setDistance(adjustedMinDistance);
+            }
+        }
+    }, [logicalQubits, topology, distance]);
 
     const containerStyle: React.CSSProperties = {
         display: 'flex',
@@ -273,6 +298,11 @@ const PlaygroundParameterSelection: React.FC<
             params.reps = customParams.reps || 2;
         }
 
+        // Add topology-specific parameters
+        if (topology === 'heavy_hex') {
+            params.distance = distance;
+        }
+
         return params;
     };
 
@@ -309,6 +339,29 @@ const PlaygroundParameterSelection: React.FC<
             value = logicalQubits; // Default to min
         }
         setPhysicalQubits(Math.max(logicalQubits, Math.min(value, MAX_QUBITS)));
+    };
+
+    const handleDistanceInputChange = (
+        e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        setDistanceInput(e.target.value);
+    };
+
+    const handleDistanceInputBlur = () => {
+        let value = parseInt(distanceInput, 10);
+        if (isNaN(value)) {
+            value = 3; // Default minimum distance
+        }
+        // Calculate minimum distance for current logical qubits
+        const minDistance = Math.ceil((2 + Math.sqrt(24 + 40 * logicalQubits)) / 10);
+        const adjustedMinDistance = minDistance % 2 === 0 ? minDistance + 1 : minDistance;
+
+        // Ensure distance is odd and at least minimum required
+        let adjustedValue = Math.max(adjustedMinDistance, Math.min(value, 21)); // Max 21 for reasonable size
+        if (adjustedValue % 2 === 0) {
+            adjustedValue += 1;
+        }
+        setDistance(adjustedValue);
     };
 
     const renderQAOAParams = () => {
@@ -497,33 +550,64 @@ const PlaygroundParameterSelection: React.FC<
                         </div>
                     </div>
 
-                    {/* Physical Qubits Slider */}
+                    {/* Physical Qubits Slider or Distance Parameter */}
                     <div style={sectionStyle}>
                         <div style={sliderContainerStyle}>
-                            <div style={sliderLabelStyle}>Physical Qubits</div>
-                            <div style={sliderWrapperStyle}>
-                                <input
-                                    type="range"
-                                    min={logicalQubits}
-                                    max={MAX_QUBITS}
-                                    value={physicalQubits}
-                                    onChange={(e) =>
-                                        setPhysicalQubits(
-                                            parseInt(e.target.value)
-                                        )
-                                    }
-                                    style={sliderStyle}
-                                />
-                                <input
-                                    type="number"
-                                    min={logicalQubits}
-                                    max={MAX_QUBITS}
-                                    value={physicalQubitsInput}
-                                    onChange={handlePhysicalQubitsInputChange}
-                                    onBlur={handlePhysicalQubitsInputBlur}
-                                    style={sliderValueStyle}
-                                />
-                            </div>
+                            {topology === 'heavy_hex' ? (
+                                <>
+                                    <div style={sliderLabelStyle}>Heavy Hex Distance</div>
+                                    <div style={sliderWrapperStyle}>
+                                        <input
+                                            type="range"
+                                            min={Math.ceil((2 + Math.sqrt(24 + 40 * logicalQubits)) / 10)}
+                                            max="21"
+                                            step="2"
+                                            value={distance}
+                                            onChange={(e) =>
+                                                setDistance(parseInt(e.target.value))
+                                            }
+                                            style={sliderStyle}
+                                        />
+                                        <input
+                                            type="number"
+                                            min={Math.ceil((2 + Math.sqrt(24 + 40 * logicalQubits)) / 10)}
+                                            max="21"
+                                            step="2"
+                                            value={distanceInput}
+                                            onChange={handleDistanceInputChange}
+                                            onBlur={handleDistanceInputBlur}
+                                            style={sliderValueStyle}
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div style={sliderLabelStyle}>Physical Qubits</div>
+                                    <div style={sliderWrapperStyle}>
+                                        <input
+                                            type="range"
+                                            min={logicalQubits}
+                                            max={MAX_QUBITS}
+                                            value={physicalQubits}
+                                            onChange={(e) =>
+                                                setPhysicalQubits(
+                                                    parseInt(e.target.value)
+                                                )
+                                            }
+                                            style={sliderStyle}
+                                        />
+                                        <input
+                                            type="number"
+                                            min={logicalQubits}
+                                            max={MAX_QUBITS}
+                                            value={physicalQubitsInput}
+                                            onChange={handlePhysicalQubitsInputChange}
+                                            onBlur={handlePhysicalQubitsInputBlur}
+                                            style={sliderValueStyle}
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
 
