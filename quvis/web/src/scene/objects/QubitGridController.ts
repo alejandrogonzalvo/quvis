@@ -419,10 +419,10 @@ export class QubitGridController {
                 maxLogicalConnections
             );
         } else {
-            const effectiveCouplingMap = this.heavyHexCouplingMap || this.dataManager.couplingMap;
-            if (effectiveCouplingMap) {
+            const couplingMap = this.dataManager.couplingMap;
+            if (couplingMap) {
                 this.renderManager.initializeInstancedConnections(
-                    effectiveCouplingMap.length
+                    couplingMap.length
                 );
             }
         }
@@ -434,14 +434,8 @@ export class QubitGridController {
     }
 
     private recreateGridForNewQubitCount(newQubitCount: number): void {
-        // Calculate new layout based on topology type
-        const topologyType = this.dataManager.topologyType;
-        if (topologyType === 'heavy_hex') {
-            this.heavyHexCouplingMap = this.layoutManager.calculateHeavyHexLayout(newQubitCount);
-        } else {
-            this.layoutManager.calculateGridLayout(newQubitCount);
-            this.heavyHexCouplingMap = null; // Clear any existing heavy hex coupling map
-        }
+        // Calculate new grid layout
+        this.layoutManager.calculateGridLayout(newQubitCount);
 
         // Create new grid of qubits
         this.renderManager.createGrid(

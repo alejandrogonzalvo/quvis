@@ -208,107 +208,71 @@ export class LayoutManager {
 
     /**
      * Generate heavy hex coupling map based on IBM's connectivity pattern
-     * IBM heavy hex: each qubit connects to at most 3 neighbors (degree ≤ 3)
      */
     private generateHeavyHexCouplingMap(numQubits: number): number[][] {
         const couplingMap: number[][] = [];
 
-        // Simplified heavy hex for small qubit counts
-        // Create a more sparse connectivity pattern that matches IBM's actual heavy hex
-        if (numQubits <= 12) {
-            // Single hexagon pattern for small circuits
-            return this.generateSingleHexagonCoupling(numQubits);
-        }
+        // Heavy hex pattern: each hexagon has 12 qubits
+        // Within each hexagon:
+        // - 6 vertices (qubits 0-5 in each hex)
+        // - 6 edge midpoints (qubits 6-11 in each hex)
+        // Connectivity within each hexagon:
+        // - Each vertex connects to its 2 adjacent vertices (in a ring)
+        // - Each vertex connects to its corresponding edge midpoint
+        // - Edge midpoints connect neighboring hexagons
 
-        // For larger circuits, use a tiling approach but keep it sparse
-        return this.generateTiledHeavyHexCoupling(numQubits);
-    }
+        const qubitsPerHex = 12;
+        const numHexagons = Math.ceil(numQubits / qubitsPerHex);
+        const hexCols = Math.ceil(Math.sqrt(numHexagons));
 
-    /**
-     * Generate coupling for a single hexagon (≤12 qubits)
-     */
-    private generateSingleHexagonCoupling(numQubits: number): number[][] {
-        const couplingMap: number[][] = [];
+        for (let qubit = 0; qubit < numQubits; qubit++) {
+            const hexIndex = Math.floor(qubit / qubitsPerHex);
+            const qubitInHex = qubit % qubitsPerHex;
+            const hexRow = Math.floor(hexIndex / hexCols);
+            const hexCol = hexIndex % hexCols;
+            const hexBase = hexIndex * qubitsPerHex;
 
-        if (numQubits <= 6) {
-            // Linear chain for very small circuits
-            for (let i = 0; i < numQubits - 1; i++) {
-                couplingMap.push([i, i + 1]);
-            }
-        } else {
-            // Hexagon pattern: create a ring of connections
-            // First 6 qubits form the hexagon vertices
-            for (let i = 0; i < Math.min(6, numQubits); i++) {
-                const next = (i + 1) % Math.min(6, numQubits);
-                if (next !== i && next < numQubits) {
-                    couplingMap.push([i, next]);
+            if (qubitInHex < 6) {
+                // Vertex qubit (0-5 in hex)
+                const vertex = qubitInHex;
+
+                // Connect to adjacent vertices in the same hexagon (ring)
+                const nextVertex = (vertex + 1) % 6;
+                const prevVertex = (vertex + 5) % 6; // equivalent to (vertex - 1 + 6) % 6
+
+                const nextQubit = hexBase + nextVertex;
+                const prevQubit = hexBase + prevVertex;
+
+                if (nextQubit < numQubits) {
+                    couplingMap.push([qubit, nextQubit]);
                 }
-            }
-
-            // Additional qubits connect to the hexagon
-            for (let i = 6; i < numQubits; i++) {
-                const connectTo = i % 6; // Connect to corresponding vertex
-                if (connectTo < numQubits) {
-                    couplingMap.push([i, connectTo]);
+                if (prevQubit < numQubits && prevQubit !== nextQubit) {
+                    couplingMap.push([qubit, prevQubit]);
                 }
-            }
-        }
 
-        return couplingMap;
-    }
-
-    /**
-     * Generate coupling for multiple hexagons (>12 qubits)
-     */
-    private generateTiledHeavyHexCoupling(numQubits: number): number[][] {
-        const couplingMap: number[][] = [];
-
-        // Create a sparse tiled pattern similar to IBM's approach
-        const qubitsPerTile = 12;
-        const numTiles = Math.ceil(numQubits / qubitsPerTile);
-        const tilesPerRow = Math.ceil(Math.sqrt(numTiles));
-
-        for (let tile = 0; tile < numTiles; tile++) {
-            const tileStart = tile * qubitsPerTile;
-            const tileEnd = Math.min(tileStart + qubitsPerTile, numQubits);
-            const qubitsInTile = tileEnd - tileStart;
-
-            // Internal tile connections (hexagon-like)
-            for (let i = 0; i < qubitsInTile - 1; i += 2) {
-                const q1 = tileStart + i;
-                const q2 = tileStart + i + 1;
-                if (q2 < numQubits) {
-                    couplingMap.push([q1, q2]);
+                // Connect to corresponding edge midpoint
+                const edgeQubit = hexBase + 6 + vertex;
+                if (edgeQubit < numQubits) {
+                    couplingMap.push([qubit, edgeQubit]);
                 }
-            }
+            } else {
+                // Edge midpoint qubit (6-11 in hex)
+                const edge = qubitInHex - 6;
 
-            // Connect to adjacent tiles (sparse inter-tile connections)
-            const tileRow = Math.floor(tile / tilesPerRow);
-            const tileCol = tile % tilesPerRow;
-
-            // Connect to right tile
-            if (tileCol < tilesPerRow - 1) {
-                const rightTile = tile + 1;
-                const rightTileStart = rightTile * qubitsPerTile;
-                if (rightTileStart < numQubits) {
-                    const edgeQubit = tileStart + Math.floor(qubitsInTile / 2);
-                    const rightEdgeQubit = rightTileStart;
-                    if (edgeQubit < numQubits && rightEdgeQubit < numQubits) {
-                        couplingMap.push([edgeQubit, rightEdgeQubit]);
-                    }
+                // Connect to the vertex this edge belongs to
+                const vertexQubit = hexBase + edge;
+                if (vertexQubit < numQubits) {
+                    couplingMap.push([qubit, vertexQubit]);
                 }
-            }
 
-            // Connect to bottom tile
-            if (tileRow < Math.ceil(numTiles / tilesPerRow) - 1) {
-                const bottomTile = tile + tilesPerRow;
-                if (bottomTile < numTiles) {
-                    const bottomTileStart = bottomTile * qubitsPerTile;
-                    if (bottomTileStart < numQubits) {
-                        const edgeQubit = tileEnd - 1;
-                        const bottomEdgeQubit = bottomTileStart;
-                        if (edgeQubit < numQubits && bottomEdgeQubit < numQubits) {
-                            couplingMap.push([edgeQubit, bottomEdgeQubit]);
+                // Connect to adjacent hexagons (heavy hex inter-hex connectivity)
+                // This creates the characteristic heavy hex pattern
+                const adjacentHexagons = this.getAdjacentHexagons(hexRow, hexCol, hexCols, numHexagons);
+                for (const adjHex of adjacentHexagons) {
+                    if (adjHex < numHexagons) {
+                        const adjEdgeQubit = adjHex * qubitsPerHex + 6 + ((edge + 3) % 6); // opposite edge
+                        if (adjEdgeQubit < numQubits) {
+                            couplingMap.push([qubit, adjEdgeQubit]);
                         }
                     }
                 }
@@ -318,6 +282,31 @@ export class LayoutManager {
         return couplingMap;
     }
 
+    /**
+     * Get adjacent hexagons for heavy hex inter-hexagon connectivity
+     */
+    private getAdjacentHexagons(row: number, col: number, cols: number, totalHexagons: number): number[] {
+        const adjacent: number[] = [];
+
+        // Hexagonal tiling adjacency (6 neighbors in hex grid)
+        const offsets = [
+            [-1, -1], [-1, 0], [0, -1], [0, 1], [1, 0], [1, 1]
+        ];
+
+        for (const [dr, dc] of offsets) {
+            const newRow = row + dr;
+            const newCol = col + dc;
+
+            if (newRow >= 0 && newCol >= 0 && newCol < cols) {
+                const adjHex = newRow * cols + newCol;
+                if (adjHex < totalHexagons && adjHex >= 0) {
+                    adjacent.push(adjHex);
+                }
+            }
+        }
+
+        return adjacent;
+    }
 
     /**
      * Apply grid layout to existing qubits, maintaining their order
