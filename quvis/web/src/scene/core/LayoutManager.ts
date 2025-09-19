@@ -259,63 +259,100 @@ export class LayoutManager {
 
     /**
      * Generate coupling for multiple hexagons (>12 qubits)
+     * More accurate to IBM's heavy hex topology
      */
     private generateTiledHeavyHexCoupling(numQubits: number): number[][] {
         const couplingMap: number[][] = [];
 
-        // Create a sparse tiled pattern similar to IBM's approach
-        const qubitsPerTile = 12;
-        const numTiles = Math.ceil(numQubits / qubitsPerTile);
-        const tilesPerRow = Math.ceil(Math.sqrt(numTiles));
+        // Use a more accurate heavy hex pattern
+        // Each hexagon contains 12 qubits, but arranged in a specific pattern
+        const qubitsPerHex = 12;
+        const numHexagons = Math.ceil(numQubits / qubitsPerHex);
 
-        for (let tile = 0; tile < numTiles; tile++) {
-            const tileStart = tile * qubitsPerTile;
-            const tileEnd = Math.min(tileStart + qubitsPerTile, numQubits);
-            const qubitsInTile = tileEnd - tileStart;
+        for (let hexIndex = 0; hexIndex < numHexagons; hexIndex++) {
+            const hexStart = hexIndex * qubitsPerHex;
+            const hexEnd = Math.min(hexStart + qubitsPerHex, numQubits);
+            const qubitsInHex = hexEnd - hexStart;
 
-            // Internal tile connections (hexagon-like)
-            for (let i = 0; i < qubitsInTile - 1; i += 2) {
-                const q1 = tileStart + i;
-                const q2 = tileStart + i + 1;
-                if (q2 < numQubits) {
+            // Generate internal hexagon connections
+            this.addHexagonInternalConnections(couplingMap, hexStart, qubitsInHex);
+        }
+
+        // Add very sparse inter-hexagon connections
+        this.addSparseInterHexagonConnections(couplingMap, numQubits, qubitsPerHex, numHexagons);
+
+        return couplingMap;
+    }
+
+    /**
+     * Add internal connections within a single hexagon
+     */
+    private addHexagonInternalConnections(couplingMap: number[][], hexStart: number, qubitsInHex: number): void {
+        if (qubitsInHex >= 6) {
+            // Create hexagon ring for first 6 qubits
+            for (let i = 0; i < Math.min(6, qubitsInHex); i++) {
+                const next = (i + 1) % Math.min(6, qubitsInHex);
+                const q1 = hexStart + i;
+                const q2 = hexStart + next;
+                if (q1 < hexStart + qubitsInHex && q2 < hexStart + qubitsInHex) {
                     couplingMap.push([q1, q2]);
                 }
             }
 
-            // Connect to adjacent tiles (sparse inter-tile connections)
-            const tileRow = Math.floor(tile / tilesPerRow);
-            const tileCol = tile % tilesPerRow;
+            // Connect additional qubits (7-12) to the hexagon vertices
+            for (let i = 6; i < qubitsInHex; i++) {
+                const connectTo = hexStart + ((i - 6) % 6); // Connect to vertex
+                if (connectTo < hexStart + Math.min(6, qubitsInHex)) {
+                    couplingMap.push([hexStart + i, connectTo]);
+                }
+            }
+        } else {
+            // For incomplete hexagons, create a simple chain
+            for (let i = 0; i < qubitsInHex - 1; i++) {
+                couplingMap.push([hexStart + i, hexStart + i + 1]);
+            }
+        }
+    }
 
-            // Connect to right tile
-            if (tileCol < tilesPerRow - 1) {
-                const rightTile = tile + 1;
-                const rightTileStart = rightTile * qubitsPerTile;
-                if (rightTileStart < numQubits) {
-                    const edgeQubit = tileStart + Math.floor(qubitsInTile / 2);
-                    const rightEdgeQubit = rightTileStart;
-                    if (edgeQubit < numQubits && rightEdgeQubit < numQubits) {
-                        couplingMap.push([edgeQubit, rightEdgeQubit]);
+    /**
+     * Add very sparse connections between hexagons
+     */
+    private addSparseInterHexagonConnections(couplingMap: number[][], numQubits: number, qubitsPerHex: number, numHexagons: number): void {
+        // Only add inter-hexagon connections for adjacent hexagons in a grid pattern
+        const hexCols = Math.ceil(Math.sqrt(numHexagons));
+
+        for (let hexIndex = 0; hexIndex < numHexagons; hexIndex++) {
+            const hexRow = Math.floor(hexIndex / hexCols);
+            const hexCol = hexIndex % hexCols;
+            const hexStart = hexIndex * qubitsPerHex;
+
+            // Connect to right neighbor (if exists and both hexagons have enough qubits)
+            if (hexCol < hexCols - 1 && hexIndex + 1 < numHexagons) {
+                const rightHexStart = (hexIndex + 1) * qubitsPerHex;
+                if (rightHexStart < numQubits) {
+                    // Connect edge qubits (vertices 1 and 4 typically connect horizontally)
+                    const leftEdge = hexStart + 1;   // vertex 1 of left hex
+                    const rightEdge = rightHexStart + 4; // vertex 4 of right hex
+                    if (leftEdge < numQubits && rightEdge < numQubits) {
+                        couplingMap.push([leftEdge, rightEdge]);
                     }
                 }
             }
 
-            // Connect to bottom tile
-            if (tileRow < Math.ceil(numTiles / tilesPerRow) - 1) {
-                const bottomTile = tile + tilesPerRow;
-                if (bottomTile < numTiles) {
-                    const bottomTileStart = bottomTile * qubitsPerTile;
-                    if (bottomTileStart < numQubits) {
-                        const edgeQubit = tileEnd - 1;
-                        const bottomEdgeQubit = bottomTileStart;
-                        if (edgeQubit < numQubits && bottomEdgeQubit < numQubits) {
-                            couplingMap.push([edgeQubit, bottomEdgeQubit]);
-                        }
+            // Connect to bottom neighbor (much sparser)
+            const bottomHexIndex = hexIndex + hexCols;
+            if (bottomHexIndex < numHexagons) {
+                const bottomHexStart = bottomHexIndex * qubitsPerHex;
+                if (bottomHexStart < numQubits) {
+                    // Connect specific edge vertices
+                    const topEdge = hexStart + 2;    // vertex 2 of top hex
+                    const bottomEdge = bottomHexStart + 5; // vertex 5 of bottom hex
+                    if (topEdge < numQubits && bottomEdge < numQubits) {
+                        couplingMap.push([topEdge, bottomEdge]);
                     }
                 }
             }
         }
-
-        return couplingMap;
     }
 
 
