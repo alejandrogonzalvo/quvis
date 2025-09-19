@@ -210,7 +210,6 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
 
     const handleGridButtonClick = () => {
         setActiveTab("grid");
-        playground?.updateIdealDistance(gridIdealDistance);
         playground?.applyGridLayout();
     };
 
