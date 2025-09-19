@@ -282,13 +282,8 @@ class PlaygroundAPI:
             }
 
         elif topology == "heavy_hex":
-            # For heavy hex, use distance parameter directly if provided
-            distance = kwargs.get('distance')
-            if distance is None:
-                # Fallback: calculate distance from num_qubits for backward compatibility
-                distance = math.ceil((2 + math.sqrt(24 + 40 * num_qubits)) / 10)
+            distance = math.ceil((2 + math.sqrt(24 + 40 * num_qubits)) / 10)
 
-            # Ensure distance is odd (IBM requirement)
             if distance % 2 == 0:
                 distance += 1
 
