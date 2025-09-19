@@ -6,7 +6,7 @@ import { VisualizationStateManager } from '../core/VisualizationStateManager.js'
 import { HeatmapManager } from '../core/HeatmapManager.js';
 
 interface CircuitLayoutState {
-    layoutType: 'grid' | 'force';
+    layoutType: 'grid' | 'force' | 'heavy-hex';
     positions?: Map<number, THREE.Vector3>;
 }
 
@@ -37,6 +37,9 @@ export class QubitGridController {
 
     // Per-circuit layout state management
     private circuitLayoutStates: Map<number, CircuitLayoutState> = new Map();
+
+    // Heavy hex coupling map override
+    private heavyHexCouplingMap: number[][] | null = null;
 
     constructor(
         scene: THREE.Scene,
@@ -155,6 +158,9 @@ export class QubitGridController {
         // Always update parameters and trigger layout recalculation
         this.layoutManager.updateParameters(params);
 
+        // Clear heavy hex coupling map when switching to force layout
+        this.heavyHexCouplingMap = null;
+
         const deviceQubitCount = this.dataManager.deviceQubitCount;
         if (deviceQubitCount > 0) {
             this.layoutManager.calculateForceDirectedLayout(
@@ -226,6 +232,9 @@ export class QubitGridController {
         this.layoutManager.applyGridLayoutToExistingQubits();
         this.renderManager.updateQubitPositions(this.layoutManager.positions);
 
+        // Clear heavy hex coupling map when switching to grid layout
+        this.heavyHexCouplingMap = null;
+
         const deviceQubitCount = this.dataManager.deviceQubitCount;
         if (deviceQubitCount > 0) {
             this.heatmapManager.generateClusters(
@@ -235,6 +244,14 @@ export class QubitGridController {
             this.heatmapManager.clearPositionsCache();
         }
 
+        // Re-initialize connections with original coupling map
+        const couplingMap = this.dataManager.couplingMap;
+        if (couplingMap) {
+            this.renderManager.initializeInstancedConnections(
+                couplingMap.length
+            );
+        }
+
         this.updateVisualization();
 
         // Save grid layout state for current circuit
@@ -242,6 +259,52 @@ export class QubitGridController {
             this.saveCurrentLayoutState(
                 this.dataManager.currentCircuitIndex,
                 'grid'
+            );
+        }
+    }
+
+    public updateIdealDistanceHeavyHex(distance: number): void {
+        this.heavyHexCouplingMap = this.layoutManager.updateIdealDistanceHeavyHex(distance);
+        this.renderManager.updateQubitPositions(this.layoutManager.positions);
+        this.heatmapManager.clearPositionsCache();
+
+        // Re-initialize connections with updated heavy hex coupling map
+        if (this.heavyHexCouplingMap) {
+            this.renderManager.initializeInstancedConnections(
+                this.heavyHexCouplingMap.length
+            );
+        }
+
+        this.updateVisualization();
+    }
+
+    public applyHeavyHexLayout(): void {
+        this.heavyHexCouplingMap = this.layoutManager.applyHeavyHexLayoutToExistingQubits();
+        this.renderManager.updateQubitPositions(this.layoutManager.positions);
+
+        const deviceQubitCount = this.dataManager.deviceQubitCount;
+        if (deviceQubitCount > 0) {
+            this.heatmapManager.generateClusters(
+                this.layoutManager.positions,
+                deviceQubitCount
+            );
+            this.heatmapManager.clearPositionsCache();
+        }
+
+        // Re-initialize connections with heavy hex coupling map
+        if (this.heavyHexCouplingMap) {
+            this.renderManager.initializeInstancedConnections(
+                this.heavyHexCouplingMap.length
+            );
+        }
+
+        this.updateVisualization();
+
+        // Save heavy hex layout state for current circuit
+        if (this.dataManager.isMultiCircuit) {
+            this.saveCurrentLayoutState(
+                this.dataManager.currentCircuitIndex,
+                'heavy-hex'
             );
         }
     }
@@ -310,6 +373,8 @@ export class QubitGridController {
             // Restore saved layout state
             if (savedLayoutState.layoutType === 'grid') {
                 this.applyGridLayout();
+            } else if (savedLayoutState.layoutType === 'heavy-hex') {
+                this.applyHeavyHexLayout();
             } else if (savedLayoutState.positions) {
                 // Restore force layout positions
                 this.restoreLayoutPositions(savedLayoutState.positions);
@@ -323,11 +388,20 @@ export class QubitGridController {
                 this.heatmapManager.clearPositionsCache();
             }
         } else {
-            // Initialize with default grid layout for new circuit
-            this.applyGridLayout();
-            this.circuitLayoutStates.set(circuitIndex, {
-                layoutType: 'grid',
-            });
+            // Initialize with layout based on topology type
+            const topologyType = this.dataManager.topologyType;
+            if (topologyType === 'heavy_hex') {
+                this.applyHeavyHexLayout();
+                this.circuitLayoutStates.set(circuitIndex, {
+                    layoutType: 'heavy-hex',
+                });
+            } else {
+                // Default to grid layout
+                this.applyGridLayout();
+                this.circuitLayoutStates.set(circuitIndex, {
+                    layoutType: 'grid',
+                });
+            }
         }
 
         // Update connections based on circuit type
@@ -397,7 +471,7 @@ export class QubitGridController {
 
     public saveCurrentLayoutState(
         circuitIndex: number,
-        layoutType: 'grid' | 'force'
+        layoutType: 'grid' | 'force' | 'heavy-hex'
     ): void {
         if (this.dataManager.isMultiCircuit) {
             const currentState: CircuitLayoutState = {
@@ -537,8 +611,14 @@ export class QubitGridController {
         const couplingMap = this.dataManager.couplingMap;
         const qubitCount = this.dataManager.qubitCount;
 
-        // Initialize layout
-        this.layoutManager.calculateGridLayout(deviceQubitCount);
+        // Initialize layout based on topology type
+        const topologyType = this.dataManager.topologyType;
+        if (topologyType === 'heavy_hex') {
+            this.heavyHexCouplingMap = this.layoutManager.calculateHeavyHexLayout(deviceQubitCount);
+        } else {
+            this.layoutManager.calculateGridLayout(deviceQubitCount);
+            this.heavyHexCouplingMap = null; // Clear any existing heavy hex coupling map
+        }
 
         // Initialize slices in state manager
         this.stateManager.initializeSlices(this.dataManager.operationsPerSlice);
@@ -550,9 +630,10 @@ export class QubitGridController {
         );
 
         // Initialize connections
-        if (couplingMap) {
+        const effectiveCouplingMap = this.heavyHexCouplingMap || couplingMap;
+        if (effectiveCouplingMap) {
             this.renderManager.initializeInstancedConnections(
-                couplingMap.length
+                effectiveCouplingMap.length
             );
         }
 
@@ -636,10 +717,13 @@ export class QubitGridController {
                 this.dataManager.interactionPairsPerSlice
             );
 
+        // Use heavy hex coupling map if available, otherwise use data manager's coupling map
+        const effectiveCouplingMap = this.heavyHexCouplingMap || this.dataManager.couplingMap;
+
         this.renderManager.drawConnections(
             this.stateManager.visualizationMode,
             this.layoutManager.positions,
-            this.dataManager.couplingMap,
+            effectiveCouplingMap,
             currentSliceInteractionPairs,
             this.dataManager,
             currentSliceIndex,

@@ -8,6 +8,7 @@ interface LayoutControlsProps {
         repelForce: number;
         idealDistance: number;
         gridIdealDistance: number;
+        heavyHexIdealDistance: number;
         iterations: number;
         coolingFactor: number;
     };
@@ -146,13 +147,16 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
     setIsLoading,
 }) => {
     const [isHovered, setIsHovered] = useState(false);
-    const [activeTab, setActiveTab] = useState<"grid" | "force">("grid");
+    const [activeTab, setActiveTab] = useState<"grid" | "heavy-hex" | "force">("grid");
     const [repelForce, setRepelForce] = useState(initialValues.repelForce);
     const [idealDistance, setIdealDistance] = useState(
         initialValues.idealDistance,
     );
     const [gridIdealDistance, setGridIdealDistance] = useState(
         initialValues.gridIdealDistance,
+    );
+    const [heavyHexIdealDistance, setHeavyHexIdealDistance] = useState(
+        initialValues.heavyHexIdealDistance,
     );
     const [iterations, setIterations] = useState(initialValues.iterations);
     const [coolingFactor, setCoolingFactor] = useState(
@@ -163,6 +167,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
         setRepelForce(initialValues.repelForce);
         setIdealDistance(initialValues.idealDistance);
         setGridIdealDistance(initialValues.gridIdealDistance);
+        setHeavyHexIdealDistance(initialValues.heavyHexIdealDistance);
         setIterations(initialValues.iterations);
         setCoolingFactor(initialValues.coolingFactor);
     }, [initialValues]);
@@ -185,6 +190,12 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
         setGridIdealDistance(parseFloat(event.target.value));
     };
 
+    const handleHeavyHexIdealDistanceChange = (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        setHeavyHexIdealDistance(parseFloat(event.target.value));
+    };
+
     const handleIterationsChange = (
         event: React.ChangeEvent<HTMLInputElement>,
     ) => {
@@ -201,6 +212,12 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
         setActiveTab("grid");
         playground?.updateIdealDistance(gridIdealDistance);
         playground?.applyGridLayout();
+    };
+
+    const handleHeavyHexButtonClick = () => {
+        setActiveTab("heavy-hex");
+        playground?.updateIdealDistanceHeavyHex(heavyHexIdealDistance);
+        playground?.applyHeavyHexLayout();
     };
 
     const handleForceButtonClick = () => {
@@ -269,6 +286,16 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                     </button>
                     <button
                         style={
+                            activeTab === "heavy-hex"
+                                ? activeTabButtonStyle
+                                : tabButtonStyle
+                        }
+                        onClick={() => setActiveTab("heavy-hex")}
+                    >
+                        Heavy Hex
+                    </button>
+                    <button
+                        style={
                             activeTab === "force"
                                 ? activeTabButtonStyle
                                 : tabButtonStyle
@@ -302,6 +329,34 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                         <div style={controlGroupStyle}>
                             <button style={buttonStyle} onClick={handleGridButtonClick}>
                                 Apply Grid Layout
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === "heavy-hex" && (
+                    <div>
+                        <div style={controlGroupStyle}>
+                            <label htmlFor="heavy-hex-ideal-distance" style={labelStyle}>
+                                Ideal Distance:{" "}
+                                <span style={valueStyle}>
+                                    {heavyHexIdealDistance.toFixed(1)}
+                                </span>
+                            </label>
+                            <input
+                                type="range"
+                                id="heavy-hex-ideal-distance"
+                                min="1.0"
+                                max="10.0"
+                                step="0.5"
+                                value={heavyHexIdealDistance}
+                                onChange={handleHeavyHexIdealDistanceChange}
+                                style={sliderStyle}
+                            />
+                        </div>
+                        <div style={controlGroupStyle}>
+                            <button style={buttonStyle} onClick={handleHeavyHexButtonClick}>
+                                Apply Heavy Hex Layout
                             </button>
                         </div>
                     </div>
