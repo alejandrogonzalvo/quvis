@@ -1,6 +1,6 @@
 {
     "name": "quvis",
-    "version": "0.24.1",
+    "version": "0.24.0",
     "description": "Quvis Web Interface - Interactive quantum circuit visualization",
     "type": "module",
     "scripts": {
