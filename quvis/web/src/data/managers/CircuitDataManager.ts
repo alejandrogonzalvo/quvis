@@ -16,7 +16,6 @@ interface CompiledCircuitInfo {
 interface DeviceInfo {
     num_qubits_on_device: number;
     connectivity_graph_coupling_map: number[][];
-    topology_type?: string;
 }
 
 interface Circuit {
@@ -93,14 +92,6 @@ export class CircuitDataManager {
             return currentCircuit?.device_info?.num_qubits_on_device || 0;
         }
         return 0;
-    }
-
-    get topologyType(): string | undefined {
-        if (this.circuits) {
-            const currentCircuit = this.circuits[this._currentCircuitIndex];
-            return currentCircuit?.device_info?.topology_type;
-        }
-        return undefined;
     }
 
     get isMultiCircuit(): boolean {

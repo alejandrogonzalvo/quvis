@@ -263,19 +263,6 @@ export class Playground {
         }
     }
 
-    public updateIdealDistanceHeavyHex(distance: number): void {
-        this.layoutManager.setIdealDistance(distance);
-        if (this.grid) {
-            this.grid.updateIdealDistanceHeavyHex(distance);
-        }
-    }
-
-    public applyHeavyHexLayout(): void {
-        if (this.grid) {
-            this.grid.applyHeavyHexLayout();
-        }
-    }
-
     // Appearance methods
     public updateAppearanceParameters(params: {
         qubitSize?: number;

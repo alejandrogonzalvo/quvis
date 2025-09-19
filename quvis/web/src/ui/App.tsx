@@ -99,7 +99,6 @@ const App: React.FC = () => {
         repelForce: 0.6,
         idealDistance: 1.0,
         gridIdealDistance: 1.0,
-        heavyHexIdealDistance: 1.0,
         iterations: 500,
         coolingFactor: 1.0,
     });
@@ -586,7 +585,6 @@ const App: React.FC = () => {
             repelForce: playgroundInstance.currentRepelForce,
             idealDistance: playgroundInstance.currentIdealDistance,
             gridIdealDistance: 1.0, // Default value
-            heavyHexIdealDistance: 1.0, // Default value
             iterations: playgroundInstance.currentIterations,
             coolingFactor: playgroundInstance.currentCoolingFactor,
         });
