@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 QFT Circuit Regression Test
 
@@ -10,7 +9,8 @@ for future regression testing to ensure implementation consistency.
 import json
 from math import sqrt, ceil
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
+import argparse
 
 from qiskit import transpile
 from qiskit.circuit.library import QFT
@@ -24,7 +24,7 @@ def create_2d_grid_coupling_map(num_qubits: int) -> CouplingMap:
     return CouplingMap.from_grid(grid_size, grid_size)
 
 
-def extract_regression_data(visualization_data: Dict[str, Any]) -> Dict[str, Any]:
+def extract_regression_data(visualization_data: dict[str, Any]) -> dict[str, Any]:
     """Extract the key data needed for regression testing."""
     regression_data = {}
 
@@ -40,7 +40,6 @@ def extract_regression_data(visualization_data: Dict[str, Any]) -> Dict[str, Any
             "circuit_stats": circuit_data["circuit_stats"],
         }
 
-        # Extract operations per slice (interaction data)
         if circuit_type == "logical":
             extracted_data["operations_per_slice"] = circuit_data["circuit_info"]["interaction_graph_ops_per_slice"]
         else:
@@ -67,60 +66,38 @@ def extract_regression_data(visualization_data: Dict[str, Any]) -> Dict[str, Any
 
 
 def generate_qft_regression_baseline():
-    """Generate the baseline regression data for QFT circuit with 144 qubits."""
-    print("🔧 Generating QFT regression baseline...")
-
-    # Configuration
     num_qubits = 144
     optimization_level = 0
 
-    # Create 2D grid coupling map
     coupling_map = create_2d_grid_coupling_map(num_qubits)
     print(f"📐 Created 2D grid coupling map with {coupling_map.size()} qubits")
 
-    # Create QFT circuit
     qft_circuit = QFT(num_qubits).decompose()
-    print(f"🔢 Created QFT circuit with {num_qubits} qubits")
-    print(f"   - Original gates: {len(qft_circuit.data)}")
-    print(f"   - Original depth: {qft_circuit.depth()}")
-
-    # Setup visualizer (without launching UI)
     visualizer = Visualizer(auto_open_browser=False, verbose=True)
-
-    # Add logical circuit (no coupling map)
     visualizer.add_circuit(
         qft_circuit.copy(),
         coupling_map=None,
         algorithm_name=f"QFT Logical (Q={num_qubits})"
     )
 
-    # Transpile and add compiled circuit
     transpiled_circuit = transpile(
         qft_circuit,
         coupling_map=coupling_map,
         optimization_level=optimization_level
     )
-    print(f"🚀 Transpiled circuit (O={optimization_level}):")
-    print(f"   - Transpiled gates: {len(transpiled_circuit.data)}")
-    print(f"   - Transpiled depth: {transpiled_circuit.depth()}")
-
     visualizer.add_circuit(
         transpiled_circuit,
         coupling_map=coupling_map,
         algorithm_name=f"QFT Compiled (Q={num_qubits}, O={optimization_level})"
     )
 
-    # Get visualization data without launching UI
-    print("📊 Processing visualization data...")
     visualization_data = {
         "circuits": [circuit.to_dict() for circuit in visualizer.circuits],
         "total_circuits": len(visualizer.circuits),
     }
 
-    # Extract regression-specific data
     regression_data = extract_regression_data(visualization_data)
 
-    # Add metadata
     regression_data["metadata"] = {
         "num_qubits": num_qubits,
         "optimization_level": optimization_level,
@@ -132,8 +109,7 @@ def generate_qft_regression_baseline():
     return regression_data
 
 
-def save_regression_baseline(data: Dict[str, Any], filename: str = "qft_regression_baseline.json"):
-    """Save regression baseline data to file."""
+def save_regression_baseline(data: dict[str, Any], filename: str = "qft_regression_baseline.json"):
     baseline_path = Path(__file__).parent / filename
 
     print(f"💾 Saving baseline data to {baseline_path}...")
@@ -144,8 +120,7 @@ def save_regression_baseline(data: Dict[str, Any], filename: str = "qft_regressi
     return baseline_path
 
 
-def load_regression_baseline(filename: str = "qft_regression_baseline.json") -> Dict[str, Any]:
-    """Load regression baseline data from file."""
+def load_regression_baseline(filename: str = "qft_regression_baseline.json") -> dict[str, Any]:
     baseline_path = Path(__file__).parent / filename
 
     if not baseline_path.exists():
@@ -155,7 +130,7 @@ def load_regression_baseline(filename: str = "qft_regression_baseline.json") -> 
         return json.load(f)
 
 
-def compare_regression_data(current_data: Dict[str, Any], baseline_data: Dict[str, Any]) -> Dict[str, Any]:
+def compare_regression_data(current_data: dict[str, Any], baseline_data: dict[str, Any]) -> dict[str, Any]:
     """Compare current regression data with baseline, accounting for routing stochasticity."""
     differences = {}
 
@@ -278,17 +253,10 @@ def run_regression_test() -> bool:
     print("🧪 Running QFT regression test...")
 
     try:
-        # Load baseline data
         baseline_data = load_regression_baseline()
-        print("📖 Loaded baseline data")
-
-        # Generate current data
         current_data = generate_qft_regression_baseline()
-
-        # Compare
         differences = compare_regression_data(current_data, baseline_data)
 
-        # Separate critical differences from informational routing differences
         critical_differences = {k: v for k, v in differences.items() if not k.endswith("_routing_info")}
         routing_info = {k: v for k, v in differences.items() if k.endswith("_routing_info")}
 
@@ -328,8 +296,6 @@ def run_regression_test() -> bool:
 
 
 if __name__ == "__main__":
-    import argparse
-
     parser = argparse.ArgumentParser(description="QFT Circuit Regression Test")
     parser.add_argument("--generate-baseline", action="store_true",
                        help="Generate new baseline data")
@@ -346,6 +312,5 @@ if __name__ == "__main__":
         success = run_regression_test()
         exit(0 if success else 1)
     else:
-        # Default: run regression test
         success = run_regression_test()
         exit(0 if success else 1)
