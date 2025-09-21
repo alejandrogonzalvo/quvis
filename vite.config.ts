@@ -155,7 +155,7 @@ export default defineConfig({
     build: {
         outDir: 'dist',
         rollupOptions: {
-            input: 'index.html',
+            input: 'quvis/web/index.html',
             output: {
                 manualChunks: {
                     three: ['three'],
