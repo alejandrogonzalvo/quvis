@@ -5,7 +5,7 @@ export class BlochSphere {
     blochSphere: THREE.Group;
     private readonly maxMainSphereOpacity: number = 0.25;
     private isLightBackground: () => boolean;
-    private sphereMaterial: THREE.MeshPhongMaterial;
+    private sphereMaterial: THREE.MeshBasicMaterial;
 
     constructor(x: number, y: number, z: number, isLightBackground: () => boolean = () => false) {
         this.isLightBackground = isLightBackground;
