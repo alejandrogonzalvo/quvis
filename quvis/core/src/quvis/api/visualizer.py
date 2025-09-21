@@ -223,8 +223,6 @@ class Visualizer:
 
             # Create a minimal device info for logical circuits
             device_info = DeviceInfo(
-                source_coupling_map_file="logical_circuit",
-                topology_type="logical",
                 num_qubits_on_device=circuit.num_qubits,
                 connectivity_graph_coupling_map=[],
             )
@@ -263,8 +261,6 @@ class Visualizer:
             )
 
             device_info = DeviceInfo(
-                source_coupling_map_file="python_library",
-                topology_type=topology_type,
                 num_qubits_on_device=num_device_qubits,
                 connectivity_graph_coupling_map=list(coupling_map_list),
             )

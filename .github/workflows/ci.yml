@@ -38,26 +38,13 @@ jobs:
               run: |
                   npm ci
 
-            - name: Test Core library
-              run: |
-                  poetry run pytest || echo "Core tests not yet configured"
-
             - name: Run QFT Regression Test
               run: |
                   poetry run python tests/test_qft_regression.py --test
 
-            - name: Run Web tests with coverage
+            - name: Run unit tests
               run: |
-                  npm run test:coverage || echo "Web tests not yet configured"
-
-            - name: Upload test results and coverage
-              uses: actions/upload-artifact@v4
-              if: always()
-              with:
-                  name: test-results
-                  path: |
-                      coverage/
-                  retention-days: 7
+                  poetry run python tests/compiler.py
 
     release:
         needs: test
@@ -67,7 +54,6 @@ jobs:
             issues: write
             pull-requests: write
             id-token: write
-        # Only run release on main branch pushes, not on PRs
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         steps:
             - name: Checkout code

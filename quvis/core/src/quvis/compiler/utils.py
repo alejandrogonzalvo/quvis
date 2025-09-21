@@ -25,8 +25,6 @@ class RoutingCircuitInfo:
 @dataclass
 class DeviceInfo:
     """Stores information about the target device."""
-    source_coupling_map_file: str
-    topology_type: str
     num_qubits_on_device: int
     connectivity_graph_coupling_map: list
 

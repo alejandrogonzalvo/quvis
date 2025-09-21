@@ -6,7 +6,7 @@ generating quantum circuits on-demand based on user selections.
 """
 
 import sys, math, json, os, argparse, logging
-from typing import Any, Dict, List
+from typing import Any 
 from pathlib import Path
 from qiskit import QuantumCircuit
 from qiskit.circuit.library import QFT
@@ -44,7 +44,7 @@ class PlaygroundAPI:
         topology: str,
         optimization_level: int = 1,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate visualization data for a quantum circuit.
 
@@ -61,11 +61,6 @@ class PlaygroundAPI:
         circuit = self._create_circuit(algorithm, num_qubits, **kwargs)
         coupling_map = self._create_coupling_map(topology, num_qubits)
 
-        if coupling_map["coupling_map"]:
-            qiskit_coupling_map = QiskitCouplingMap(coupling_map["coupling_map"])
-        else:
-            qiskit_coupling_map = None
-
         basis_gates = ["id", "rz", "sx", "x", "cx", "swap"]
 
         logger.info("Processing circuit for playground visualization...")
@@ -79,7 +74,6 @@ class PlaygroundAPI:
         compiled_circuit_data = self._process_compiled_circuit(
             circuit,
             coupling_map,
-            qiskit_coupling_map,
             basis_gates,
             optimization_level,
             algorithm,
@@ -100,8 +94,8 @@ class PlaygroundAPI:
         self,
         circuit: QuantumCircuit,
         algorithm: str,
-        kwargs: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        kwargs: dict[str, Any],
+    ) -> dict[str, Any]:
         """Process the logical version of the circuit."""
         decomposed_circuit = circuit.decompose()
         logical_operations_per_slice = extract_operations_per_slice(decomposed_circuit)
@@ -115,8 +109,6 @@ class PlaygroundAPI:
         )
 
         device_info = DeviceInfo(
-            source_coupling_map_file="playground_logical",
-            topology_type="logical",
             num_qubits_on_device=decomposed_circuit.num_qubits,
             connectivity_graph_coupling_map=[],
         )
@@ -137,25 +129,22 @@ class PlaygroundAPI:
     def _process_compiled_circuit(
         self,
         circuit: QuantumCircuit,
-        coupling_map: Dict[str, Any],
-        qiskit_coupling_map,
-        basis_gates: List[str],
+        coupling_map: QiskitCouplingMap,
+        basis_gates: list[str],
         optimization_level: int,
         algorithm: str,
-        kwargs: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        kwargs: dict[str, Any],
+    ) -> dict[str, Any]:
         """Process the compiled version of the circuit."""
         logger.info(
             f"🔧 Transpiling for optimization level {optimization_level}..."
         )
-        transpile_options = {
-            "basis_gates": basis_gates,
-            "optimization_level": optimization_level,
-        }
-        if qiskit_coupling_map:
-            transpile_options["coupling_map"] = qiskit_coupling_map
 
-        transpiled_circuit = transpile(circuit, **transpile_options)
+        transpiled_circuit = transpile(
+            circuit,
+            basis_gates=basis_gates,
+            optimization_level=optimization_level,
+            coupling_map=coupling_map)
         logger.info(
             f"   ✓ Transpilation complete: {len(transpiled_circuit.data)} gates total"
         )
@@ -192,10 +181,8 @@ class PlaygroundAPI:
         )
 
         device_info = DeviceInfo(
-            source_coupling_map_file="playground_compiled",
-            topology_type=coupling_map["topology_type"],
-            num_qubits_on_device=coupling_map["num_qubits"],
-            connectivity_graph_coupling_map=list(coupling_map["coupling_map"]),
+            num_qubits_on_device=coupling_map.size(),
+            connectivity_graph_coupling_map=list(coupling_map.get_edges()),
         )
 
         return {
@@ -234,7 +221,7 @@ class PlaygroundAPI:
             reps = kwargs.get("reps", 2)
             circuit = QuantumCircuit(num_qubits, name=f"QAOA-{num_qubits}-p{reps}")
 
-            for rep in range(reps):
+            for _ in range(reps):
                 # Problem layer (ZZ interactions)
                 for i in range(num_qubits - 1):
                     circuit.rzz(0.5, i, i + 1)
@@ -248,38 +235,21 @@ class PlaygroundAPI:
         else:
             raise ValueError(f"Unsupported algorithm: {algorithm}")
 
-    def _create_coupling_map(self, topology: str, num_qubits: int) -> Dict[str, Any]:
+    def _create_coupling_map(self, topology: str, num_qubits: int) -> QiskitCouplingMap:
         """Create a coupling map using Qiskit's built-in topology generators."""
 
         if topology == "line":
-            coupling_map = QiskitCouplingMap.from_line(num_qubits)
-            return {
-                "coupling_map": coupling_map.get_edges(),
-                "num_qubits": coupling_map.size(),
-                "topology_type": "line",
-            }
+            return QiskitCouplingMap.from_line(num_qubits)
 
         elif topology == "ring":
-            coupling_map = QiskitCouplingMap.from_ring(num_qubits)
-            return {
-                "coupling_map": coupling_map.get_edges(),
-                "num_qubits": coupling_map.size(),
-                "topology_type": "ring",
-            }
+            return QiskitCouplingMap.from_ring(num_qubits)
 
         elif topology == "grid":
             # Find best square grid size
             n = int(num_qubits**0.5)
             if n * n < num_qubits:
                 n += 1
-            coupling_map = QiskitCouplingMap.from_grid(n, n)
-            return {
-                "coupling_map": coupling_map.get_edges(),
-                "num_qubits": coupling_map.size(),
-                "topology_type": "grid",
-                "grid_dim_rows": n,
-                "grid_dim_cols": n,
-            }
+            return QiskitCouplingMap.from_grid(n, n)
 
         elif topology == "heavy_hex":
             distance = math.ceil((2 + math.sqrt(24 + 40 * num_qubits)) / 10)
@@ -287,13 +257,7 @@ class PlaygroundAPI:
             if distance % 2 == 0:
                 distance += 1
 
-            coupling_map = QiskitCouplingMap.from_heavy_hex(distance)
-            return {
-                "coupling_map": coupling_map.get_edges(),
-                "num_qubits": coupling_map.size(),
-                "topology_type": "heavy_hex",
-                "distance": distance,
-            }
+            return QiskitCouplingMap.from_heavy_hex(distance)
 
         elif topology == "heavy_square":
             distance = math.ceil((1 + math.sqrt(1 + 3 * num_qubits)) / 3)
@@ -301,60 +265,29 @@ class PlaygroundAPI:
             if distance % 2 == 0:
                 distance += 1
 
-            coupling_map = QiskitCouplingMap.from_heavy_square(distance)
-            return {
-                "coupling_map": coupling_map.get_edges(),
-                "num_qubits": coupling_map.size(),
-                "topology_type": "heavy_square",
-                "distance": distance,
-            }
+            return QiskitCouplingMap.from_heavy_square(distance)
 
         elif topology == "hexagonal":
-            # Hexagonal lattice - use reasonable rows/cols
             rows = max(2, int((num_qubits / 2) ** 0.5))
             cols = max(2, num_qubits // rows)
-            coupling_map = QiskitCouplingMap.from_hexagonal_lattice(rows, cols)
-            return {
-                "coupling_map": coupling_map.get_edges(),
-                "num_qubits": coupling_map.size(),
-                "topology_type": "hexagonal",
-                "rows": rows,
-                "cols": cols,
-            }
+            return QiskitCouplingMap.from_hexagonal_lattice(rows, cols)
 
         elif topology == "full":
-            coupling_map = QiskitCouplingMap.from_full(num_qubits)
-            return {
-                "coupling_map": coupling_map.get_edges(),
-                "num_qubits": coupling_map.size(),
-                "topology_type": "full",
-            }
+            return QiskitCouplingMap.from_full(num_qubits)
 
         else:
             raise ValueError(
-                f"Unsupported topology: {topology}. Available: {self.get_supported_topologies()}"
+                f"Unsupported topology: {topology}."
             )
 
     def get_supported_algorithms(self) -> list:
         """Get list of supported algorithms."""
         return ["qft", "qaoa", "ghz"]
 
-    def get_supported_topologies(self) -> list:
-        """Get list of supported topologies."""
-        return [
-            "line",
-            "ring",
-            "grid",
-            "heavy_hex",
-            "heavy_square",
-            "hexagonal",
-            "full",
-        ]
-
 
 def generate_playground_circuit(
     algorithm: str, num_qubits: int, topology: str, **kwargs
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     High-level function to generate a playground circuit.
     """
