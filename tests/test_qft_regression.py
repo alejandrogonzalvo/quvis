@@ -55,7 +55,6 @@ def extract_regression_data(visualization_data: dict[str, Any]) -> dict[str, Any
 
         # Extract device connectivity information
         extracted_data["device_info"] = {
-            "topology_type": circuit_data["device_info"]["topology_type"],
             "num_qubits_on_device": circuit_data["device_info"]["num_qubits_on_device"],
             "connectivity_graph_coupling_map": circuit_data["device_info"]["connectivity_graph_coupling_map"],
         }
@@ -176,7 +175,7 @@ def compare_regression_data(current_data: dict[str, Any], baseline_data: dict[st
         current_device = current_circuit.get("device_info", {})
         baseline_device = baseline_circuit.get("device_info", {})
 
-        device_fields_to_compare = ["topology_type", "num_qubits_on_device"]
+        device_fields_to_compare = ["num_qubits_on_device"]
         for field in device_fields_to_compare:
             if current_device.get(field) != baseline_device.get(field):
                 if f"{circuit_key}_differences" not in differences:

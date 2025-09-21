@@ -36,6 +36,8 @@ class TestExtractOperationsPerSlice(unittest.TestCase):
         routing_ops, swap_count, routing_depth = extract_routing_operations_per_slice(circuit)
 
         self.assertEqual(swap_count, 1)
+    
+    
         
 
 
