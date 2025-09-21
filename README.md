@@ -9,6 +9,19 @@
 
 Quvis is a quantum circuit visualization platform that provides interactive 3D visualization of logical and compiled circuits.
 
+## 🚀 Quick Start 
+
+Want to try Quvis immediately? Run the interactive web playground locally:
+
+```bash
+git clone https://github.com/alejandrogonzalvo/quvis-web.git
+cd quvis-web
+pip install poetry
+poetry install
+npm install
+npm run dev
+```
+
 ## Installation
 
 ### Option 1: Install from PyPI (Recommended)
