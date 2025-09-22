@@ -11,6 +11,7 @@ interface PlaygroundParameterSelectionProps {
 interface PlaygroundParams {
     algorithm: string;
     numQubits: number;
+    physicalQubits: number;
     topology: string;
     optimizationLevel: number;
     customParams?: Record<string, any>;
@@ -253,6 +254,7 @@ const PlaygroundParameterSelection: React.FC<
         const params: PlaygroundParams = {
             algorithm,
             numQubits: logicalQubits,
+            physicalQubits: physicalQubits,
             topology,
             optimizationLevel,
             customParams: getCustomParams(),

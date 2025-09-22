@@ -36,6 +36,11 @@ const circuitGeneratorMiddleware = async (req, res, next) => {
                 (params.optimization_level || 1).toString(),
             ];
 
+            // Add physical qubits parameter if provided
+            if (params.physical_qubits && params.physical_qubits > params.num_qubits) {
+                args.push('--physical-qubits', params.physical_qubits.toString());
+            }
+
             const pythonProcess = spawn('python3', args, {
                 cwd: process.cwd(),
                 stdio: ['pipe', 'pipe', 'pipe'],

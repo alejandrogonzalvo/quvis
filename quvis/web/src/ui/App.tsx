@@ -409,6 +409,7 @@ const App: React.FC = () => {
                 body: JSON.stringify({
                     algorithm: params.algorithm,
                     num_qubits: params.numQubits,
+                    physical_qubits: params.physicalQubits,
                     topology: params.topology,
                     optimization_level: params.optimizationLevel,
                     custom_params: params.customParams || {},

@@ -40,11 +40,12 @@ jobs:
 
             - name: Run QFT Regression Test
               run: |
-                  poetry run python tests/test_qft_regression.py --test
+                  poetry run python tests/regression/test_qft_regression.py --test
 
             - name: Run unit tests
               run: |
-                  poetry run python tests/compiler.py
+                  poetry run python tests/unit/compiler.py
+                  poetry run python tests/unit/playground.py
 
     release:
         needs: test
