@@ -37,7 +37,7 @@ const circuitGeneratorMiddleware = async (req, res, next) => {
             ];
 
             // Add physical qubits parameter if provided
-            if (params.physical_qubits && params.physical_qubits > params.num_qubits) {
+            if (params.physical_qubits) {
                 args.push('--physical-qubits', params.physical_qubits.toString());
             }
 
