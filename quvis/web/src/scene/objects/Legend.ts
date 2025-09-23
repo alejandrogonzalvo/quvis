@@ -102,9 +102,8 @@ export class HeatmapLegend {
         // maxObservedRawInteractionCount is the raw count of interactions for the "hottest" qubit in the window.
 
         if (effectiveSlicesInWindow > 0) {
-            this.subtitleElement.innerHTML =
-                `Peak: ${(actualMaxIntensityRatio * 100).toFixed(0)}% intensity<br>` +
-                `≈${maxObservedRawInteractionCount.toFixed(1)} interactions over ${effectiveSlicesInWindow} slice${effectiveSlicesInWindow === 1 ? '' : 's'}`;
+            this.subtitleElement.textContent =
+                `Peak: ${(actualMaxIntensityRatio * 100).toFixed(0)}% intensity`;
         } else {
             this.subtitleElement.textContent = "No activity in current window";
         }
@@ -118,11 +117,15 @@ export class HeatmapLegend {
             yellowText = "Medium";
             greenText = "Low";
         } else if (effectiveSlicesInWindow > 0) {
-            const interactionsForRed = 1.0 * effectiveSlicesInWindow;
-            const interactionsForYellow = this.yellowThreshold * effectiveSlicesInWindow;
-            redText = `≥${interactionsForRed.toFixed(1)}×`;
-            yellowText = `≈${interactionsForYellow.toFixed(1)}×`;
-            greenText = "<1×";
+            // Red represents the maximum observed interactions (100% intensity)
+            const interactionsForRed = maxObservedRawInteractionCount;
+            // Yellow represents the threshold for yellow color (typically 50% of max)
+            const interactionsForYellow = this.yellowThreshold * maxObservedRawInteractionCount;
+            // Green represents 25% of maximum interactions
+            const interactionsForGreen = 0.25 * maxObservedRawInteractionCount;
+            redText = `${interactionsForRed.toFixed(1)}×`;
+            yellowText = `${interactionsForYellow.toFixed(1)}×`;
+            greenText = `${interactionsForGreen.toFixed(1)}×`;
         } else {
             redText = "No data";
             yellowText = "No data";
@@ -155,14 +158,14 @@ export class HeatmapLegend {
 
         const htmlContent = `
             <div style="margin-bottom: 18px;">
-                <div style="display: flex; align-items: center; margin-bottom: 6px;">
-                    <span style="font-weight: 600; font-size: 18px; color: ${colors.text.primary};">Activity Heatmap - </span>
-                    <span id="${titleId}" style="font-size: 16px; color: ${colors.text.muted}; margin-left: 4px;"></span>
-                    <span style="font-size: 16px; color: ${colors.text.muted}; margin-left: 4px;">interaction levels:</span>
+                <div style="font-weight: 600; font-size: 16px; color: ${colors.text.primary}; margin-bottom: 6px;">
+                    <span>Heatmap </span>
+                    <span id="${titleId}" style="font-weight: 600; font-size: 16px; color: ${colors.text.primary};"></span>
+                    <span> interactions:</span>
                 </div>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 18px;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 18px;">
                 <div style="display: flex; align-items: center;">
                     <div style="width: 16px; height: 16px; background: #00ff00; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);"></div>
                     <span id="${textLowId}" style="font-size: 16px; color: ${colors.text.secondary};"></span>
