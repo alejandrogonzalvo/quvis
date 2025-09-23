@@ -679,6 +679,19 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
                         </div>
                     </div>
                 </div>
+
+                {/* Heatmap Legend Container */}
+                <div style={controlGroupStyle}>
+                    <div
+                        id="heatmap-legend-container"
+                        style={{
+                            backgroundColor: colors.ui.surface,
+                            borderRadius: "6px",
+                            border: `1px solid ${colors.border.separator}`,
+                            padding: "0", // Legend will handle its own padding
+                        }}
+                    ></div>
+                </div>
             </div>
         </div>
     );

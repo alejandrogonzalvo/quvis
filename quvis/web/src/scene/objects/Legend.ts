@@ -32,14 +32,17 @@ export class HeatmapLegend {
     }
 
     private applyStyles() {
-        this.container.style.padding = "10px";
-        this.container.style.background = colors.background.panel;
-        this.container.style.borderRadius = "5px";
-        this.container.style.fontFamily = "Arial, sans-serif";
-        this.container.style.fontSize = "12px";
+        this.container.style.padding = "16px";
+        this.container.style.background = "rgba(0, 0, 0, 0.6)";
+        this.container.style.borderRadius = "12px";
+        this.container.style.border = "1px solid rgba(255, 255, 255, 0.1)";
+        this.container.style.backdropFilter = "blur(8px)";
+        this.container.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        this.container.style.fontSize = "13px";
         this.container.style.color = colors.text.primary;
-        this.container.style.minWidth = "180px";
+        this.container.style.minWidth = "200px";
         this.container.style.marginTop = "0px";
+        this.container.style.boxShadow = "0 8px 32px rgba(0, 0, 0, 0.3)";
         this.stylesApplied = true;
     }
 
@@ -87,10 +90,9 @@ export class HeatmapLegend {
         }
 
         if (maxSlicesSetting === -1) {
-            this.titleElement.textContent =
-                "Activity (All Slices up to Current)";
+            this.titleElement.textContent = "All slices up to current";
         } else {
-            this.titleElement.textContent = `Activity (Last ${maxSlicesSetting} Slices)`;
+            this.titleElement.textContent = `Last ${maxSlicesSetting} slice${maxSlicesSetting === 1 ? '' : 's'}`;
         }
 
         const actualMaxIntensityRatio =
@@ -101,38 +103,38 @@ export class HeatmapLegend {
 
         if (effectiveSlicesInWindow > 0) {
             this.subtitleElement.textContent =
-                `Max observed intensity: ${(actualMaxIntensityRatio * 100).toFixed(0)}% ` +
-                `(approx. ${maxObservedRawInteractionCount.toFixed(1)} interactions in ${effectiveSlicesInWindow} slices).`;
+                `Peak: ${(actualMaxIntensityRatio * 100).toFixed(0)}% intensity`;
         } else {
-            this.subtitleElement.textContent = "(No activity or window)";
+            this.subtitleElement.textContent = "No activity in current window";
         }
 
         let redText: string;
         let yellowText: string;
-        // Default for Green, covers minimal activity due to the 0.002 intensity floor in Heatmap.ts
-        let greenText: string = `Green: > 0 interactions`;
+        let greenText: string;
 
         if (effectiveSlicesInWindow === 1) {
-            redText = `Red: Active (1 interaction)`;
-            // In a 1-slice window, if a qubit is active, its intensity is 1.0 (making it Red).
-            // A distinct Yellow state (intensity 0.5) isn't achieved by interaction count here.
-            yellowText = `Yellow: N/A (if active, it's Red)`;
+            redText = "High";
+            yellowText = "Medium";
+            greenText = "Low";
         } else if (effectiveSlicesInWindow > 0) {
-            const interactionsForRed = 1.0 * effectiveSlicesInWindow;
-            const interactionsForYellow =
-                this.yellowThreshold * effectiveSlicesInWindow; // yellowThreshold is 0.5
-            redText = `Red: &ge; ${interactionsForRed.toFixed(1)} interactions`;
-            yellowText = `Yellow: &approx; ${interactionsForYellow.toFixed(1)} interactions`;
+            // Red represents the maximum observed interactions (100% intensity)
+            const interactionsForRed = maxObservedRawInteractionCount;
+            // Yellow represents the threshold for yellow color (typically 50% of max)
+            const interactionsForYellow = this.yellowThreshold * maxObservedRawInteractionCount;
+            // Green represents 25% of maximum interactions
+            const interactionsForGreen = 0.25 * maxObservedRawInteractionCount;
+            redText = `${interactionsForRed.toFixed(1)}×`;
+            yellowText = `${interactionsForYellow.toFixed(1)}×`;
+            greenText = `${interactionsForGreen.toFixed(1)}×`;
         } else {
-            // This case (e.g., effectiveSlicesInWindow = 0) implies no activity or window
-            redText = `Red: N/A`;
-            yellowText = `Yellow: N/A`;
-            greenText = `Green: N/A`; // Or more descriptive like "No activity in window"
+            redText = "No data";
+            yellowText = "No data";
+            greenText = "No data";
         }
 
-        this.textHighElement.innerHTML = redText;
-        this.textMedElement.innerHTML = yellowText;
-        this.textLowElement.innerHTML = greenText;
+        this.textHighElement.textContent = redText;
+        this.textMedElement.textContent = yellowText;
+        this.textLowElement.textContent = greenText;
     }
 
     private setupDOM() {
@@ -155,17 +157,32 @@ export class HeatmapLegend {
         const textHighId = `${this.containerId}-text-high`;
 
         const htmlContent = `
-            <div style="margin-bottom: 5px; font-weight: bold; text-align: center;">Heatmap Legend</div>
-            <div id="${titleId}" style="font-size:11px; text-align: center; margin-bottom: 8px;"></div>
-            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 5px;">
-                <div style="width: 100px; height: 15px; background: linear-gradient(to right, ${colors.visualization.heatmapGradient.start}, ${colors.visualization.heatmapGradient.middle}, ${colors.visualization.heatmapGradient.end}); border: 1px solid ${colors.visualization.legendBorder};"></div>
+            <div style="margin-bottom: 18px;">
+                <div style="font-weight: 600; font-size: 16px; color: ${colors.text.primary}; margin-bottom: 6px;">
+                    <span>Heatmap </span>
+                    <span id="${titleId}" style="font-weight: 600; font-size: 16px; color: ${colors.text.primary};"></span>
+                    <span> interactions:</span>
+                </div>
             </div>
-            <div style="font-size: 11px; line-height: 1.4; text-align: center;">
-                <span id="${textLowId}" style="font-size: 1.2em;"></span><br>
-                <span id="${textMedId}" style="font-size: 1.2em;"></span><br>
-                <span id="${textHighId}" style="font-size: 1.2em;"></span>
+
+            <div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 18px;">
+                <div style="display: flex; align-items: center;">
+                    <div style="width: 16px; height: 16px; background: #00ff00; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);"></div>
+                    <span id="${textLowId}" style="font-size: 16px; color: ${colors.text.secondary};"></span>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <div style="width: 16px; height: 16px; background: #ffff00; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 10px rgba(255, 255, 0, 0.5);"></div>
+                    <span id="${textMedId}" style="font-size: 16px; color: ${colors.text.secondary};"></span>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <div style="width: 16px; height: 16px; background: #ff0000; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);"></div>
+                    <span id="${textHighId}" style="font-size: 16px; color: ${colors.text.secondary};"></span>
+                </div>
             </div>
-            <div id="${subtitleId}" style="font-size: 9px; color: ${colors.text.muted}; margin-top: 5px; text-align: center;"></div>
+
+            <div style="padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                <div id="${subtitleId}" style="font-size: 13px; color: ${colors.text.muted}; line-height: 1.4;"></div>
+            </div>
         `;
         this.container.innerHTML = htmlContent;
 

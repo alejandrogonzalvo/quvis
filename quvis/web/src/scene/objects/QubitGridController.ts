@@ -82,7 +82,6 @@ export class QubitGridController {
             visualizationMode
         );
         this.heatmapManager = new HeatmapManager(
-            scene,
             camera,
             1, // initial qubit count (will be updated)
             initialMaxSlicesForHeatmap
@@ -126,7 +125,7 @@ export class QubitGridController {
         return this.heatmapManager.heatmapInstance;
     }
 
-    get heatmapLegend() {
+    get legend() {
         return this.heatmapManager.legendInstance;
     }
 

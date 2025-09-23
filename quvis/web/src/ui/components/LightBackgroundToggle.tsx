@@ -26,19 +26,11 @@ const LightBackgroundToggle: React.FC<LightBackgroundToggleProps> = ({
         }
     };
 
-    const containerStyle: React.CSSProperties = {
-        position: 'fixed',
-        bottom: bottomPosition,
-        right: '20px',
-        zIndex: 10,
-        fontFamily: 'Inter, system-ui, sans-serif',
-    };
-
     const toggleButtonStyle: React.CSSProperties = {
         width: '48px',
         height: '48px',
-        backgroundColor: isHovered 
-            ? colors.ui.surface 
+        backgroundColor: isHovered
+            ? colors.ui.surface
             : colors.background.panel,
         border: `1px solid ${colors.border.light}`,
         borderRadius: '12px',
@@ -50,13 +42,17 @@ const LightBackgroundToggle: React.FC<LightBackgroundToggleProps> = ({
         color: colors.text.primary,
         transition: 'all 0.2s ease',
         boxShadow: `0 2px 10px ${colors.shadow.light}`,
-        position: 'relative',
+        position: 'fixed',
+        bottom: '20px',
+        left: '20px',
+        zIndex: 10,
+        fontFamily: 'Inter, system-ui, sans-serif',
     };
 
     const tooltipStyle: React.CSSProperties = {
         position: 'absolute',
         bottom: '100%',
-        right: '0',
+        left: '0',
         marginBottom: '8px',
         padding: '8px 12px',
         backgroundColor: colors.background.panelSolid,
@@ -76,8 +72,8 @@ const LightBackgroundToggle: React.FC<LightBackgroundToggleProps> = ({
     // Tooltip arrow
     const tooltipArrowStyle: React.CSSProperties = {
         position: 'absolute',
-        top: '100%',
-        right: '16px',
+        left: '16px',
+        bottom: '16px',
         width: '0',
         height: '0',
         borderLeft: '4px solid transparent',
@@ -92,27 +88,25 @@ const LightBackgroundToggle: React.FC<LightBackgroundToggleProps> = ({
         : 'Switch to light background';
 
     return (
-        <div style={containerStyle}>
-            <button
-                style={toggleButtonStyle}
-                onClick={handleClick}
-                onMouseEnter={() => {
-                    setIsHovered(true);
-                    setShowTooltip(true);
-                }}
-                onMouseLeave={() => {
-                    setIsHovered(false);
-                    setShowTooltip(false);
-                }}
-                title={tooltipText}
-            >
-                {icon}
-                <div style={tooltipStyle}>
-                    {tooltipText}
-                    <div style={tooltipArrowStyle} />
-                </div>
-            </button>
-        </div>
+        <button
+            style={toggleButtonStyle}
+            onClick={handleClick}
+            onMouseEnter={() => {
+                setIsHovered(true);
+                setShowTooltip(true);
+            }}
+            onMouseLeave={() => {
+                setIsHovered(false);
+                setShowTooltip(false);
+            }}
+            title={tooltipText}
+        >
+            {icon}
+            <div style={tooltipStyle}>
+                {tooltipText}
+                <div style={tooltipArrowStyle} />
+            </div>
+        </button>
     );
 };
 
