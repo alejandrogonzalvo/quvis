@@ -761,7 +761,7 @@ const App: React.FC = () => {
                                         lightMode={lightMode}
                                         onToggle={handleLightModeToggle}
                                         playground={playgroundRef.current}
-                                        bottomPosition={lightToggleBottom}
+                                        bottomPosition=""
                                     />
                                     <DebugInfo
                                         fps={fps}

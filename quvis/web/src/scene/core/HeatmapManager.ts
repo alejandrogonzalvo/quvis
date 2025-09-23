@@ -4,8 +4,7 @@ import { HeatmapLegend } from "../objects/Legend.js";
 
 export class HeatmapManager {
     private heatmap: Heatmap;
-    private heatmapLegend: HeatmapLegend;
-    private scene: THREE.Scene;
+    private legend: HeatmapLegend;
 
     // Current heatmap state
     private maxSlicesForHeatmap: number;
@@ -13,16 +12,14 @@ export class HeatmapManager {
     private lastEffectiveSlicesForHeatmap: number = 0;
 
     // Configuration
-    private readonly heatmapLegendContainerId = "heatmap-legend-container";
+    private readonly legendContainerId = "heatmap-legend-container";
     private readonly heatmapYellowThreshold = 0.5;
 
     constructor(
-        scene: THREE.Scene,
         camera: THREE.PerspectiveCamera,
         qubitCount: number,
         initialMaxSlicesForHeatmap: number = 10,
     ) {
-        this.scene = scene;
         this.maxSlicesForHeatmap = initialMaxSlicesForHeatmap;
 
         // Initialize heatmap
@@ -31,11 +28,10 @@ export class HeatmapManager {
             qubitCount,
             this.maxSlicesForHeatmap,
         );
-        // Note: Heatmap mesh is not added to scene as it uses two-pass rendering
 
         // Initialize legend
-        this.heatmapLegend = new HeatmapLegend(
-            this.heatmapLegendContainerId,
+        this.legend = new HeatmapLegend(
+            this.legendContainerId,
             this.heatmapYellowThreshold,
         );
 
@@ -49,7 +45,7 @@ export class HeatmapManager {
     }
 
     get legendInstance(): HeatmapLegend {
-        return this.heatmapLegend;
+        return this.legend;
     }
 
     get maxSlices(): number {
@@ -115,15 +111,15 @@ export class HeatmapManager {
      * Update the heatmap legend
      */
     updateLegend(): void {
-        if (this.heatmapLegend) {
-            this.heatmapLegend.update(
+        if (this.legend) {
+            this.legend.update(
                 this.maxSlicesForHeatmap,
                 this.lastEffectiveSlicesForHeatmap,
                 this.lastMaxObservedRawHeatmapSum,
             );
         } else {
             console.warn(
-                "HeatmapManager: updateLegend called but heatmapLegend not initialized.",
+                "HeatmapManager: updateLegend called but legend not initialized.",
             );
         }
     }
@@ -339,7 +335,7 @@ export class HeatmapManager {
      * Check if heatmap is properly initialized
      */
     isInitialized(): boolean {
-        return !!(this.heatmap && this.heatmap.mesh && this.heatmapLegend);
+        return !!(this.heatmap && this.heatmap.mesh && this.legend);
     }
 
     /**
