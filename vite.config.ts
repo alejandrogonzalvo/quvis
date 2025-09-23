@@ -22,31 +22,38 @@ const circuitGeneratorMiddleware = async (req, res, next) => {
 
             console.log('🐍 Executing Python playground API...');
 
+            // Determine if we're in CI environment and adjust Python command accordingly
+            const isCI = process.env.CI === 'true';
+            const pythonCmd = isCI ? 'poetry' : 'python3';
+
             // Execute Python script
-            const args = [
-                '-m',
-                'quvis.api.playground',
-                '--algorithm',
-                params.algorithm,
-                '--num-qubits',
-                params.num_qubits.toString(),
-                '--topology',
-                params.topology,
-                '--optimization-level',
-                (params.optimization_level || 1).toString(),
-            ];
+            const args = isCI
+                ? ['run', 'python', '-m', 'quvis.api.playground']
+                : ['-m', 'quvis.api.playground'];
+
+            args.push(
+                '--algorithm', params.algorithm,
+                '--num-qubits', params.num_qubits.toString(),
+                '--topology', params.topology,
+                '--optimization-level', (params.optimization_level || 1).toString()
+            );
 
             // Add physical qubits parameter if provided
             if (params.physical_qubits) {
                 args.push('--physical-qubits', params.physical_qubits.toString());
             }
 
-            const pythonProcess = spawn('python3', args, {
-                cwd: process.cwd(),
+            const workingDir = isCI ? path.join(process.cwd(), 'quvis/core') : process.cwd();
+            const pythonPath = isCI ? undefined : path.join(process.cwd(), 'quvis/core/src');
+
+            console.log(`Running: ${pythonCmd} ${args.join(' ')} in ${workingDir}`);
+
+            const pythonProcess = spawn(pythonCmd, args, {
+                cwd: workingDir,
                 stdio: ['pipe', 'pipe', 'pipe'],
                 env: {
                     ...process.env,
-                    PYTHONPATH: path.join(process.cwd(), 'quvis/core/src'),
+                    ...(pythonPath && { PYTHONPATH: pythonPath }),
                 },
             });
 
