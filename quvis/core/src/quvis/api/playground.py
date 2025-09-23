@@ -41,6 +41,7 @@ class PlaygroundAPI:
         self,
         algorithm: str,
         num_qubits: int,
+        physical_qubits: int,
         topology: str,
         optimization_level: int = 1,
         **kwargs,
@@ -50,16 +51,18 @@ class PlaygroundAPI:
 
         Args:
             algorithm: Algorithm type ('qft', 'qaoa', 'ghz')
-            num_qubits: Number of qubits (4-1000)
+            num_qubits: Number of logical qubits (4-1000)
             topology: Topology type ('line', 'ring', 'grid', 'heavy_hex', etc.)
             optimization_level: Qiskit optimization level (0-3)
+            physical_qubits: Number of physical qubits for the device topology (defaults to num_qubits)
             **kwargs: Additional algorithm parameters
 
         Returns:
             Dictionary containing visualization data in library_multi format
         """
+
         circuit = self._create_circuit(algorithm, num_qubits, **kwargs)
-        coupling_map = self._create_coupling_map(topology, num_qubits)
+        coupling_map = self._create_coupling_map(topology, physical_qubits)
 
         basis_gates = ["id", "rz", "sx", "x", "cx", "swap"]
 
@@ -235,24 +238,24 @@ class PlaygroundAPI:
         else:
             raise ValueError(f"Unsupported algorithm: {algorithm}")
 
-    def _create_coupling_map(self, topology: str, num_qubits: int) -> QiskitCouplingMap:
+    def _create_coupling_map(self, topology: str, physical_qubits: int) -> QiskitCouplingMap:
         """Create a coupling map using Qiskit's built-in topology generators."""
 
         if topology == "line":
-            return QiskitCouplingMap.from_line(num_qubits)
+            return QiskitCouplingMap.from_line(physical_qubits)
 
         elif topology == "ring":
-            return QiskitCouplingMap.from_ring(num_qubits)
+            return QiskitCouplingMap.from_ring(physical_qubits)
 
         elif topology == "grid":
             # Find best square grid size
-            n = int(num_qubits**0.5)
-            if n * n < num_qubits:
+            n = int(physical_qubits**0.5)
+            if n * n < physical_qubits:
                 n += 1
             return QiskitCouplingMap.from_grid(n, n)
 
         elif topology == "heavy_hex":
-            distance = math.ceil((2 + math.sqrt(24 + 40 * num_qubits)) / 10)
+            distance = math.ceil((2 + math.sqrt(24 + 40 * physical_qubits)) / 10)
 
             if distance % 2 == 0:
                 distance += 1
@@ -260,7 +263,7 @@ class PlaygroundAPI:
             return QiskitCouplingMap.from_heavy_hex(distance)
 
         elif topology == "heavy_square":
-            distance = math.ceil((1 + math.sqrt(1 + 3 * num_qubits)) / 3)
+            distance = math.ceil((1 + math.sqrt(1 + 3 * physical_qubits)) / 3)
 
             if distance % 2 == 0:
                 distance += 1
@@ -268,12 +271,12 @@ class PlaygroundAPI:
             return QiskitCouplingMap.from_heavy_square(distance)
 
         elif topology == "hexagonal":
-            rows = max(2, int((num_qubits / 2) ** 0.5))
-            cols = max(2, num_qubits // rows)
+            rows = max(2, int((physical_qubits / 2) ** 0.5))
+            cols = max(2, physical_qubits // rows)
             return QiskitCouplingMap.from_hexagonal_lattice(rows, cols)
 
         elif topology == "full":
-            return QiskitCouplingMap.from_full(num_qubits)
+            return QiskitCouplingMap.from_full(physical_qubits)
 
         else:
             raise ValueError(
@@ -286,13 +289,13 @@ class PlaygroundAPI:
 
 
 def generate_playground_circuit(
-    algorithm: str, num_qubits: int, topology: str, **kwargs
+    algorithm: str, num_qubits: int, physical_qubits: int , topology: str,  **kwargs
 ) -> dict[str, Any]:
     """
     High-level function to generate a playground circuit.
     """
     api = PlaygroundAPI()
-    return api.generate_visualization_data(algorithm, num_qubits, topology, **kwargs)
+    return api.generate_visualization_data(algorithm, num_qubits, physical_qubits, topology, **kwargs)
 
 
 def main():
@@ -303,7 +306,10 @@ def main():
         "--algorithm", required=True, type=str, help="The algorithm to use."
     )
     parser.add_argument(
-        "--num-qubits", required=True, type=int, help="The number of qubits."
+        "--num-qubits", required=True, type=int, help="The number of logical qubits."
+    )
+    parser.add_argument(
+        "--physical-qubits", type=int, help="The number of physical qubits for the device topology."
     )
     parser.add_argument(
         "--topology", required=True, type=str, help="The circuit topology."
@@ -331,6 +337,7 @@ def main():
         result = generate_playground_circuit(
             algorithm=args.algorithm,
             num_qubits=args.num_qubits,
+            physical_qubits=args.physical_qubits,
             topology=args.topology,
             optimization_level=args.optimization_level,
         )

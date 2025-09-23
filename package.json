@@ -1,60 +1,61 @@
 {
-    "name": "quvis",
-    "version": "0.24.4",
-    "description": "Quvis Web Interface - Interactive quantum circuit visualization",
-    "type": "module",
-    "scripts": {
-        "dev": "vite",
-        "build": "vite build",
-        "start": "http-server",
-        "prepare": "husky",
-        "test": "vitest",
-        "test:ui": "vitest --ui",
-        "test:run": "vitest run",
-        "test:coverage": "vitest run --coverage",
-        "preview": "vite preview"
-    },
-    "dependencies": {
-        "@types/react": "^18.0.0",
-        "@types/react-dom": "^18.0.0",
-        "noisejs": "^2.1.0",
-        "pako": "^2.1.0",
-        "rc-slider": "^11.1.8",
-        "react": "^18.0.0",
-        "react-dom": "^18.0.0",
-        "three": "^0.161.0"
-    },
-    "devDependencies": {
-        "@types/node": "^20.0.0",
-        "@types/three": "^0.161.2",
-        "@vitejs/plugin-react": "^4.0.0",
-        "eslint": "^8.0.0",
-        "eslint-plugin-react": "^7.35.0",
-        "eslint-plugin-react-hooks": "^4.6.0",
-        "eslint-plugin-react-refresh": "^0.4.9",
-        "globals": "^15.9.0",
-        "husky": "^9.1.6",
-        "prettier": "^3.3.3",
-        "typescript": "^5.5.4",
-        "vite": "^5.4.2",
-        "vitest": "^2.0.5"
-    },
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/alejandrogonzalvo/quvis.git",
-        "directory": "quvis/web"
-    },
-    "homepage": "https://github.com/alejandrogonzalvo/quvis",
-    "bugs": {
-        "url": "https://github.com/alejandrogonzalvo/quvis/issues"
-    },
-    "keywords": [
-        "quantum",
-        "visualization",
-        "threejs",
-        "react",
-        "circuits"
-    ],
-    "author": "Alejandro Gonzalvo Hidalgo <alejandro@gonzalvo.org>",
-    "license": "MIT"
+  "name": "quvis",
+  "version": "0.24.4",
+  "description": "Quvis Web Interface - Interactive quantum circuit visualization",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "start": "http-server",
+    "prepare": "husky",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "noisejs": "^2.1.0",
+    "pako": "^2.1.0",
+    "rc-slider": "^11.1.8",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "three": "^0.161.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^20.0.0",
+    "@types/three": "^0.161.2",
+    "@vitejs/plugin-react": "^4.0.0",
+    "eslint": "^8.0.0",
+    "eslint-plugin-react": "^7.35.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.9",
+    "globals": "^15.9.0",
+    "husky": "^9.1.6",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.2",
+    "vitest": "^2.0.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alejandrogonzalvo/quvis.git",
+    "directory": "quvis/web"
+  },
+  "homepage": "https://github.com/alejandrogonzalvo/quvis",
+  "bugs": {
+    "url": "https://github.com/alejandrogonzalvo/quvis/issues"
+  },
+  "keywords": [
+    "quantum",
+    "visualization",
+    "threejs",
+    "react",
+    "circuits"
+  ],
+  "author": "Alejandro Gonzalvo Hidalgo <alejandro@gonzalvo.org>",
+  "license": "MIT"
 }

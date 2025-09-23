@@ -27,3 +27,10 @@ wheels/
 web/public/temp_circuit_data.json
 public/playground_circuit_data.json
 quvis/web/public/playground_circuit_data.json
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
