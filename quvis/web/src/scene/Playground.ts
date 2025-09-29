@@ -98,7 +98,7 @@ export class Playground {
             this.threeComponents.scene,
             this.mouseHandler.getMouse(),
             this.threeComponents.camera,
-            data, 
+            data,
             this.visualizationStateManager.getVisualizationMode(),
             this.visualizationStateManager.getMaxHeatmapSlices(),
             this.layoutManager.getRepelForce(),
@@ -335,6 +335,10 @@ export class Playground {
             return this.threeSetup.isLightBackground();
         }
         return false;
+    }
+
+    public getKeyboardController() {
+        return this.threeComponents?.keyboardController;
     }
 
     public updateHeatmapColorParameters(params: {

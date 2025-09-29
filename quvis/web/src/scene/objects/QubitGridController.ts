@@ -429,6 +429,7 @@ export class QubitGridController {
         // Future implementation for fidelity visualization
     }
 
+
     public updateHeatmapColorParameters(params: {
         fadeThreshold?: number;
         greenThreshold?: number;

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { KeyboardCameraController } from "./KeyboardCameraController.js";
 
 export interface ThreeSceneComponents {
     scene: THREE.Scene;
@@ -7,6 +8,7 @@ export interface ThreeSceneComponents {
     cameraRig: THREE.Group<THREE.Object3DEventMap>;
     renderer: THREE.WebGLRenderer;
     controls: OrbitControls;
+    keyboardController: KeyboardCameraController;
     lightRig: THREE.Group<THREE.Object3DEventMap>;
 }
 
@@ -66,6 +68,10 @@ export class ThreeSceneSetup {
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
 
+        // Create keyboard camera controller
+        const keyboardController = new KeyboardCameraController(camera, controls);
+        keyboardController.initialize();
+
         // Setup lights
         const lightRig = this.setupLights(scene, camera);
 
@@ -75,6 +81,7 @@ export class ThreeSceneSetup {
             cameraRig,
             renderer,
             controls,
+            keyboardController,
             lightRig,
         };
 
@@ -140,6 +147,9 @@ export class ThreeSceneSetup {
     public dispose(): void {
         if (!this.components) return;
 
+        if (this.components.keyboardController) {
+            this.components.keyboardController.dispose();
+        }
         if (this.components.controls) {
             this.components.controls.dispose();
         }
