@@ -108,7 +108,8 @@ export class Playground {
             this.appearanceManager.getConnectionThickness(),
             this.appearanceManager.getInactiveAlpha(),
             onSlicesLoadedCallback,
-            () => this.threeSetup.isLightBackground()
+            () => this.threeSetup.isLightBackground(),
+            this.threeComponents.smartAlignment
         );
 
         // Set up grid references in modules
@@ -339,6 +340,10 @@ export class Playground {
 
     public getKeyboardController() {
         return this.threeComponents?.keyboardController;
+    }
+
+    public getSmartAlignment() {
+        return this.threeComponents?.smartAlignment;
     }
 
     public updateHeatmapColorParameters(params: {

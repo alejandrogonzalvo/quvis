@@ -141,6 +141,8 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
             { keys: ["↓", "S"], description: "Rotate down" },
             { keys: ["←", "A"], description: "Rotate left" },
             { keys: ["→", "D"], description: "Rotate right" },
+            { keys: ["Q"], description: "Roll left" },
+            { keys: ["E"], description: "Roll right" },
             { keys: ["+", "="], description: "Zoom in" },
             { keys: ["-"], description: "Zoom out" },
             { keys: ["P"], description: "Pan left" },

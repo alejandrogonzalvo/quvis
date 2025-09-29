@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { SmartCameraAlignment } from "./SmartCameraAlignment.js";
 
 export class KeyboardCameraController {
     private camera: THREE.PerspectiveCamera;
@@ -10,10 +11,12 @@ export class KeyboardCameraController {
     private panStep: number = 1.0;
     private zoomStep: number = 2.0;
     private onHelpToggle?: () => void;
+    private smartAlignment: SmartCameraAlignment;
 
     constructor(camera: THREE.PerspectiveCamera, controls: OrbitControls) {
         this.camera = camera;
         this.controls = controls;
+        this.smartAlignment = new SmartCameraAlignment(camera, controls);
         this.boundHandleKeyDown = this.handleKeyDown.bind(this);
     }
 
@@ -31,6 +34,10 @@ export class KeyboardCameraController {
 
     public setHelpToggleCallback(callback: () => void): void {
         this.onHelpToggle = callback;
+    }
+
+    public getSmartAlignment(): SmartCameraAlignment {
+        return this.smartAlignment;
     }
 
     private handleKeyDown(event: KeyboardEvent): void {
@@ -74,6 +81,15 @@ export class KeyboardCameraController {
                 handled = true;
                 break;
 
+            // Roll rotation around Z-axis (camera forward axis)
+            case 'q':
+                this.rotateAroundTarget('z', this.rotationStep);
+                handled = true;
+                break;
+            case 'e':
+                this.rotateAroundTarget('z', -this.rotationStep);
+                handled = true;
+                break;
 
             // Zoom in/out
             case '+':
@@ -146,27 +162,30 @@ export class KeyboardCameraController {
 
     private rotateAroundTarget(axis: 'x' | 'y' | 'z', angle: number): void {
         const target = this.controls.target.clone();
+
+        if (axis === 'z') {
+            // Roll rotation: rotate the camera's up vector around the viewing direction
+            this.rollCamera(angle);
+            return;
+        }
+
+        // For pitch and yaw, rotate the camera position around the target
         const position = this.camera.position.clone();
 
         // Translate to origin (target becomes 0,0,0)
         position.sub(target);
 
-        // Create rotation matrix based on camera's local axes
+        // Get camera-relative axes from smart alignment
+        const cameraAxes = this.smartAlignment.getCameraRelativeAxes();
+
+        // Create rotation matrix based on camera's current orientation
         let rotationMatrix: THREE.Matrix4;
         switch (axis) {
             case 'x': // Pitch (up/down rotation around camera's right axis)
-                const right = new THREE.Vector3();
-                this.camera.getWorldDirection(new THREE.Vector3()); // Update camera matrix
-                right.setFromMatrixColumn(this.camera.matrixWorld, 0);
-                rotationMatrix = new THREE.Matrix4().makeRotationAxis(right.normalize(), angle);
+                rotationMatrix = new THREE.Matrix4().makeRotationAxis(cameraAxes.right, angle);
                 break;
-            case 'y': // Yaw (left/right rotation around world Y axis for predictable horizontal rotation)
-                rotationMatrix = new THREE.Matrix4().makeRotationY(angle);
-                break;
-            case 'z': // Roll (rotation around camera's view direction)
-                const viewDirection = new THREE.Vector3();
-                this.camera.getWorldDirection(viewDirection);
-                rotationMatrix = new THREE.Matrix4().makeRotationAxis(viewDirection.normalize(), -angle); // Negative for intuitive direction
+            case 'y': // Yaw (left/right rotation around camera's up axis)
+                rotationMatrix = new THREE.Matrix4().makeRotationAxis(cameraAxes.up, angle);
                 break;
         }
 
@@ -179,6 +198,27 @@ export class KeyboardCameraController {
         // Update camera position
         this.camera.position.copy(position);
         this.camera.lookAt(target);
+    }
+
+    private rollCamera(angle: number): void {
+        // For roll, we need to rotate the camera's up vector around the view direction
+        const viewDirection = new THREE.Vector3();
+        this.camera.getWorldDirection(viewDirection);
+
+        // Get current up vector
+        const up = this.camera.up.clone();
+
+        // Create rotation matrix around the view direction
+        const rotationMatrix = new THREE.Matrix4().makeRotationAxis(viewDirection, angle);
+
+        // Apply rotation to the up vector
+        up.applyMatrix4(rotationMatrix);
+
+        // Update camera's up vector
+        this.camera.up.copy(up);
+
+        // Update the camera matrix
+        this.camera.updateMatrixWorld();
     }
 
     private zoomCamera(deltaDistance: number): void {

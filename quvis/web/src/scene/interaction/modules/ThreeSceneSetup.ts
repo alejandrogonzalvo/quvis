@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { KeyboardCameraController } from "./KeyboardCameraController.js";
+import { SmartCameraAlignment } from "./SmartCameraAlignment.js";
 
 export interface ThreeSceneComponents {
     scene: THREE.Scene;
@@ -9,6 +10,7 @@ export interface ThreeSceneComponents {
     renderer: THREE.WebGLRenderer;
     controls: OrbitControls;
     keyboardController: KeyboardCameraController;
+    smartAlignment: SmartCameraAlignment;
     lightRig: THREE.Group<THREE.Object3DEventMap>;
 }
 
@@ -72,6 +74,9 @@ export class ThreeSceneSetup {
         const keyboardController = new KeyboardCameraController(camera, controls);
         keyboardController.initialize();
 
+        // Get smart alignment from keyboard controller (it creates its own instance)
+        const smartAlignment = keyboardController.getSmartAlignment();
+
         // Setup lights
         const lightRig = this.setupLights(scene, camera);
 
@@ -82,6 +87,7 @@ export class ThreeSceneSetup {
             renderer,
             controls,
             keyboardController,
+            smartAlignment,
             lightRig,
         };
 
