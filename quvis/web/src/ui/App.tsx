@@ -101,6 +101,7 @@ const App: React.FC = () => {
         gridIdealDistance: 1.0,
         iterations: 500,
         coolingFactor: 1.0,
+        attractForce: 0.1,
     });
 
     // State for HeatmapControls initial values (matching Playground defaults)

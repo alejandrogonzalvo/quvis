@@ -10,6 +10,7 @@ interface LayoutControlsProps {
         gridIdealDistance: number;
         iterations: number;
         coolingFactor: number;
+        attractForce?: number;
     };
     isCollapsed: boolean;
     onToggleCollapse: () => void;
@@ -158,6 +159,9 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
     const [coolingFactor, setCoolingFactor] = useState(
         initialValues.coolingFactor,
     );
+    const [attractForce, setAttractForce] = useState(
+        initialValues.attractForce ?? 0.1,
+    );
 
     useEffect(() => {
         setRepelForce(initialValues.repelForce);
@@ -165,6 +169,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
         setGridIdealDistance(initialValues.gridIdealDistance);
         setIterations(initialValues.iterations);
         setCoolingFactor(initialValues.coolingFactor);
+        setAttractForce(initialValues.attractForce ?? 0.1);
     }, [initialValues]);
 
     const handleRepelForceChange = (
@@ -197,6 +202,12 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
         setCoolingFactor(parseFloat(event.target.value));
     };
 
+    const handleAttractForceChange = (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        setAttractForce(parseFloat(event.target.value));
+    };
+
     const handleGridButtonClick = () => {
         setActiveTab("grid");
         playground?.updateIdealDistance(gridIdealDistance);
@@ -212,6 +223,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                 idealDistance,
                 iterations,
                 coolingFactor,
+                attractForce,
             },
             () => {
                 setIsLoading(false);
@@ -356,7 +368,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                                 type="range"
                                 id="iterations"
                                 min="100"
-                                max="10000"
+                                max="20000"
                                 step="100"
                                 value={iterations}
                                 onChange={handleIterationsChange}
@@ -379,6 +391,25 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                                 step="0.01"
                                 value={coolingFactor}
                                 onChange={handleCoolingFactorChange}
+                                style={sliderStyle}
+                            />
+                        </div>
+
+                        <div style={controlGroupStyle}>
+                            <label htmlFor="attract-force" style={labelStyle}>
+                                Attract Force:{" "}
+                                <span style={valueStyle}>
+                                    {attractForce.toFixed(3)}
+                                </span>
+                            </label>
+                            <input
+                                type="range"
+                                id="attract-force"
+                                min="0"
+                                max="1"
+                                step="0.001"
+                                value={attractForce}
+                                onChange={handleAttractForceChange}
                                 style={sliderStyle}
                             />
                         </div>

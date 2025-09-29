@@ -226,6 +226,7 @@ export class Playground {
             idealDistance?: number;
             iterations?: number;
             coolingFactor?: number;
+            attractForce?: number;
         },
         onLayoutComplete?: () => void
     ) {
