@@ -4,6 +4,7 @@ import { LayoutManager } from '../core/LayoutManager.js';
 import { RenderManager } from '../core/RenderManager.js';
 import { VisualizationStateManager } from '../core/VisualizationStateManager.js';
 import { HeatmapManager } from '../core/HeatmapManager.js';
+import { SmartCameraAlignment } from '../interaction/modules/SmartCameraAlignment.js';
 
 interface CircuitLayoutState {
     layoutType: 'grid' | 'force';
@@ -21,6 +22,7 @@ export class QubitGridController {
     private renderManager: RenderManager;
     private stateManager: VisualizationStateManager;
     private heatmapManager: HeatmapManager;
+    private smartAlignment?: SmartCameraAlignment;
 
     // Scene references
     private scene: THREE.Scene;
@@ -52,12 +54,14 @@ export class QubitGridController {
         initialConnectionThickness: number = 0.05,
         initialInactiveElementAlpha: number = 0.1,
         onSlicesLoadedCallback?: (count: number, initialIndex: number) => void,
-        isLightBackground?: () => boolean
+        isLightBackground?: () => boolean,
+        smartAlignment?: SmartCameraAlignment
     ) {
         this.scene = scene;
         this.mouse = mouse;
         this.camera = camera;
         this.onSlicesLoadedCallback = onSlicesLoadedCallback;
+        this.smartAlignment = smartAlignment;
 
         // Initialize subsystems
         this.dataManager = new CircuitDataManager();
@@ -167,6 +171,9 @@ export class QubitGridController {
                     );
                     this.heatmapManager.clearPositionsCache();
                     this.updateVisualization();
+
+                    // Auto-align camera to optimal viewing angle for the layout
+                    this.autoAlignCameraToLayout();
 
                     // Save force layout state for current circuit
                     if (this.dataManager.isMultiCircuit) {
@@ -427,6 +434,19 @@ export class QubitGridController {
             params
         );
         // Future implementation for fidelity visualization
+    }
+
+    private autoAlignCameraToLayout(): void {
+        if (this.smartAlignment && this.layoutManager.positions.size > 0) {
+
+            // Use 3-point plane detection method
+            this.smartAlignment.alignToForceLayout(this.layoutManager.positions);
+
+            // Alternative: Use minimal variance plane detection
+            // this.smartAlignment.alignToMinimalVariancePlane(this.layoutManager.positions);
+        } else {
+            console.warn("Smart alignment not available or no qubit positions");
+        }
     }
 
     public updateHeatmapColorParameters(params: {

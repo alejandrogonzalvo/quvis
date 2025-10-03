@@ -21,7 +21,7 @@ export class LayoutManager {
         initialIdealDist: number = 5.0,
         initialIterations: number = 300,
         initialCoolingFactor: number = 0.95,
-        initialKAttract: number = 0.05,
+        initialKAttract: number = 0.1,
         initialBarnesHutTheta: number = 0.8,
     ) {
         this.layoutParams = {
@@ -173,6 +173,7 @@ export class LayoutManager {
         idealDistance?: number;
         iterations?: number;
         coolingFactor?: number;
+        attractForce?: number;
     }): boolean {
         let changed = false;
 
@@ -202,6 +203,13 @@ export class LayoutManager {
             this.layoutParams.coolingFactor !== params.coolingFactor
         ) {
             this.layoutParams.coolingFactor = params.coolingFactor;
+            changed = true;
+        }
+        if (
+            params.attractForce !== undefined &&
+            this.layoutParams.kAttract !== params.attractForce
+        ) {
+            this.layoutParams.kAttract = params.attractForce;
             changed = true;
         }
 

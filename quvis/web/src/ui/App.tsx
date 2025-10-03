@@ -14,6 +14,7 @@ import Tooltip from './components/Tooltip.js';
 import PlaybackControls from './components/PlaybackControls.js';
 import DebugInfo from './components/DebugInfo.js';
 import LightBackgroundToggle from './components/LightBackgroundToggle.js';
+import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp.js';
 import { colors } from './theme/colors.js';
 
 const BASE_TOP_MARGIN_PX = 20;
@@ -101,6 +102,7 @@ const App: React.FC = () => {
         gridIdealDistance: 1.0,
         iterations: 500,
         coolingFactor: 1.0,
+        attractForce: 0.1,
     });
 
     // State for HeatmapControls initial values (matching Playground defaults)
@@ -129,6 +131,7 @@ const App: React.FC = () => {
     const [isTimelineCollapsed, setIsTimelineCollapsed] = useState(false);
     const [isPlaybackCollapsed, setIsPlaybackCollapsed] = useState(false);
     const [isCircuitTabsCollapsed, setIsCircuitTabsCollapsed] = useState(false);
+    const [isKeyboardShortcutsVisible, setIsKeyboardShortcutsVisible] = useState(false);
 
     // State for playback
     const [isPlaying, setIsPlaying] = useState(false);
@@ -281,6 +284,10 @@ const App: React.FC = () => {
 
     const toggleCircuitTabsCollapse = () => {
         setIsCircuitTabsCollapsed(!isCircuitTabsCollapsed);
+    };
+
+    const toggleKeyboardShortcuts = () => {
+        setIsKeyboardShortcutsVisible(!isKeyboardShortcutsVisible);
     };
 
     const collapseAllPanels = () => {
@@ -484,8 +491,6 @@ const App: React.FC = () => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === '0' && playgroundRef.current) {
                 playgroundRef.current.resetCamera();
-            } else if (event.key.toLowerCase() === 'h') {
-                setIsUiVisible((prev) => !prev);
             } else if (event.key.toLowerCase() === 'c') {
                 collapseAllPanels();
             } else if (event.key.toLowerCase() === 'e') {
@@ -599,6 +604,14 @@ const App: React.FC = () => {
         });
         // Initialize light mode from playground background state
         setLightMode(playgroundInstance.isLightBackground());
+
+        // Set up keyboard controller help toggle callback
+        const keyboardController = playgroundInstance.getKeyboardController();
+        if (keyboardController) {
+            keyboardController.setHelpToggleCallback(() => {
+                setIsKeyboardShortcutsVisible(prev => !prev);
+            });
+        }
     }, [playgroundData]);
 
     // Effect specifically for dataset changes to dispose the old playground
@@ -761,7 +774,7 @@ const App: React.FC = () => {
                                         lightMode={lightMode}
                                         onToggle={handleLightModeToggle}
                                         playground={playgroundRef.current}
-                                        bottomPosition=""
+                                        bottomPosition={lightToggleBottom}
                                     />
                                     <DebugInfo
                                         fps={fps}
@@ -826,6 +839,11 @@ const App: React.FC = () => {
                     )}
                 </>
             )}
+
+            <KeyboardShortcutsHelp
+                isVisible={isKeyboardShortcutsVisible}
+                onClose={() => setIsKeyboardShortcutsVisible(false)}
+            />
         </div>
     );
 };
