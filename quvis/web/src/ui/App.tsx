@@ -16,6 +16,7 @@ import DebugInfo from './components/DebugInfo.js';
 import LightBackgroundToggle from './components/LightBackgroundToggle.js';
 import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp.js';
 import { colors } from './theme/colors.js';
+import { getCircuitGenerationUrl } from '../config/api.js';
 
 const BASE_TOP_MARGIN_PX = 20;
 const INTER_PANEL_SPACING_PX = 20;
@@ -407,8 +408,8 @@ const App: React.FC = () => {
             setLoadingStage('Compiling Circuit');
             setCompilationProgress(['Initializing circuit generation...']);
 
-            // Call the Python script via API
-            const response = await fetch('/api/generate-circuit', {
+            // Call the circuit generation API
+            const response = await fetch(getCircuitGenerationUrl(), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

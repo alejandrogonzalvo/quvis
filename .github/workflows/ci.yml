@@ -185,6 +185,10 @@ jobs:
                   sed -i "s/__version__ = \"[^\"]*\"/__version__ = \"$VERSION\"/" src/quvis/__init__.py
                   sed -i "s/__version__ = \"[^\"]*\"/__version__ = \"$VERSION\"/" src/__init__.py
 
+                  # Update version in FastAPI app
+                  sed -i "s/version=\"[^\"]*\"/version=\"$VERSION\"/" src/quvis/api/fastapi_app.py
+                  sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" src/quvis/api/fastapi_app.py
+
                   echo "Updated Python package version to $VERSION"
 
             - name: Build Python package
@@ -210,7 +214,7 @@ jobs:
                   # Add both package.json and the UI file
                   git add package.json quvis/web/src/ui/components/PlaygroundParameterSelection.tsx quvis/web/index.html # Ensure index.html is also added if modified by previous steps, though it shouldn't be
                   # Add Python package files
-                  git add pyproject.toml quvis/core/src/quvis/__init__.py quvis/core/src/__init__.py
+                  git add pyproject.toml quvis/core/src/quvis/__init__.py quvis/core/src/__init__.py quvis/core/src/quvis/api/fastapi_app.py
                   # Check if there are changes to commit to prevent empty commits
                   if git diff --staged --quiet; then
                     echo "No changes to UI version, package.json, or Python package files to commit."
