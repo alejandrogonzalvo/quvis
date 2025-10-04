@@ -81,9 +81,26 @@ jobs:
 
             - name: Start FastAPI backend
               run: |
+                  echo "Starting FastAPI backend..."
                   poetry run uvicorn quvis.api.fastapi_app:app --host 0.0.0.0 --port 8000 > /tmp/backend.log 2>&1 &
-                  echo "Waiting for backend..."
-                  npx wait-on http://localhost:8000/api/health --timeout 60000
+                  BACKEND_PID=$!
+                  echo "Backend PID: $BACKEND_PID"
+                  sleep 5
+                  echo "Backend log output:"
+                  cat /tmp/backend.log || echo "No logs yet"
+                  echo "Waiting for health endpoint..."
+                  for i in {1..30}; do
+                    if curl -f http://localhost:8000/api/health 2>/dev/null; then
+                      echo "✅ Backend is ready!"
+                      break
+                    fi
+                    if [ $i -eq 30 ]; then
+                      echo "❌ Backend failed to start"
+                      cat /tmp/backend.log
+                      exit 1
+                    fi
+                    sleep 2
+                  done
 
             - name: Start Vite dev server
               run: npm run dev &
