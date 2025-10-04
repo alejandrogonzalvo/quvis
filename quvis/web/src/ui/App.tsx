@@ -15,6 +15,7 @@ import PlaybackControls from './components/PlaybackControls.js';
 import DebugInfo from './components/DebugInfo.js';
 import LightBackgroundToggle from './components/LightBackgroundToggle.js';
 import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp.js';
+import BackendConnectionError from './components/BackendConnectionError.js';
 import { colors } from './theme/colors.js';
 import { getCircuitGenerationUrl } from '../config/api.js';
 
@@ -150,6 +151,9 @@ const App: React.FC = () => {
 
     // State for Playground data (for library mode)
     const [playgroundData, setPlaygroundData] = useState<any>(null);
+
+    // State for backend connection error
+    const [showBackendError, setShowBackendError] = useState(false);
 
     // Check for library mode on app initialization
     useEffect(() => {
@@ -484,7 +488,11 @@ const App: React.FC = () => {
             setLoadingStage('Loading');
             setCompilationProgress([]);
             setCurrentParams(null);
-            // You might want to show an error message to the user here
+
+            // Check if it's a network error (backend not available)
+            if (error instanceof TypeError && error.message.includes('fetch')) {
+                setShowBackendError(true);
+            }
         }
     };
 
@@ -844,6 +852,12 @@ const App: React.FC = () => {
             <KeyboardShortcutsHelp
                 isVisible={isKeyboardShortcutsVisible}
                 onClose={() => setIsKeyboardShortcutsVisible(false)}
+            />
+
+            <BackendConnectionError
+                isVisible={showBackendError}
+                onClose={() => setShowBackendError(false)}
+                apiUrl={getCircuitGenerationUrl()}
             />
         </div>
     );
