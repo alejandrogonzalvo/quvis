@@ -32,18 +32,18 @@ const BackendConnectionError: React.FC<BackendConnectionErrorProps> = ({
         >
             <div
                 style={{
-                    backgroundColor: colors.panel.background,
-                    border: `2px solid ${colors.error}`,
+                    backgroundColor: colors.background.panelSolid,
+                    border: `2px solid ${colors.state.error}`,
                     borderRadius: '8px',
                     padding: '30px',
                     maxWidth: '500px',
-                    boxShadow: `0 4px 20px ${colors.shadow.heavy}`,
+                    boxShadow: `0 4px 20px ${colors.shadow.dark}`,
                 }}
                 onClick={(e) => e.stopPropagation()}
             >
                 <h2
                     style={{
-                        color: colors.error,
+                        color: colors.state.error,
                         marginTop: 0,
                         marginBottom: '20px',
                         fontSize: '24px',
@@ -62,7 +62,7 @@ const BackendConnectionError: React.FC<BackendConnectionErrorProps> = ({
                         backgroundColor: colors.shadow.medium,
                         padding: '10px',
                         borderRadius: '4px',
-                        color: colors.accent.primary,
+                        color: colors.primary.accent,
                         marginBottom: '20px',
                         wordBreak: 'break-all',
                     }}
@@ -96,7 +96,7 @@ const BackendConnectionError: React.FC<BackendConnectionErrorProps> = ({
                     style={{
                         marginTop: '20px',
                         padding: '10px 20px',
-                        backgroundColor: colors.accent.primary,
+                        backgroundColor: colors.primary.main,
                         color: colors.text.primary,
                         border: 'none',
                         borderRadius: '4px',
@@ -106,11 +106,11 @@ const BackendConnectionError: React.FC<BackendConnectionErrorProps> = ({
                     }}
                     onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor =
-                            colors.accent.secondary;
+                            colors.primary.dark;
                     }}
                     onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor =
-                            colors.accent.primary;
+                            colors.primary.main;
                     }}
                 >
                     Dismiss
