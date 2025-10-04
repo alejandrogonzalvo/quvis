@@ -113,7 +113,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Quvis API",
     description="Quantum Circuit Visualization API for generating and transpiling quantum circuits",
-    version="0.25.0",
+    version="v0.27.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc"
@@ -144,7 +144,7 @@ async def root():
     """Root endpoint."""
     return {
         "service": "Quvis API",
-        "version": "0.25.0",
+        "version": "v0.27.0",
         "docs": "/docs",
         "health": "/api/health"
     }
@@ -155,7 +155,7 @@ async def health_check():
     """Health check endpoint."""
     return HealthCheckResponse(
         status="healthy",
-        version="0.25.0",
+        version="v0.27.0",
         supported_algorithms=playground_api.get_supported_algorithms()
     )
 
