@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quvis-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    volumes:
+      # Mount source for development hot-reload (optional, comment out for production)
+      - ./quvis/core/src:/app/quvis/core/src
+    networks:
+      - quvis-network
+
+networks:
+  quvis-network:
+    driver: bridge

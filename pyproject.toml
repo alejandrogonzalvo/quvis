@@ -13,6 +13,9 @@ qiskit = "^2.1.0"
 numpy = "^1.24.0"
 ipykernel = "^6.29.5"
 pillow = "^11.3.0"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.32.0"}
+pydantic = "^2.10.0"
 
 [build-system]
 requires = ["poetry-core"]

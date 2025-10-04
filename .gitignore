@@ -2,6 +2,10 @@ node_modules
 venv
 dist
 
+# Environment files
+.env.local
+.env.*.local
+
 # Python
 *.pyc
 *.pyo

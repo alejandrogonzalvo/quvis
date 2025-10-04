@@ -15,7 +15,9 @@ import PlaybackControls from './components/PlaybackControls.js';
 import DebugInfo from './components/DebugInfo.js';
 import LightBackgroundToggle from './components/LightBackgroundToggle.js';
 import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp.js';
+import BackendConnectionError from './components/BackendConnectionError.js';
 import { colors } from './theme/colors.js';
+import { getCircuitGenerationUrl } from '../config/api.js';
 
 const BASE_TOP_MARGIN_PX = 20;
 const INTER_PANEL_SPACING_PX = 20;
@@ -149,6 +151,37 @@ const App: React.FC = () => {
 
     // State for Playground data (for library mode)
     const [playgroundData, setPlaygroundData] = useState<any>(null);
+
+    // State for backend connection error
+    const [showBackendError, setShowBackendError] = useState(false);
+
+    // Check backend connection on startup
+    useEffect(() => {
+        const checkBackendConnection = async () => {
+            try {
+                const apiUrl = getCircuitGenerationUrl();
+                // Only check if using external API (not Vite middleware)
+                if (apiUrl && apiUrl.startsWith('http')) {
+                    const healthUrl = apiUrl.replace('/api/generate-circuit', '/api/health');
+                    const response = await fetch(healthUrl, {
+                        method: 'GET',
+                        signal: AbortSignal.timeout(5000)
+                    });
+                    if (!response.ok) {
+                        setShowBackendError(true);
+                    }
+                }
+            } catch (error) {
+                // Backend not available
+                const apiUrl = getCircuitGenerationUrl();
+                if (apiUrl && apiUrl.startsWith('http')) {
+                    setShowBackendError(true);
+                }
+            }
+        };
+
+        checkBackendConnection();
+    }, []);
 
     // Check for library mode on app initialization
     useEffect(() => {
@@ -407,8 +440,8 @@ const App: React.FC = () => {
             setLoadingStage('Compiling Circuit');
             setCompilationProgress(['Initializing circuit generation...']);
 
-            // Call the Python script via API
-            const response = await fetch('/api/generate-circuit', {
+            // Call the circuit generation API
+            const response = await fetch(getCircuitGenerationUrl(), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -483,7 +516,11 @@ const App: React.FC = () => {
             setLoadingStage('Loading');
             setCompilationProgress([]);
             setCurrentParams(null);
-            // You might want to show an error message to the user here
+
+            // Check if it's a network error (backend not available)
+            if (error instanceof TypeError && error.message.includes('fetch')) {
+                setShowBackendError(true);
+            }
         }
     };
 
@@ -843,6 +880,12 @@ const App: React.FC = () => {
             <KeyboardShortcutsHelp
                 isVisible={isKeyboardShortcutsVisible}
                 onClose={() => setIsKeyboardShortcutsVisible(false)}
+            />
+
+            <BackendConnectionError
+                isVisible={showBackendError}
+                onClose={() => setShowBackendError(false)}
+                apiUrl={getCircuitGenerationUrl()}
             />
         </div>
     );

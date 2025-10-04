@@ -79,6 +79,29 @@ jobs:
             - name: Install Playwright Browsers
               run: npx playwright install --with-deps
 
+            - name: Start FastAPI backend
+              run: |
+                  echo "Starting FastAPI backend..."
+                  poetry run uvicorn quvis.api.fastapi_app:app --host 0.0.0.0 --port 8000 > /tmp/backend.log 2>&1 &
+                  BACKEND_PID=$!
+                  echo "Backend PID: $BACKEND_PID"
+                  sleep 5
+                  echo "Backend log output:"
+                  cat /tmp/backend.log || echo "No logs yet"
+                  echo "Waiting for health endpoint..."
+                  for i in {1..30}; do
+                    if curl -f http://localhost:8000/api/health 2>/dev/null; then
+                      echo "✅ Backend is ready!"
+                      break
+                    fi
+                    if [ $i -eq 30 ]; then
+                      echo "❌ Backend failed to start"
+                      cat /tmp/backend.log
+                      exit 1
+                    fi
+                    sleep 2
+                  done
+
             - name: Start Vite dev server
               run: npm run dev &
               env:
@@ -89,6 +112,10 @@ jobs:
 
             - name: Run Playwright tests
               run: npx playwright test
+
+            - name: Show backend logs on failure
+              if: failure()
+              run: cat /tmp/backend.log
 
             - name: Upload Playwright Report
               uses: actions/upload-artifact@v4
@@ -185,6 +212,10 @@ jobs:
                   sed -i "s/__version__ = \"[^\"]*\"/__version__ = \"$VERSION\"/" src/quvis/__init__.py
                   sed -i "s/__version__ = \"[^\"]*\"/__version__ = \"$VERSION\"/" src/__init__.py
 
+                  # Update version in FastAPI app
+                  sed -i "s/version=\"[^\"]*\"/version=\"$VERSION\"/" src/quvis/api/fastapi_app.py
+                  sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" src/quvis/api/fastapi_app.py
+
                   echo "Updated Python package version to $VERSION"
 
             - name: Build Python package
@@ -210,7 +241,7 @@ jobs:
                   # Add both package.json and the UI file
                   git add package.json quvis/web/src/ui/components/PlaygroundParameterSelection.tsx quvis/web/index.html # Ensure index.html is also added if modified by previous steps, though it shouldn't be
                   # Add Python package files
-                  git add pyproject.toml quvis/core/src/quvis/__init__.py quvis/core/src/__init__.py
+                  git add pyproject.toml quvis/core/src/quvis/__init__.py quvis/core/src/__init__.py quvis/core/src/quvis/api/fastapi_app.py
                   # Check if there are changes to commit to prevent empty commits
                   if git diff --staged --quiet; then
                     echo "No changes to UI version, package.json, or Python package files to commit."
