@@ -155,6 +155,34 @@ const App: React.FC = () => {
     // State for backend connection error
     const [showBackendError, setShowBackendError] = useState(false);
 
+    // Check backend connection on startup
+    useEffect(() => {
+        const checkBackendConnection = async () => {
+            try {
+                const apiUrl = getCircuitGenerationUrl();
+                // Only check if using external API (not Vite middleware)
+                if (apiUrl && apiUrl.startsWith('http')) {
+                    const healthUrl = apiUrl.replace('/api/generate-circuit', '/api/health');
+                    const response = await fetch(healthUrl, {
+                        method: 'GET',
+                        signal: AbortSignal.timeout(5000)
+                    });
+                    if (!response.ok) {
+                        setShowBackendError(true);
+                    }
+                }
+            } catch (error) {
+                // Backend not available
+                const apiUrl = getCircuitGenerationUrl();
+                if (apiUrl && apiUrl.startsWith('http')) {
+                    setShowBackendError(true);
+                }
+            }
+        };
+
+        checkBackendConnection();
+    }, []);
+
     // Check for library mode on app initialization
     useEffect(() => {
         // Check if we're in library mode via environment variables
