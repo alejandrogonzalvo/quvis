@@ -136,6 +136,7 @@ export class RenderManager {
         this.instancedConnectionMesh.instanceMatrix.setUsage(
             THREE.DynamicDrawUsage
         );
+        this.instancedConnectionMesh.renderOrder = 1; // Render connections in front of qubits
         this.intensityAttribute = new THREE.InstancedBufferAttribute(
             new Float32Array(maxConnections),
             1
@@ -177,6 +178,7 @@ export class RenderManager {
         this.logicalConnectionMesh.instanceMatrix.setUsage(
             THREE.DynamicDrawUsage
         );
+        this.logicalConnectionMesh.renderOrder = 1; // Render connections in front of qubits
         this.scene.add(this.logicalConnectionMesh);
     }
 
