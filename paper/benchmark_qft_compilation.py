@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Benchmark QFT compilation time vs qubit count for academic paper.
-Measures how compilation time scales with circuit size.
+Benchmark QFT circuit depth vs qubit count for academic paper.
+Measures how compiled circuit depth scales with circuit size.
 """
 
-import time
 import math
 import matplotlib.pyplot as plt
 from qiskit import QuantumCircuit
@@ -14,9 +13,8 @@ from qiskit.providers.fake_provider import GenericBackendV2
 from qiskit.transpiler import CouplingMap
 
 # Configuration
-QUBIT_SIZES = [24, 48, 72, 96, 120, 144, 168, 192, 216, 240]
-OPTIMIZATION_LEVEL = 1
-NUM_TRIALS = 5  # Average over multiple trials for stability
+QUBIT_SIZES = [i*24 for i in range(1, 15)]
+OPTIMIZATION_LEVEL = 0  # Level 0 is deterministic
 
 def create_grid_coupling_map(num_qubits):
     """Create a 2D grid coupling map for the given number of qubits."""
@@ -47,18 +45,17 @@ def create_line_coupling_map(num_qubits):
 
 
 
-def benchmark_qft_compilation(num_qubits, topology='grid', optimization_level=1, num_trials=5):
+def get_compiled_circuit_depth(num_qubits, topology='grid', optimization_level=1):
     """
-    Compile QFT circuit and measure average compilation time.
+    Compile QFT circuit and return the compiled circuit depth.
 
     Args:
         num_qubits: Number of qubits in QFT circuit
-        topology: Coupling topology ('grid' or 'heavy_hex')
+        topology: Coupling topology ('grid', 'heavy_hex', or 'line')
         optimization_level: Qiskit transpilation optimization level
-        num_trials: Number of compilation runs to average
 
     Returns:
-        Average compilation time in seconds
+        Compiled circuit depth
     """
     # Create backend with specified topology
     if topology == 'grid':
@@ -83,76 +80,67 @@ def benchmark_qft_compilation(num_qubits, topology='grid', optimization_level=1,
         backend=backend
     )
 
-    # Benchmark compilation time
-    times = []
-    for _ in range(num_trials):
-        start_time = time.perf_counter()
-        pm.run(qc)
-        end_time = time.perf_counter()
-        times.append(end_time - start_time)
-
-    return sum(times) / len(times)
+    # Compile and get depth
+    compiled_qc = pm.run(qc)
+    return compiled_qc.depth()
 
 
 def main():
-    print("Benchmarking QFT Compilation Time vs Qubit Count")
+    print("Benchmarking QFT Circuit Depth vs Qubit Count")
     print("=" * 60)
 
-    grid_times = []
-    heavy_hex_times = []
-    line_times = []
+    grid_depths = []
+    heavy_hex_depths = []
+    line_depths = []
 
     for num_qubits in QUBIT_SIZES:
         print(f"Compiling {num_qubits}-qubit QFT...")
 
         # Grid topology
         print(f"  Grid topology... ", end="", flush=True)
-        avg_time_grid = benchmark_qft_compilation(
+        depth_grid = get_compiled_circuit_depth(
             num_qubits,
             topology='grid',
-            optimization_level=OPTIMIZATION_LEVEL,
-            num_trials=NUM_TRIALS
+            optimization_level=OPTIMIZATION_LEVEL
         )
-        grid_times.append(avg_time_grid)
-        print(f"{avg_time_grid:.4f}s")
+        grid_depths.append(depth_grid)
+        print(f"depth={depth_grid}")
 
         # Heavy-hex topology
         print(f"  Heavy-hex topology... ", end="", flush=True)
-        avg_time_hex = benchmark_qft_compilation(
+        depth_hex = get_compiled_circuit_depth(
             num_qubits,
             topology='heavy_hex',
-            optimization_level=OPTIMIZATION_LEVEL,
-            num_trials=NUM_TRIALS
+            optimization_level=OPTIMIZATION_LEVEL
         )
-        heavy_hex_times.append(avg_time_hex)
-        print(f"{avg_time_hex:.4f}s")
+        heavy_hex_depths.append(depth_hex)
+        print(f"depth={depth_hex}")
 
         # Line topology
         print(f"  Line topology... ", end="", flush=True)
-        avg_time_line = benchmark_qft_compilation(
+        depth_line = get_compiled_circuit_depth(
             num_qubits,
             topology='line',
-            optimization_level=OPTIMIZATION_LEVEL,
-            num_trials=NUM_TRIALS
+            optimization_level=OPTIMIZATION_LEVEL
         )
-        line_times.append(avg_time_line)
-        print(f"{avg_time_line:.4f}s")
+        line_depths.append(depth_line)
+        print(f"depth={depth_line}")
 
     # Create plot with three lines
     plt.figure(figsize=(10, 6))
-    plt.plot(QUBIT_SIZES, grid_times, 'o-', linewidth=2, markersize=8, label='2D Grid')
-    plt.plot(QUBIT_SIZES, heavy_hex_times, 's-', linewidth=2, markersize=8, label='Heavy-Hex')
-    plt.plot(QUBIT_SIZES, line_times, '^-', linewidth=2, markersize=8, label='Line')
+    plt.plot(QUBIT_SIZES, grid_depths, 'o-', linewidth=2, markersize=8, label='2D Grid')
+    plt.plot(QUBIT_SIZES, heavy_hex_depths, 's-', linewidth=2, markersize=8, label='Heavy-Hex')
+    plt.plot(QUBIT_SIZES, line_depths, '^-', linewidth=2, markersize=8, label='Line')
     plt.xlabel('Number of Qubits', fontsize=12)
-    plt.ylabel('Compilation Time (seconds)', fontsize=12)
-    plt.title('QFT Circuit Compilation Time vs Qubit Count', fontsize=14)
+    plt.ylabel('Circuit Depth', fontsize=12)
+    plt.title('QFT Compiled Circuit Depth vs Qubit Count', fontsize=14)
     plt.legend(fontsize=11)
     plt.grid(True, alpha=0.3)
     plt.xticks(QUBIT_SIZES)  # Set x-axis ticks to exact qubit sizes
     plt.tight_layout()
 
     # Save plot
-    output_file = 'qft_compilation_benchmark.png'
+    output_file = 'qft_depth_benchmark.png'
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     print(f"\n✓ Plot saved to {output_file}")
 
@@ -160,14 +148,14 @@ def main():
     print("\nSummary:")
     print(f"  Qubit range: {QUBIT_SIZES[0]} to {QUBIT_SIZES[-1]}")
     print(f"\n  Grid topology:")
-    print(f"    Time range: {grid_times[0]:.4f}s to {grid_times[-1]:.4f}s")
-    print(f"    Growth factor: {grid_times[-1]/grid_times[0]:.1f}x")
+    print(f"    Depth range: {grid_depths[0]} to {grid_depths[-1]}")
+    print(f"    Growth factor: {grid_depths[-1]/grid_depths[0]:.1f}x")
     print(f"\n  Heavy-hex topology:")
-    print(f"    Time range: {heavy_hex_times[0]:.4f}s to {heavy_hex_times[-1]:.4f}s")
-    print(f"    Growth factor: {heavy_hex_times[-1]/heavy_hex_times[0]:.1f}x")
+    print(f"    Depth range: {heavy_hex_depths[0]} to {heavy_hex_depths[-1]}")
+    print(f"    Growth factor: {heavy_hex_depths[-1]/heavy_hex_depths[0]:.1f}x")
     print(f"\n  Line topology:")
-    print(f"    Time range: {line_times[0]:.4f}s to {line_times[-1]:.4f}s")
-    print(f"    Growth factor: {line_times[-1]/line_times[0]:.1f}x")
+    print(f"    Depth range: {line_depths[0]} to {line_depths[-1]}")
+    print(f"    Growth factor: {line_depths[-1]/line_depths[0]:.1f}x")
 
     plt.show()
 
