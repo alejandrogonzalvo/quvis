@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { colors } from '../theme/colors.js';
+import CodeBlock from '../components/CodeBlock.js';
+
 
 const LandingPage: React.FC = () => {
     const [scrolled, setScrolled] = useState(false);
@@ -172,19 +174,26 @@ const LandingPage: React.FC = () => {
                 description="Quvis leverages Qiskit for robust transpilation. Configure optimization levels and layout methods directly from the interface."
                 reversed={true}
             >
-                <CodeBlock code={`# Circuit Generation API
-POST /api/generate-circuit
-{
-  "algorithm": "qft",
-  "num_qubits": 5,
-  "topology": "heavy_hex",
-  "optimization_level": 3
-}
+                <CodeBlock code={`from qiskit import QuantumCircuit, transpile
+from quvis import Visualizer
 
-# Returns:
-# - Logical Circuit Interaction Graph
-# - Compiled Circuit with SWAPs
-# - Routing Overhead Metrics`} language="python" />
+# 1. Define your circuit in Qiskit
+circuit = QuantumCircuit(4)
+circuit.h(0)
+circuit.cx(0, 1)
+
+# 2. Compile for a specific topology
+# e.g., Linear: 0-1-2-3
+compiled = transpile(
+    circuit, 
+    coupling_map=[[0,1], [1,2], [2,3]]
+)
+
+# 3. Visualize the comparison
+quvis = Visualizer()
+quvis.add_circuit(circuit, "Logical")
+quvis.add_circuit(compiled, "Compiled")
+quvis.visualize()`} language="python" />
             </FeatureSection>
 
             {/* Feature 3: Spatio-Temporal */}
@@ -269,23 +278,7 @@ const FeatureSection: React.FC<{
     </section>
 );
 
-const CodeBlock: React.FC<{ code: string; language?: string }> = ({ code }) => (
-    <div style={{
-        padding: '2rem',
-        fontFamily: "'Fira Code', monospace",
-        fontSize: '0.9rem',
-        lineHeight: 1.5,
-        color: '#e2e8f0',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-    }}>
-        <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-            {code}
-        </pre>
-    </div>
-);
+
 
 const PlaceholderImage: React.FC<{ label: string; color: string }> = ({ label, color }) => (
     <div style={{

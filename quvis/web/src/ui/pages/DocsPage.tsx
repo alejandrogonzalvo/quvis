@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import CodeBlock from '../components/CodeBlock.js';
 
 const DocsPage: React.FC = () => {
     return (
@@ -42,7 +43,7 @@ const DocsPage: React.FC = () => {
 
                     <SectionHeader title="Architecture" />
                     <ul style={listStyle}>
-                        <li><a href="#circuit-compilation" style={linkStyle}>Circuit Compilation</a></li>
+                        <li><a href="#circuit-compilation" style={linkStyle}>Integration with Qiskit</a></li>
                         <li><a href="#topology-mapping" style={linkStyle}>Topology Mapping</a></li>
                     </ul>
                 </nav>
@@ -121,18 +122,62 @@ const DocsPage: React.FC = () => {
                 <hr style={{ border: 0, borderTop: '1px solid rgba(255, 255, 255, 0.1)', margin: '4rem 0' }} />
 
                 <section id="circuit-compilation" style={{ marginBottom: '4rem' }}>
-                    <h1 style={h1Style}>Circuit Compilation</h1>
+                    <h1 style={h1Style}>Integration with Qiskit</h1>
                     <p style={pStyle}>
-                        Quvis uses a client-server architecture to ensure accurate circuit synthesis.
+                        Quvis is designed to work seamlessly with <a href="https://qiskit.org" style={{ color: '#a78bfa', textDecoration: 'none' }}>Qiskit</a>,
+                        IBM's open-source framework for quantum computing. It acts as a visualization backend that can be inserted directly into your experimentation workflow.
                     </p>
-                    <h3 style={h3Style}>The Process</h3>
-                    <ol style={contentListStyle}>
-                        <li>Your parameters are sent to the **Python Backend**.</li>
-                        <li>The backend uses **Qiskit** to generate the logical circuit.</li>
-                        <li>The transpiler maps this logical circuit to the selected physical **Topology**.</li>
-                        <li>Wait/SWAP gates are inserted to respect connectivity constraints.</li>
-                        <li>The final "compiled" circuit is returned to the frontend for rendering.</li>
-                    </ol>
+
+                    <h3 style={h3Style}>How it Intertwines</h3>
+                    <p style={pStyle}>
+                        The core philosophy is simple: <strong>Define in Qiskit, Visualize in Quvis.</strong>
+                        You don't need to learn a new circuit definition language. You continue to use `QuantumCircuit` and `transpile` from Qiskit,
+                        and pass the results to the Quvis `Visualizer`.
+                    </p>
+
+                    <h3 style={h3Style}>Compiling Circuits</h3>
+                    <p style={pStyle}>
+                        Compilation (or transpilation) is the process of mapping a high-level quantum circuit to a specific customized physical device.
+                        Quvis allows you to visualize this process by accepting both the "logical" (pre-compilation) and "physical" (post-compilation) circuits side-by-side.
+                    </p>
+
+                    <CodeBlock code={`from qiskit import QuantumCircuit, transpile
+from qiskit.circuit.library import QFT
+from quvis import Visualizer
+
+# 1. Create your Logical Circuit using standard Qiskit
+qft = QFT(4)
+
+# 2. Initiate the Quvis Visualizer
+quvis = Visualizer()
+quvis.add_circuit(qft, algorithm_name="QFT (Logical)")
+
+# 3. Define the Physical Constraints (Topology)
+# Example: A linear line of qubits [0]--[1]--[2]--[3]
+coupling_map = [[0, 1], [1, 2], [2, 3]]
+
+# 4. Compile the circuit using Qiskit's transpiler
+compiled_qft = transpile(qft, coupling_map=coupling_map, optimization_level=2)
+
+# 5. Add the Compiled Circuit to Quvis
+# We pass the topology metadata so Quvis can render the device correctly
+quvis.add_circuit(
+    compiled_qft,
+    coupling_map={
+        "coupling_map": coupling_map,
+        "num_qubits": 4,
+        "topology_type": "line"
+    },
+    algorithm_name="QFT (Compiled)"
+)
+
+# 6. Launch the Visualization
+quvis.visualize()`} language="python" />
+
+                    <p style={pStyle}><br />
+                        In the code above, `transpile()` handles the heavy lifting of inserting SWAP gates to satisfy the linear topology.
+                        Quvis then takes this compiled artifact and renders it in 3D, showing exactly where those overhead operations were placed.
+                    </p>
                 </section>
 
                 <section id="topology-mapping" style={{ marginBottom: '4rem' }}>
