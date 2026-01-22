@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  # Backend Service (FastAPI)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quvis-backend
+    restart: unless-stopped
+    environment:
+      - PORT=8000
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - quvis-prod-net
+
+  # Frontend Service (Nginx)
+  frontend:
+    build:
+      context: ./quvis/web
+      dockerfile: Dockerfile
+    container_name: quvis-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"  # Expose on port 80 of the host
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - quvis-prod-net
+
+networks:
+  quvis-prod-net:
+    driver: bridge
