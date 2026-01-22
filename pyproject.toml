@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "quvis"
-version = "v0.27.1"
+version = "0.27.2"
 description = "Quvis - Quantum Circuit Visualization System"
 authors = ["Alejandro Gonzalvo Hidalgo <alejandro@gonzalvo.org>"]
 readme = "README.md"
