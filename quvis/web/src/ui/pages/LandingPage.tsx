@@ -44,7 +44,7 @@ const LandingPage: React.FC = () => {
                     opacity: 0.4,
                 }}
             >
-                <source src="/quvis-summary.mp4" type="video/mp4" />
+                <source src="/quvis-summary-optimized.mp4" type="video/mp4" />
             </video>
 
             {/* Overlay to ensure text readability */}
