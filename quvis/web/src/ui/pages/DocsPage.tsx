@@ -59,8 +59,36 @@ const DocsPage: React.FC = () => {
                 <section id="playground-guide" style={{ marginBottom: '4rem' }}>
                     <h1 style={h1Style}>Playground Guide</h1>
                     <p style={pStyle}>
-                        The Quvis Playground is an interactive environment for visualizing quantum circuits on realistic device topologies.
-                        It combines Qiskit's powerful compilation engine with a real-time 3D rendering system.
+                        The Quvis Playground is an interactive environment designed to bridge the transparency gap in quantum compilation.
+                        It clarifies complex quantum behavior for learners while offering qualitative analysis tools for researchers.
+                    </p>
+                </section>
+
+                <section id="dual-nature" style={{ marginBottom: '4rem' }}>
+                    <h2 style={h2Style}>The Dual Nature of Quvis</h2>
+                    <p style={pStyle}>
+                        Quvis is built on the philosophy that understanding quantum algorithms requires visibility into both their
+                        theoretical structure and their physical implementation.
+                    </p>
+
+                    <h3 style={h3Style}>Logical vs. Compiled Views</h3>
+                    <p style={pStyle}>
+                        The tool provides two distinct yet interconnected views of the same circuit:
+                    </p>
+                    <ul style={contentListStyle}>
+                        <li>
+                            <strong>Logical View:</strong> Visualizes the algorithm as designed. This hardware-agnostic representation
+                            reveals the intrinsic data dependencies and structure of the algorithm, effectively showing "what you want to compute".
+                        </li>
+                        <li>
+                            <strong>Compiled View:</strong> Visualizes the algorithm as it runs on the machine. This hardware-aware view
+                            exposes the reality of NISQ devices, showing the SWAP gates and routing overhead required to map the
+                            logical qubits onto a restricted physical topology (e.g., Grid, Heavy Hex).
+                        </li>
+                    </ul>
+                    <p style={pStyle}>
+                        By comparing these views, users can directly observe the cost of compilation and the impact of hardware constraints
+                        on algorithm efficiency.
                     </p>
                 </section>
 
