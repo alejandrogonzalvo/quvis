@@ -137,7 +137,7 @@ const circuitGeneratorMiddleware = async (req, res, next) => {
 };
 
 export default defineConfig({
-    base: process.env.NODE_ENV === 'production' ? '/quvis/' : '/',
+    base: process.env.VITE_BASE_PATH || (process.env.NODE_ENV === 'production' ? '/quvis/' : '/'),
     plugins: [
         {
             name: 'circuit-generator',
