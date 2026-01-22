@@ -60,8 +60,8 @@ const DocsPage: React.FC = () => {
                 <section id="playground-guide" style={{ marginBottom: '4rem' }}>
                     <h1 style={h1Style}>Playground Guide</h1>
                     <p style={pStyle}>
-                        The Quvis Playground is an interactive environment designed to bridge the transparency gap in quantum compilation.
-                        It clarifies complex quantum behavior for learners while offering qualitative analysis tools for researchers.
+                        The Quvis Playground visualizes quantum circuit execution on specific device topologies.
+                        It displays both logical algorithm structures and their compiled hardware implementations.
                     </p>
                 </section>
 
@@ -96,49 +96,46 @@ const DocsPage: React.FC = () => {
                 <section id="circuit-parameters" style={{ marginBottom: '4rem' }}>
                     <h2 style={h2Style}>Circuit Parameters</h2>
                     <p style={pStyle}>
-                        When generating a circuit, you can configure the following parameters:
+                        The circuit generator accepts the following configuration:
                     </p>
                     <ul style={contentListStyle}>
-                        <li><strong>Algorithm:</strong> Choose from presets like QFT (Quantum Fourier Transform), QAOA, or GHZ states.</li>
-                        <li><strong>Qubits:</strong> The number of logical qubits in your circuit.</li>
-                        <li><strong>Topology:</strong> The physical layout of the quantum processor (e.g., Grid, Ring, Heavy Hex).</li>
-                        <li><strong>Optimization Level:</strong> Controls how aggressively Qiskit optimizes the circuit (0-3).</li>
+                        <li><strong>Algorithm:</strong> Presets including QFT (Quantum Fourier Transform), QAOA, or GHZ states.</li>
+                        <li><strong>Qubits:</strong> Number of logical qubits.</li>
+                        <li><strong>Topology:</strong> Target device layout (e.g., Grid, Ring, Heavy Hex).</li>
+                        <li><strong>Optimization Level:</strong> Qiskit transpiler optimization setting (0-3).</li>
                     </ul>
                 </section>
 
                 <section id="visualization-controls" style={{ marginBottom: '4rem' }}>
                     <h2 style={h2Style}>Visualization Controls</h2>
                     <p style={pStyle}>
-                        Once generated, you can inspect the circuit using the 3D view:
+                        The 3D view supports the following interactions:
                     </p>
                     <ul style={contentListStyle}>
-                        <li><strong>Timeline:</strong> Scrub through the circuit execution slice-by-slice.</li>
-                        <li><strong>Camera:</strong> Left-click to rotate, right-click to pan, scroll to zoom. Press '0' to reset.</li>
-                        <li><strong>Layers:</strong> Toggle Connection Lines or Bloch Spheres for clearer views.</li>
-                        <li><strong>Heatmap:</strong> Visualize gate density or error rates across the device.</li>
+                        <li><strong>Timeline:</strong> Step through circuit execution.</li>
+                        <li><strong>Camera:</strong> Left-click to rotate, right-click to pan, scroll to zoom.</li>
+                        <li><strong>Layers:</strong> Toggle connection lines and Bloch spheres.</li>
+                        <li><strong>Heatmap:</strong> Display gate density or error rates.</li>
                     </ul>
                 </section>
 
                 <hr style={{ border: 0, borderTop: '1px solid rgba(255, 255, 255, 0.1)', margin: '4rem 0' }} />
 
                 <section id="circuit-compilation" style={{ marginBottom: '4rem' }}>
-                    <h1 style={h1Style}>Integration with Qiskit</h1>
+                    <h1 style={h1Style}>Qiskit Integration</h1>
                     <p style={pStyle}>
-                        Quvis is designed to work seamlessly with <a href="https://qiskit.org" style={{ color: '#a78bfa', textDecoration: 'none' }}>Qiskit</a>,
-                        IBM's open-source framework for quantum computing. It acts as a visualization backend that can be inserted directly into your experimentation workflow.
+                        Quvis functions as a visualization backend for <a href="https://qiskit.org" style={{ color: '#a78bfa', textDecoration: 'none' }}>Qiskit</a>.
+                        It accepts standard `QuantumCircuit` objects and transpilation results.
                     </p>
 
-                    <h3 style={h3Style}>How it Intertwines</h3>
+                    <h3 style={h3Style}>Workflow</h3>
                     <p style={pStyle}>
-                        The core philosophy is simple: <strong>Define in Qiskit, Visualize in Quvis.</strong>
-                        You don't need to learn a new circuit definition language. You continue to use `QuantumCircuit` and `transpile` from Qiskit,
-                        and pass the results to the Quvis `Visualizer`.
+                        Users define circuits using Qiskit's `QuantumCircuit` and `transpile` functions, then pass the objects to the `Visualizer`.
                     </p>
 
-                    <h3 style={h3Style}>Compiling Circuits</h3>
+                    <h3 style={h3Style}>Compilation Visualization</h3>
                     <p style={pStyle}>
-                        Compilation (or transpilation) is the process of mapping a high-level quantum circuit to a specific customized physical device.
-                        Quvis allows you to visualize this process by accepting both the "logical" (pre-compilation) and "physical" (post-compilation) circuits side-by-side.
+                        The visualizer accepts both pre-compilation (logical) and post-compilation (physical) circuits.
                     </p>
 
                     <CodeBlock code={`from qiskit import QuantumCircuit, transpile
@@ -183,12 +180,11 @@ quvis.visualize()`} language="python" />
                 <section id="topology-mapping" style={{ marginBottom: '4rem' }}>
                     <h2 style={h2Style}>Topology Mapping</h2>
                     <p style={pStyle}>
-                        A key feature of Quvis is visualizing the "Routing Overhead". When you run a logical circuit on physical hardware,
-                        qubits are not fully connected. The compiler must insert SWAP gates to move information between non-adjacent qubits.
+                        Mapping logical qubits to physical hardware often requires overhead. If two logical qubits need to interact but are not physically connected,
+                        the compiler inserts SWAP gates to move their states to adjacent physical qubits.
                     </p>
                     <p style={pStyle}>
-                        In the playground, you will often see extra gates appear in the "Compiled" view compared to the "Logical" view.
-                        These represent the cost of running algorithms on simpler topologies like a **Line** or **Ring**.
+                        The "Compiled" view renders these additional gates, illustrating the cost of running algorithms on simpler topologies like a <strong>Line</strong> or <strong>Ring</strong>.
                     </p>
                 </section>
             </main>
