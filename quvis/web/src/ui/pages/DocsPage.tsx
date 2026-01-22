@@ -27,8 +27,12 @@ const DocsPage: React.FC = () => {
                         fontWeight: 700,
                         color: '#fff',
                         textDecoration: 'none',
-                        letterSpacing: '-0.02em'
+                        letterSpacing: '-0.02em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem'
                     }}>
+                        <img src="/logo.png" alt="Quvis Logo" style={{ width: '28px', height: '28px' }} />
                         Quvis Docs
                     </Link>
                 </div>

@@ -39,8 +39,8 @@ const LandingPage: React.FC = () => {
                 borderBottom: scrolled ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
                 transition: 'all 0.3s ease',
             }}>
-                <div style={{ fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{ width: '24px', height: '24px', background: 'linear-gradient(135deg, #7c3aed, #2563eb)', borderRadius: '6px' }} />
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <img src="/logo.png" alt="Quvis Logo" style={{ width: '32px', height: '32px' }} />
                     Quvis
                 </div>
                 <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
