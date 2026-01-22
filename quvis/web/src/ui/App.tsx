@@ -110,7 +110,7 @@ const App: React.FC = () => {
     // State for HeatmapControls initial values (matching Playground defaults)
     const [initialHeatmapSettings, setInitialHeatmapSettings] = useState({
         maxSlices: -1,
-        baseSize: 500.0,
+        baseSize: 1500.0,
     });
 
     // State for FidelityControls initial values
@@ -733,10 +733,10 @@ const App: React.FC = () => {
         : `${parseInt(fidelityPanelTop) + FIDELITY_PANEL_EXPANDED_HEIGHT_PX + INTER_PANEL_SPACING_PX}px`;
 
     // Right-side component positioning (new unified system)
-    const playbackControlsHeight = isPlaybackCollapsed 
-        ? PLAYBACK_CONTROLS_COLLAPSED_HEIGHT_PX 
+    const playbackControlsHeight = isPlaybackCollapsed
+        ? PLAYBACK_CONTROLS_COLLAPSED_HEIGHT_PX
         : PLAYBACK_CONTROLS_EXPANDED_HEIGHT_PX;
-    
+
     const debugInfoBottom = `${BASE_BOTTOM_MARGIN_PX + playbackControlsHeight + INTER_PANEL_SPACING_PX}px`;
     const lightToggleBottom = `${parseInt(debugInfoBottom) + DEBUG_INFO_HEIGHT_PX + INTER_PANEL_SPACING_PX}px`;
 

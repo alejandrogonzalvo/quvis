@@ -21,8 +21,8 @@ const PlaygroundParameterSelection: React.FC<
     PlaygroundParameterSelectionProps
 > = ({ onGenerate }) => {
     const [algorithm, setAlgorithm] = useState<string>('qft');
-    const [logicalQubits, setLogicalQubits] = useState<number>(10);
-    const [physicalQubits, setPhysicalQubits] = useState<number>(10);
+    const [logicalQubits, setLogicalQubits] = useState<number>(100);
+    const [physicalQubits, setPhysicalQubits] = useState<number>(100);
     const [topology, setTopology] = useState<string>('grid');
     const [optimizationLevel, setOptimizationLevel] = useState<number>(1);
     const [customParams, setCustomParams] = useState<Record<string, any>>({});

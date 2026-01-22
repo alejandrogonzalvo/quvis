@@ -14,7 +14,7 @@ export class AppearanceParameterManager {
         qubitSize: number = 1.0,
         connectionThickness: number = 0.05,
         inactiveAlpha: number = 0.1,
-        baseSize: number = 500.0,
+        baseSize: number = 1500.0,
         areBlochSpheresVisible: boolean = false,
         areConnectionLinesVisible: boolean = true,
     ) {
