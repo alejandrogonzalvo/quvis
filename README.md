@@ -16,8 +16,8 @@ Quvis is a quantum circuit visualization platform that provides interactive 3D v
 Run the interactive web playground locally:
 
 ```bash
-git clone https://github.com/alejandrogonzalvo/quvis-web.git
-cd quvis-web
+git clone https://github.com/alejandrogonzalvo/quvis.git
+cd quvis
 pip install poetry
 poetry install
 npm install
