@@ -268,51 +268,30 @@ export class LayoutManager {
         }
     }
 
-    /**
-     * Get position of a specific qubit
-     */
     getQubitPosition(qubitId: number): THREE.Vector3 | undefined {
         return this.qubitPositions.get(qubitId);
     }
 
-    /**
-     * Set position of a specific qubit
-     */
     setQubitPosition(qubitId: number, position: THREE.Vector3): void {
         this.qubitPositions.set(qubitId, position.clone());
     }
 
-    /**
-     * Clear all positions
-     */
     clearPositions(): void {
         this.qubitPositions.clear();
     }
 
-    /**
-     * Get all qubit IDs that have positions
-     */
     getQubitIds(): number[] {
         return Array.from(this.qubitPositions.keys());
     }
 
-    /**
-     * Check if a qubit has a position
-     */
     hasQubit(qubitId: number): boolean {
         return this.qubitPositions.has(qubitId);
     }
 
-    /**
-     * Get the number of qubits with positions
-     */
     getQubitCount(): number {
         return this.qubitPositions.size;
     }
 
-    /**
-     * Validate simulation inputs are within bounds
-     */
     private validateSimulationInput(
         numNodes: number,
         edges: number[][],
@@ -464,26 +443,17 @@ export class LayoutManager {
         const coreEdges: number[][] = [];
         const coreConnections = new Set<string>();
 
-        if (inter_core_links) {
-            for (const link of inter_core_links) {
-                const core1 = Math.floor(link[0] / qubits_per_core);
-                const core2 = Math.floor(link[1] / qubits_per_core);
-                if (core1 !== core2) {
-                    const key = `${Math.min(core1, core2)}-${Math.max(core1, core2)}`;
-                    if (!coreConnections.has(key)) {
-                        coreEdges.push([core1, core2]);
-                        coreConnections.add(key);
-                    }
-                }
+        for (const link of inter_core_links) {
+            const core1 = Math.floor(link[0] / qubits_per_core);
+            const core2 = Math.floor(link[1] / qubits_per_core);
+
+            if (core1 === core2) continue;
+
+            const key = `${Math.min(core1, core2)}-${Math.max(core1, core2)}`;
+            if (!coreConnections.has(key)) {
+                coreEdges.push([core1, core2]);
+                coreConnections.add(key);
             }
-        } else {
-            // Fallback to ring if no explicit links, or generate based on topology string
-            if (global_topology === 'ring' || !global_topology) {
-                for (let i = 0; i < num_cores; i++) {
-                    coreEdges.push([i, (i + 1) % num_cores]);
-                }
-            }
-            // Add other topology defaults if needed
         }
 
         // Run simulation for cores
@@ -501,7 +471,6 @@ export class LayoutManager {
         // 2. Calculate Intra-Core Layouts
         // We will compute one reference layout if they are all identical, or one per core if coupling differs.
         // Assuming homogeneous cores mostly, but better to be safe and compute per core if coupling map is provided.
-        // If no coupling map, default to grid.
 
         const coreLocalPositions: Map<number, THREE.Vector3[]> = new Map();
 
@@ -607,12 +576,13 @@ export class LayoutManager {
         for (let i = 0; i < num_cores; i++) {
             const corePos = corePositions[i];
             const localPositions = coreLocalPositions.get(i);
-            if (localPositions) {
-                for (let j = 0; j < qubits_per_core; j++) {
-                    const globalId = i * qubits_per_core + j;
-                    const finalPos = new THREE.Vector3().copy(corePos).add(localPositions[j]);
-                    this.qubitPositions.set(globalId, finalPos);
-                }
+            if (!localPositions) {
+                throw new Error(`No local positions found for core ${i}`);
+            }
+            for (let j = 0; j < qubits_per_core; j++) {
+                const globalId = i * qubits_per_core + j;
+                const finalPos = new THREE.Vector3().copy(corePos).add(localPositions[j]);
+                this.qubitPositions.set(globalId, finalPos);
             }
         }
 
