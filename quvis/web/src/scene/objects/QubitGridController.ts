@@ -51,6 +51,7 @@ export class QubitGridController {
         initialIdealDist: number = 5.0,
         initialIterations: number = 300,
         initialCoolingFactor: number = 0.95,
+        initialCoreDistance: number = 5.0,
         initialConnectionThickness: number = 0.05,
         initialInactiveElementAlpha: number = 0.1,
         onSlicesLoadedCallback?: (count: number, initialIndex: number) => void,
@@ -66,10 +67,11 @@ export class QubitGridController {
         // Initialize subsystems
         this.dataManager = new CircuitDataManager();
         this.layoutManager = new LayoutManager(
-            initialKRepel,
-            initialIdealDist,
             initialIterations,
-            initialCoolingFactor
+            initialCoolingFactor,
+            0.1, // kAttract
+            0.8, // barnesHutTheta
+            initialCoreDistance
         );
         this.renderManager = new RenderManager(
             scene,
@@ -152,6 +154,7 @@ export class QubitGridController {
             idealDistance?: number;
             iterations?: number;
             coolingFactor?: number;
+            coreDistance?: number;
         },
         onLayoutComplete?: () => void
     ): void {
@@ -159,7 +162,36 @@ export class QubitGridController {
         this.layoutManager.updateParameters(params);
 
         const deviceQubitCount = this.dataManager.deviceQubitCount;
-        if (deviceQubitCount > 0) {
+        const modularInfo = this.dataManager.modularInfo;
+
+        if (modularInfo) {
+            console.log('Calculating modular layout...');
+            this.layoutManager.calculateModularLayout(
+                modularInfo,
+                this.layoutManager.parameters.coreDistance,
+                this.dataManager.couplingMap
+            );
+            // Directly update positions since modular layout is synchronous
+            this.renderManager.updateQubitPositions(this.layoutManager.positions);
+            this.heatmapManager.generateClusters(
+                this.layoutManager.positions,
+                deviceQubitCount
+            );
+            this.heatmapManager.clearPositionsCache();
+            this.updateVisualization();
+
+            // Auto-align camera to optimal viewing angle for the layout
+            this.autoAlignCameraToLayout();
+
+            // Save modular layout state
+            if (this.dataManager.isMultiCircuit) {
+                this.saveCurrentLayoutState(
+                    this.dataManager.currentCircuitIndex,
+                    'grid' // Treat as grid type for now or add 'modular' type
+                );
+            }
+            onLayoutComplete?.();
+        } else if (deviceQubitCount > 0) {
             this.layoutManager.calculateForceDirectedLayout(
                 deviceQubitCount,
                 this.dataManager.couplingMap,
@@ -367,7 +399,16 @@ export class QubitGridController {
 
     private recreateGridForNewQubitCount(newQubitCount: number): void {
         // Calculate new grid layout
-        this.layoutManager.calculateGridLayout(newQubitCount);
+        const modularInfo = this.dataManager.modularInfo;
+        if (modularInfo) {
+            this.layoutManager.calculateModularLayout(
+                modularInfo,
+                this.layoutManager.parameters.coreDistance,
+                this.dataManager.couplingMap
+            );
+        } else {
+            this.layoutManager.calculateGridLayout(newQubitCount);
+        }
 
         // Create new grid of qubits
         this.renderManager.createGrid(
@@ -557,7 +598,17 @@ export class QubitGridController {
         const qubitCount = this.dataManager.qubitCount;
 
         // Initialize layout
-        this.layoutManager.calculateGridLayout(deviceQubitCount);
+        const modularInfo = this.dataManager.modularInfo;
+        if (modularInfo) {
+            console.log('Initializing modular layout...');
+            this.layoutManager.calculateModularLayout(
+                modularInfo,
+                this.layoutManager.parameters.coreDistance,
+                couplingMap
+            );
+        } else {
+            this.layoutManager.calculateGridLayout(deviceQubitCount);
+        }
 
         // Initialize slices in state manager
         this.stateManager.initializeSlices(this.dataManager.operationsPerSlice);
@@ -655,6 +706,27 @@ export class QubitGridController {
                 this.dataManager.interactionPairsPerSlice
             );
 
+        // Identify inter-core connections if modular info exists
+        let interCoreConnections: Set<string> | undefined;
+        const modularInfo = this.dataManager.modularInfo;
+        const couplingMap = this.dataManager.couplingMap;
+
+        if (modularInfo && couplingMap) {
+            interCoreConnections = new Set<string>();
+            const qubitsPerCore = modularInfo.qubits_per_core;
+
+            for (const pair of couplingMap) {
+                const q1 = pair[0];
+                const q2 = pair[1];
+                const core1 = Math.floor(q1 / qubitsPerCore);
+                const core2 = Math.floor(q2 / qubitsPerCore);
+
+                if (core1 !== core2) {
+                    interCoreConnections.add(`${Math.min(q1, q2)}-${Math.max(q1, q2)}`);
+                }
+            }
+        }
+
         this.renderManager.drawConnections(
             this.stateManager.visualizationMode,
             this.layoutManager.positions,
@@ -662,7 +734,8 @@ export class QubitGridController {
             currentSliceInteractionPairs,
             this.dataManager,
             currentSliceIndex,
-            maxSlicesForHeatmap
+            maxSlicesForHeatmap,
+            interCoreConnections
         );
 
         // Update isFullyLoaded status

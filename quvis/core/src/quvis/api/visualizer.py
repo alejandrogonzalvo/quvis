@@ -25,6 +25,7 @@ from ..compiler.utils import (
     CompiledCircuitInfo,
     RoutingCircuitInfo,
     DeviceInfo,
+    ModularInfo,
 )
 
 # Create module logger
@@ -194,6 +195,15 @@ class Visualizer:
                 num_device_qubits = coupling_map.get("num_qubits", circuit.num_qubits)
                 if "topology_type" in coupling_map:
                     topology_type = coupling_map["topology_type"]
+                
+                # Parse modular info if present
+                if "num_cores" in coupling_map:
+                    modular_info = ModularInfo(
+                        num_cores=coupling_map.get("num_cores", 1),
+                        qubits_per_core=coupling_map.get("qubits_per_core", 0),
+                        global_topology=coupling_map.get("global_topology", "custom"),
+                        inter_core_links=coupling_map.get("inter_core_links", [])
+                    )
             elif isinstance(coupling_map, CouplingMap):
                 coupling_map_list = coupling_map.get_edges()
                 num_device_qubits = coupling_map.size()
@@ -263,6 +273,7 @@ class Visualizer:
             device_info = DeviceInfo(
                 num_qubits_on_device=num_device_qubits,
                 connectivity_graph_coupling_map=list(coupling_map_list),
+                modular_info=modular_info if 'modular_info' in locals() else None,
             )
 
             circuit_stats = CircuitStats(
@@ -309,76 +320,84 @@ class Visualizer:
             logger.error(f"❌ Error creating data file: {e}")
             return
 
-        # Change to frontend directory
-        os.chdir(self.frontend_path)
-
-        # Check if a server is already running on the port
-        import socket
-        import urllib.request
-        import urllib.error
-
-        def is_port_in_use(port):
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                return s.connect_ex(("localhost", port)) == 0
-
-        def test_file_accessibility(port, filename):
-            """Test if the server can serve the specific file."""
-            try:
-                url = f"http://localhost:{port}/{filename}"
-                response = urllib.request.urlopen(url, timeout=5)
-                return response.status == 200
-            except (urllib.error.URLError, socket.timeout):
-                return False
-
-        if is_port_in_use(self.port):
-            logger.warning(
-                f"⚠️  Port {self.port} is already in use. Please stop the existing server and try again."
-            )
-
-            return
+        # Store original CWD
+        original_cwd = os.getcwd()
+        
         try:
-            logger.info(f"🌐 Starting development server on port {self.port}...")
+            # Change to frontend directory
+            os.chdir(self.frontend_path)
 
-            env = os.environ.copy()
-            env["VITE_LIBRARY_MODE"] = "true"
-            env["VITE_LIBRARY_DATA_FILE"] = "temp_circuit_data.json"
-
-            process = subprocess.Popen(
-                [
-                    "npx",
-                    "vite",
-                    "--port",
-                    str(self.port),
-                    "--base",
-                    "/",
-                    "--open" if self.auto_open_browser else "--no-open",
-                ],
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-
-            if not self.auto_open_browser:
-                logger.info(f"🌐 Open your browser to: http://localhost:{self.port}")
-
-            logger.info(f"✅ Quvis is running! Press Ctrl+C to stop.")
-
+            # Check if a server is already running on the port
+            import socket
+            import urllib.request
+            import urllib.error
+    
+            def is_port_in_use(port):
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    return s.connect_ex(("localhost", port)) == 0
+    
+            def test_file_accessibility(port, filename):
+                """Test if the server can serve the specific file."""
+                try:
+                    url = f"http://localhost:{port}/{filename}"
+                    response = urllib.request.urlopen(url, timeout=5)
+                    return response.status == 200
+                except (urllib.error.URLError, socket.timeout):
+                    return False
+    
+            if is_port_in_use(self.port):
+                logger.warning(
+                    f"⚠️  Port {self.port} is already in use. Please stop the existing server and try again."
+                )
+    
+                return
             try:
-                process.wait()
-            except KeyboardInterrupt:
-                logger.info("\n🛑 Stopping...")
-                process.terminate()
-                process.wait()
-
-        except Exception as e:
-            logger.error(f"❌ Error launching visualization: {e}")
-            logger.info(
-                f"💡 Try running manually: VITE_LIBRARY_MODE=true npx vite --port {self.port} --base /"
-            )
-
-        if data_file.exists():
-            data_file.unlink()
+                logger.info(f"🌐 Starting development server on port {self.port}...")
+    
+                env = os.environ.copy()
+                env["VITE_LIBRARY_MODE"] = "true"
+                env["VITE_LIBRARY_DATA_FILE"] = "temp_circuit_data.json"
+    
+                process = subprocess.Popen(
+                    [
+                        "npx",
+                        "vite",
+                        "--port",
+                        str(self.port),
+                        "--base",
+                        "/",
+                        "--open" if self.auto_open_browser else "--no-open",
+                    ],
+                    env=env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+    
+                if not self.auto_open_browser:
+                    logger.info(f"🌐 Open your browser to: http://localhost:{self.port}")
+    
+                logger.info(f"✅ Quvis is running! Press Ctrl+C to stop.")
+    
+                try:
+                    process.wait()
+                except KeyboardInterrupt:
+                    logger.info("\n🛑 Stopping...")
+                    process.terminate()
+                    process.wait()
+    
+            except Exception as e:
+                logger.error(f"❌ Error launching visualization: {e}")
+                logger.info(
+                    f"💡 Try running manually: VITE_LIBRARY_MODE=true npx vite --port {self.port} --base /"
+                )
+    
+            if data_file.exists():
+                data_file.unlink()
+                
+        finally:
+            # Restore original CWD
+            os.chdir(original_cwd)
 
 
 def visualize_circuit(

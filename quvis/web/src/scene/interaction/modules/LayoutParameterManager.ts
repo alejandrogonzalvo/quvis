@@ -3,6 +3,7 @@ export interface LayoutParameters {
     idealDistance: number;
     iterations: number;
     coolingFactor: number;
+    coreDistance: number;
 }
 
 export class LayoutParameterManager {
@@ -13,12 +14,14 @@ export class LayoutParameterManager {
         idealDistance: number = 1.0,
         iterations: number = 500,
         coolingFactor: number = 1.0,
+        coreDistance: number = 5.0,
     ) {
         this.parameters = {
             repelForce,
             idealDistance,
             iterations,
             coolingFactor,
+            coreDistance,
         };
     }
 
@@ -40,6 +43,9 @@ export class LayoutParameterManager {
         }
         if (params.coolingFactor !== undefined) {
             this.parameters.coolingFactor = params.coolingFactor;
+        }
+        if (params.coreDistance !== undefined) {
+            this.parameters.coreDistance = params.coreDistance;
         }
         return this.getParameters();
     }
@@ -74,5 +80,13 @@ export class LayoutParameterManager {
 
     public setCoolingFactor(value: number): void {
         this.parameters.coolingFactor = value;
+    }
+
+    public getCoreDistance(): number {
+        return this.parameters.coreDistance;
+    }
+
+    public setCoreDistance(value: number): void {
+        this.parameters.coreDistance = value;
     }
 }

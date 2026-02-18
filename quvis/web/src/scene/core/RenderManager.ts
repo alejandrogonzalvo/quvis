@@ -39,6 +39,52 @@ const CYLINDER_FRAGMENT_SHADER = `
     }
 `;
 
+const DASHED_CYLINDER_VERTEX_SHADER = `
+    varying vec3 vNormal;
+    varying vec2 vUv;
+    attribute float instanceIntensity;
+    varying float vIntensity;
+
+    void main() {
+        vNormal = normalize(normalMatrix * normal);
+        vUv = uv;
+        vIntensity = instanceIntensity;
+        gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+    }
+`;
+
+const DASHED_CYLINDER_FRAGMENT_SHADER = `
+    varying float vIntensity;
+    varying vec2 vUv;
+    uniform float uInactiveAlpha;
+    uniform float uDashScale;
+
+    void main() {
+        // Dash pattern: discard fragments in gaps
+        // vUv.y goes from 0 to 1 along the cylinder height
+        // We multiply by dash scale (repetition)
+        if (fract(vUv.y * uDashScale) > 0.5) {
+            discard;
+        }
+
+        vec3 colorValue;
+        float alphaValue;
+
+        if (vIntensity <= 0.001) {
+            alphaValue = uInactiveAlpha;
+            colorValue = vec3(0.6, 0.6, 0.6); // Slightly lighter grey for dashed
+        } else if (vIntensity <= 0.5) {
+            alphaValue = 1.0;
+            colorValue = vec3(vIntensity * 2.0, 1.0, 0.0);
+        } else {
+            alphaValue = 1.0;
+            colorValue = vec3(1.0, 1.0 - (vIntensity - 0.5) * 2.0, 0.0);
+        }
+        
+        gl_FragColor = vec4(colorValue, alphaValue);
+    }
+`;
+
 interface RenderParameters {
     qubitScale: number;
     connectionThickness: number;
@@ -51,8 +97,10 @@ export class RenderManager {
 
     // Connection meshes
     private instancedConnectionMesh: THREE.InstancedMesh | null = null;
+    private instancedDashedConnectionMesh: THREE.InstancedMesh | null = null;
     private logicalConnectionMesh: THREE.InstancedMesh | null = null;
     private intensityAttribute: THREE.InstancedBufferAttribute | null = null;
+    private dashedIntensityAttribute: THREE.InstancedBufferAttribute | null = null;
 
     // Render parameters
     private renderParams: RenderParameters;
@@ -117,6 +165,7 @@ export class RenderManager {
 
         const cylinderGeo = new THREE.CylinderGeometry(1, 1, 1, 8, 1);
 
+        // Solid Material
         const material = new THREE.ShaderMaterial({
             vertexShader: CYLINDER_VERTEX_SHADER,
             fragmentShader: CYLINDER_FRAGMENT_SHADER,
@@ -128,6 +177,23 @@ export class RenderManager {
             transparent: true,
         });
 
+        // Dashed Material
+        const dashedMaterial = new THREE.ShaderMaterial({
+            vertexShader: DASHED_CYLINDER_VERTEX_SHADER,
+            fragmentShader: DASHED_CYLINDER_FRAGMENT_SHADER,
+            uniforms: {
+                uInactiveAlpha: {
+                    value: this.renderParams.inactiveElementAlpha,
+                },
+                uDashScale: {
+                    value: 10.0, // Adjust density of dashes
+                },
+            },
+            transparent: true,
+            side: THREE.DoubleSide, // Ensure visibility from all angles
+        });
+
+        // Create Solid Mesh
         this.instancedConnectionMesh = new THREE.InstancedMesh(
             cylinderGeo,
             material,
@@ -136,7 +202,8 @@ export class RenderManager {
         this.instancedConnectionMesh.instanceMatrix.setUsage(
             THREE.DynamicDrawUsage
         );
-        this.instancedConnectionMesh.renderOrder = 1; // Render connections in front of qubits
+        this.instancedConnectionMesh.renderOrder = 1;
+
         this.intensityAttribute = new THREE.InstancedBufferAttribute(
             new Float32Array(maxConnections),
             1
@@ -146,6 +213,27 @@ export class RenderManager {
             this.intensityAttribute
         );
         this.scene.add(this.instancedConnectionMesh);
+
+        // Create Dashed Mesh (assume max same possible, though usually less)
+        this.instancedDashedConnectionMesh = new THREE.InstancedMesh(
+            cylinderGeo,
+            dashedMaterial,
+            maxConnections
+        );
+        this.instancedDashedConnectionMesh.instanceMatrix.setUsage(
+            THREE.DynamicDrawUsage
+        );
+        this.instancedDashedConnectionMesh.renderOrder = 1;
+
+        this.dashedIntensityAttribute = new THREE.InstancedBufferAttribute(
+            new Float32Array(maxConnections),
+            1
+        );
+        this.instancedDashedConnectionMesh.geometry.setAttribute(
+            'instanceIntensity',
+            this.dashedIntensityAttribute
+        );
+        this.scene.add(this.instancedDashedConnectionMesh);
     }
 
     /**
@@ -193,6 +281,15 @@ export class RenderManager {
                 this.instancedConnectionMesh.material as THREE.ShaderMaterial
             ).dispose();
             this.instancedConnectionMesh = null;
+        }
+
+        if (this.instancedDashedConnectionMesh) {
+            this.scene.remove(this.instancedDashedConnectionMesh);
+            this.instancedDashedConnectionMesh.geometry.dispose();
+            (
+                this.instancedDashedConnectionMesh.material as THREE.ShaderMaterial
+            ).dispose();
+            this.instancedDashedConnectionMesh = null;
         }
     }
 
@@ -277,13 +374,17 @@ export class RenderManager {
         currentSliceInteractionPairs: Array<{ q1: number; q2: number }>,
         dataManager: CircuitDataManager,
         currentSliceIndex: number,
-        maxSlicesForHeatmap: number
+        maxSlicesForHeatmap: number,
+        interCoreConnections?: Set<string>
     ): void {
         const yAxis = new THREE.Vector3(0, 1, 0);
 
         if (!this._areConnectionLinesVisible) {
             if (this.instancedConnectionMesh) {
                 this.instancedConnectionMesh.count = 0;
+            }
+            if (this.instancedDashedConnectionMesh) {
+                this.instancedDashedConnectionMesh.count = 0;
             }
             if (this.logicalConnectionMesh) {
                 this.logicalConnectionMesh.count = 0;
@@ -301,6 +402,10 @@ export class RenderManager {
                 this.instancedConnectionMesh.count = 0;
                 this.instancedConnectionMesh.instanceMatrix.needsUpdate = true;
             }
+            if (this.instancedDashedConnectionMesh) {
+                this.instancedDashedConnectionMesh.count = 0;
+                this.instancedDashedConnectionMesh.instanceMatrix.needsUpdate = true;
+            }
         } else {
             this.drawCompiledConnections(
                 couplingMap,
@@ -308,7 +413,8 @@ export class RenderManager {
                 dataManager,
                 currentSliceIndex,
                 maxSlicesForHeatmap,
-                yAxis
+                yAxis,
+                interCoreConnections
             );
             if (this.logicalConnectionMesh) {
                 this.logicalConnectionMesh.count = 0;
@@ -381,7 +487,8 @@ export class RenderManager {
         dataManager: CircuitDataManager,
         currentSliceIndex: number,
         maxSlicesForHeatmap: number,
-        yAxis: THREE.Vector3
+        yAxis: THREE.Vector3,
+        interCoreConnections?: Set<string>
     ): void {
         if (
             !couplingMap ||
@@ -393,6 +500,10 @@ export class RenderManager {
             if (this.instancedConnectionMesh) {
                 this.instancedConnectionMesh.count = 0;
                 this.instancedConnectionMesh.instanceMatrix.needsUpdate = true;
+            }
+            if (this.instancedDashedConnectionMesh) {
+                this.instancedDashedConnectionMesh.count = 0;
+                this.instancedDashedConnectionMesh.instanceMatrix.needsUpdate = true;
             }
             return;
         }
@@ -438,7 +549,12 @@ export class RenderManager {
 
         const denominator =
             maxInteractionCountInWindow > 0 ? maxInteractionCountInWindow : 1;
+
         let visibleConnectionCount = 0;
+
+        // Count dashed connections separately
+        let dashedConnectionCount = 0;
+
         const matrix = new THREE.Matrix4();
         const position1 = new THREE.Vector3();
         const position2 = new THREE.Vector3();
@@ -464,23 +580,47 @@ export class RenderManager {
                     yAxis,
                     matrix
                 );
-                this.instancedConnectionMesh.setMatrixAt(
-                    visibleConnectionCount,
-                    matrix
-                );
-                this.intensityAttribute?.setX(
-                    visibleConnectionCount,
-                    normalizedIntensity
-                );
 
-                visibleConnectionCount++;
+                const isDashed = interCoreConnections && interCoreConnections.has(key);
+
+                if (isDashed && this.instancedDashedConnectionMesh) {
+                    this.instancedDashedConnectionMesh.setMatrixAt(
+                        dashedConnectionCount,
+                        matrix
+                    );
+                    this.dashedIntensityAttribute?.setX(
+                        dashedConnectionCount,
+                        normalizedIntensity
+                    );
+                    dashedConnectionCount++;
+                } else if (!isDashed && this.instancedConnectionMesh) {
+                    this.instancedConnectionMesh.setMatrixAt(
+                        visibleConnectionCount,
+                        matrix
+                    );
+                    this.intensityAttribute?.setX(
+                        visibleConnectionCount,
+                        normalizedIntensity
+                    );
+                    visibleConnectionCount++;
+                }
             }
         }
 
-        this.instancedConnectionMesh.count = visibleConnectionCount;
-        this.instancedConnectionMesh.instanceMatrix.needsUpdate = true;
-        if (this.intensityAttribute) {
-            this.intensityAttribute.needsUpdate = true;
+        if (this.instancedConnectionMesh) {
+            this.instancedConnectionMesh.count = visibleConnectionCount;
+            this.instancedConnectionMesh.instanceMatrix.needsUpdate = true;
+            if (this.intensityAttribute) {
+                this.intensityAttribute.needsUpdate = true;
+            }
+        }
+
+        if (this.instancedDashedConnectionMesh) {
+            this.instancedDashedConnectionMesh.count = dashedConnectionCount;
+            this.instancedDashedConnectionMesh.instanceMatrix.needsUpdate = true;
+            if (this.dashedIntensityAttribute) {
+                this.dashedIntensityAttribute.needsUpdate = true;
+            }
         }
     }
 
@@ -678,7 +818,7 @@ export class RenderManager {
             const color = this.isLightBackground() ? 0x0044bb : 0x00ffff; // Dark blue for light mode, cyan for dark mode
             this.logicalConnectionMesh.material.color.setHex(color);
         }
-        
+
         // Update all qubit sphere colors
         this.qubitInstances.forEach((qubit) => {
             if (qubit.blochSphere) {

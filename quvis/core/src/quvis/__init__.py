@@ -30,10 +30,11 @@ from .api.playground import PlaygroundAPI
 
 # Data Structures and Utilities
 from .compiler.utils import (
-    LogicalCircuitInfo, 
-    CompiledCircuitInfo, 
+    LogicalCircuitInfo,
+    CompiledCircuitInfo,
     RoutingCircuitInfo, 
     DeviceInfo, 
+    ModularInfo,
     VisualizationData,
     extract_operations_per_slice,
     extract_routing_operations_per_slice,
@@ -55,6 +56,7 @@ __all__ = [
     "CompiledCircuitInfo", 
     "RoutingCircuitInfo",
     "DeviceInfo",
+    "ModularInfo",
     "VisualizationData",
     
     # Utilities

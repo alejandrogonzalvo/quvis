@@ -105,6 +105,7 @@ const App: React.FC = () => {
         iterations: 500,
         coolingFactor: 1.0,
         attractForce: 0.1,
+        coreDistance: 5.0,
     });
 
     // State for HeatmapControls initial values (matching Playground defaults)
@@ -630,6 +631,7 @@ const App: React.FC = () => {
             gridIdealDistance: 1.0, // Default value
             iterations: playgroundInstance.currentIterations,
             coolingFactor: playgroundInstance.currentCoolingFactor,
+            coreDistance: playgroundInstance.currentCoreDistance,
         });
         setInitialHeatmapSettings({
             maxSlices: playgroundInstance.maxHeatmapSlices,
