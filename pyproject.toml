@@ -18,5 +18,21 @@ uvicorn = {extras = ["standard"], version = "^0.32.0"}
 pydantic = "^2.10.0"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api" 
+requires = ["poetry"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+files = "quvis/core/src"
+mypy_path = "quvis/core/src"
+explicit_package_bases = true
+exclude = ["quvis/web", "paper"]
+disable_error_code = "import-untyped"
+
+[[tool.mypy.overrides]]
+module = [
+    "qiskit.*",
+    "qiskit_aer.*",
+    "matplotlib",
+    "matplotlib.*"
+]
+ignore_missing_imports = true 

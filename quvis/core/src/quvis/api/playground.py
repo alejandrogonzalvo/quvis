@@ -5,11 +5,10 @@ This module provides the backend for the interactive playground mode,
 generating quantum circuits on-demand based on user selections.
 """
 
-import sys, math, json, os, argparse, logging
+import sys, json, os, argparse, logging
 from typing import Any 
 from pathlib import Path
 from qiskit import QuantumCircuit
-from qiskit.circuit.library import QFT
 from qiskit.transpiler import CouplingMap as QiskitCouplingMap
 from qiskit import transpile
 from dataclasses import asdict

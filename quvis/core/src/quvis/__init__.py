@@ -24,18 +24,12 @@ visualize_circuit(qft, coupling_map, algorithm_name="My QFT")
 
 # Main Library Mode Interfaces
 from .api.visualizer import Visualizer, visualize_circuit
-
-# Interactive Playground API
 from .api.playground import PlaygroundAPI
 
 # Data Structures and Utilities
 from .compiler.utils import (
     LogicalCircuitInfo,
     CompiledCircuitInfo,
-    RoutingCircuitInfo, 
-    DeviceInfo, 
-    ModularInfo,
-    VisualizationData,
     extract_operations_per_slice,
     extract_routing_operations_per_slice,
     analyze_routing_overhead
@@ -48,7 +42,6 @@ __version__ = "v0.27.3"
 __all__ = [
     # Main Interfaces
     "Visualizer",
-    "visualize_circuit", 
     
     # Playground API
     "PlaygroundAPI",
