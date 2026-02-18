@@ -336,15 +336,6 @@ class Visualizer:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     return s.connect_ex(("localhost", port)) == 0
     
-            def test_file_accessibility(port, filename):
-                """Test if the server can serve the specific file."""
-                try:
-                    url = f"http://localhost:{port}/{filename}"
-                    response = urllib.request.urlopen(url, timeout=5)
-                    return response.status == 200
-                except (urllib.error.URLError, socket.timeout):
-                    return False
-    
             if is_port_in_use(self.port):
                 logger.warning(
                     f"⚠️  Port {self.port} is already in use. Please stop the existing server and try again."

@@ -1,6 +1,6 @@
 
-import numpy as np
-import math
+
+
 from qiskit import QuantumCircuit, transpile
 from qiskit.circuit.library import QFT
 from qiskit.transpiler import CouplingMap

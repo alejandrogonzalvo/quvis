@@ -3,7 +3,7 @@ import json
 import os
 import sys
 from qiskit import QuantumCircuit
-import numpy as np
+
 
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../quvis/core/src')))

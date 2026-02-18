@@ -1,7 +1,7 @@
 import unittest
 from qiskit import QuantumCircuit
 from qiskit.converters import circuit_to_dag
-from qiskit.visualization import dag_drawer
+
 
 from quvis.compiler.utils import extract_operations_per_slice, extract_routing_operations_per_slice
 
