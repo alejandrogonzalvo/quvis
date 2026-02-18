@@ -13,9 +13,17 @@ interface CompiledCircuitInfo {
     compiled_interaction_graph_ops_per_slice: QubitOperation[][];
 }
 
+interface ModularInfo {
+    num_cores: number;
+    qubits_per_core: number;
+    global_topology: string;
+    inter_core_links: number[][];
+}
+
 interface DeviceInfo {
     num_qubits_on_device: number;
     connectivity_graph_coupling_map: number[][];
+    modular_info?: ModularInfo;
 }
 
 interface Circuit {
@@ -92,6 +100,14 @@ export class CircuitDataManager {
             return currentCircuit?.device_info?.num_qubits_on_device || 0;
         }
         return 0;
+    }
+
+    get modularInfo(): ModularInfo | undefined {
+        if (this.circuits) {
+            const currentCircuit = this.circuits[this._currentCircuitIndex];
+            return currentCircuit?.device_info?.modular_info;
+        }
+        return undefined;
     }
 
     get isMultiCircuit(): boolean {
@@ -331,7 +347,7 @@ export class CircuitDataManager {
         for (let i = startIndex; i <= endIndex; i++) {
             const sliceOps = this.allOperationsPerSlice[i];
             for (const op of sliceOps) {
-                if (op.qubits.includes(qubitId)) {
+                if (op.qubits.indexOf(qubitId) !== -1) {
                     if (op.qubits.length === 1) {
                         oneQubitCount++;
                     } else if (op.qubits.length === 2) {

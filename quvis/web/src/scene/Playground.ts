@@ -105,6 +105,7 @@ export class Playground {
             this.layoutManager.getIdealDistance(),
             this.layoutManager.getIterations(),
             this.layoutManager.getCoolingFactor(),
+            this.layoutManager.getCoreDistance(),
             this.appearanceManager.getConnectionThickness(),
             this.appearanceManager.getInactiveAlpha(),
             onSlicesLoadedCallback,
@@ -203,6 +204,9 @@ export class Playground {
     public get currentTwoQubitFidelityBase() {
         return this.visualizationStateManager.getTwoQubitFidelityBase();
     }
+    public get currentCoreDistance() {
+        return this.layoutManager.getCoreDistance();
+    }
 
     // Visibility getters
     public get areBlochSpheresVisible() {
@@ -256,6 +260,13 @@ export class Playground {
         this.layoutManager.setIdealDistance(distance);
         if (this.grid) {
             this.grid.updateIdealDistance(distance);
+        }
+    }
+
+    public updateCoreDistance(distance: number): void {
+        this.layoutManager.setCoreDistance(distance);
+        if (this.grid) {
+            this.grid.updateLayoutParameters({ coreDistance: distance });
         }
     }
 
@@ -321,7 +332,7 @@ export class Playground {
                 `Playground (${this.instanceId}): setLightBackground called, but threeSetup is not available.`
             );
         }
-        
+
         // Update heatmap border color based on background mode
         if (this.grid) {
             this.grid.updateHeatmapLightBackground(lightMode);

@@ -2,6 +2,8 @@ import json
 from qiskit.converters import circuit_to_dag
 from dataclasses import dataclass, asdict
 
+from typing import List, Optional, Any
+
 @dataclass
 class LogicalCircuitInfo:
     """Stores information about the logical circuit."""
@@ -23,10 +25,19 @@ class RoutingCircuitInfo:
     routing_depth: int
 
 @dataclass
+class ModularInfo:
+    """Stores information about the modular architecture."""
+    num_cores: int
+    qubits_per_core: int
+    global_topology: str
+    inter_core_links: List[List[int]]
+
+@dataclass
 class DeviceInfo:
     """Stores information about the target device."""
     num_qubits_on_device: int
     connectivity_graph_coupling_map: list
+    modular_info: Optional[ModularInfo] = None
 
 @dataclass
 class VisualizationData:

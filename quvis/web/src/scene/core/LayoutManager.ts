@@ -7,6 +7,7 @@ interface LayoutParameters {
     coolingFactor: number;
     kAttract: number;
     barnesHutTheta: number;
+    coreDistance: number;
 }
 
 export class LayoutManager {
@@ -23,6 +24,7 @@ export class LayoutManager {
         initialCoolingFactor: number = 0.95,
         initialKAttract: number = 0.1,
         initialBarnesHutTheta: number = 0.8,
+        initialCoreDistance: number = 5.0,
     ) {
         this.layoutParams = {
             kRepel: initialKRepel,
@@ -31,6 +33,7 @@ export class LayoutManager {
             coolingFactor: initialCoolingFactor,
             kAttract: initialKAttract,
             barnesHutTheta: initialBarnesHutTheta,
+            coreDistance: initialCoreDistance,
         };
 
         this.layoutWorker = new Worker(
@@ -126,8 +129,8 @@ export class LayoutManager {
         this.layoutAreaSide = Math.max(
             5,
             Math.sqrt(numDeviceQubits) *
-                2.5 *
-                (this.layoutParams.idealDist / 5),
+            2.5 *
+            (this.layoutParams.idealDist / 5),
         );
 
         const startTime = performance.now();
@@ -174,6 +177,7 @@ export class LayoutManager {
         iterations?: number;
         coolingFactor?: number;
         attractForce?: number;
+        coreDistance?: number;
     }): boolean {
         let changed = false;
 
@@ -210,6 +214,13 @@ export class LayoutManager {
             this.layoutParams.kAttract !== params.attractForce
         ) {
             this.layoutParams.kAttract = params.attractForce;
+            changed = true;
+        }
+        if (
+            params.coreDistance !== undefined &&
+            this.layoutParams.coreDistance !== params.coreDistance
+        ) {
+            this.layoutParams.coreDistance = params.coreDistance;
             changed = true;
         }
 
@@ -266,6 +277,242 @@ export class LayoutManager {
      */
     getQubitCount(): number {
         return this.qubitPositions.size;
+    }
+
+    /**
+     * Calculate layout for modular architecture
+     */
+    /**
+     * Run a synchronous force-directed simulation for a graph
+     */
+    private runForceSimulation(
+        numNodes: number,
+        edges: number[][],
+        iterations: number,
+        kRepel: number,
+        kAttract: number,
+        idealDist: number,
+        coolingFactor: number,
+        boundsScale: number = 1.0
+    ): THREE.Vector3[] {
+        const positions: THREE.Vector3[] = [];
+        const forces: THREE.Vector3[] = [];
+
+        // Initialize random positions
+        for (let i = 0; i < numNodes; i++) {
+            positions.push(new THREE.Vector3(
+                (Math.random() - 0.5) * idealDist * Math.sqrt(numNodes),
+                (Math.random() - 0.5) * idealDist * Math.sqrt(numNodes),
+                0
+            ));
+            forces.push(new THREE.Vector3());
+        }
+
+        let temp = idealDist * Math.sqrt(numNodes);
+
+        for (let it = 0; it < iterations; it++) {
+            // Reset forces
+            for (let i = 0; i < numNodes; i++) {
+                forces[i].set(0, 0, 0);
+            }
+
+            // Repulsion (Brute force O(N^2))
+            for (let i = 0; i < numNodes; i++) {
+                for (let j = i + 1; j < numNodes; j++) {
+                    const delta = new THREE.Vector3().subVectors(positions[j], positions[i]);
+                    let dist = delta.length();
+                    if (dist < 0.01) dist = 0.01;
+
+                    const force = delta.normalize().multiplyScalar((kRepel * kRepel) / dist);
+                    forces[i].sub(force);
+                    forces[j].add(force);
+                }
+            }
+
+            // Attraction
+            for (const edge of edges) {
+                const u = edge[0];
+                const v = edge[1];
+                if (u < numNodes && v < numNodes) {
+                    const delta = new THREE.Vector3().subVectors(positions[v], positions[u]);
+                    let dist = delta.length();
+                    if (dist < 0.01) dist = 0.01;
+
+                    const force = delta.normalize().multiplyScalar((dist * dist) / kAttract); // kAttract is usually distance-like or stiffness
+                    // Using F = k * (d - ideal) approx or F = d^2/k
+                    // Standard Fruchterman-Reingold: Attraction = d^2/k, Repulsion = k^2/d
+                    // Our parameters might differ slightly. specific algo:
+                    // F_attract = (dist - idealDist) * kAttract ??
+                    // Let's stick to the worker logic approx: forceMag = kAttract * (dist - idealDist)
+                    const forceMag = kAttract * (dist - idealDist);
+                    const forceVec = delta.normalize().multiplyScalar(forceMag);
+
+                    forces[u].add(forceVec);
+                    forces[v].sub(forceVec);
+                }
+            }
+
+            // Central gravity (Keep graph centered)
+            for (let i = 0; i < numNodes; i++) {
+                const distToCenter = positions[i].length();
+                if (distToCenter > 0.1) {
+                    forces[i].sub(positions[i].clone().normalize().multiplyScalar(distToCenter * 0.05));
+                }
+            }
+
+            // Apply forces
+            for (let i = 0; i < numNodes; i++) {
+                const force = forces[i];
+                const mag = force.length();
+                if (mag > 0) {
+                    // Limit displacement by temperature
+                    const displacement = force.normalize().multiplyScalar(Math.min(mag, temp));
+                    positions[i].add(displacement);
+                }
+            }
+
+            temp *= coolingFactor;
+        }
+
+        return positions;
+    }
+
+    /**
+     * Calculate layout for modular architecture
+     */
+    calculateModularLayout(
+        modularInfo: {
+            num_cores: number;
+            qubits_per_core: number;
+            global_topology: string;
+            inter_core_links?: number[][];
+        },
+        coreDistance: number = 5.0,
+        couplingMap: number[][] | null = null
+    ): void {
+        const { num_cores, qubits_per_core, global_topology, inter_core_links } = modularInfo;
+        const numQubits = num_cores * qubits_per_core;
+
+        if (numQubits === 0) {
+            this.qubitPositions.clear();
+            return;
+        }
+
+        this.qubitPositions.clear();
+
+        // 1. Calculate Core Positions (Inter-Core Layout)
+        // Extract core-to-core connectivity
+        const coreEdges: number[][] = [];
+        const coreConnections = new Set<string>();
+
+        if (inter_core_links) {
+            for (const link of inter_core_links) {
+                const core1 = Math.floor(link[0] / qubits_per_core);
+                const core2 = Math.floor(link[1] / qubits_per_core);
+                if (core1 !== core2) {
+                    const key = `${Math.min(core1, core2)}-${Math.max(core1, core2)}`;
+                    if (!coreConnections.has(key)) {
+                        coreEdges.push([core1, core2]);
+                        coreConnections.add(key);
+                    }
+                }
+            }
+        } else {
+            // Fallback to ring if no explicit links, or generate based on topology string
+            if (global_topology === 'ring' || !global_topology) {
+                for (let i = 0; i < num_cores; i++) {
+                    coreEdges.push([i, (i + 1) % num_cores]);
+                }
+            }
+            // Add other topology defaults if needed
+        }
+
+        // Run simulation for cores
+        const corePositions = this.runForceSimulation(
+            num_cores,
+            coreEdges,
+            200, // Iterations
+            coreDistance * 0.5, // kRepel (adjust for scale)
+            0.5, // kAttract
+            coreDistance, // Ideal distance
+            0.9
+        );
+
+
+        // 2. Calculate Intra-Core Layouts
+        // We will compute one reference layout if they are all identical, or one per core if coupling differs.
+        // Assuming homogeneous cores mostly, but better to be safe and compute per core if coupling map is provided.
+        // If no coupling map, default to grid.
+
+        const coreLocalPositions: Map<number, THREE.Vector3[]> = new Map();
+
+        if (couplingMap) {
+            // Group connections by core
+            const coreInternalEdges: Map<number, number[][]> = new Map();
+            for (let c = 0; c < num_cores; c++) coreInternalEdges.set(c, []);
+
+            for (const pair of couplingMap) {
+                const core1 = Math.floor(pair[0] / qubits_per_core);
+                const core2 = Math.floor(pair[1] / qubits_per_core);
+                if (core1 === core2) {
+                    const localQ1 = pair[0] % qubits_per_core;
+                    const localQ2 = pair[1] % qubits_per_core;
+                    coreInternalEdges.get(core1)?.push([localQ1, localQ2]);
+                }
+            }
+
+            for (let c = 0; c < num_cores; c++) {
+                const edges = coreInternalEdges.get(c) || [];
+                const localPos = this.runForceSimulation(
+                    qubits_per_core,
+                    edges,
+                    300,
+                    this.layoutParams.kRepel,
+                    0.2, // Stronger attraction for internal stiffness
+                    this.layoutParams.idealDist,
+                    this.layoutParams.coolingFactor
+                );
+                coreLocalPositions.set(c, localPos);
+            }
+
+        } else {
+            // Fallback to grid per core
+            const coreCols = Math.ceil(Math.sqrt(qubits_per_core));
+            const idealDist = this.layoutParams.idealDist;
+            const coreWidth = (coreCols - 1) * idealDist;
+            const offsets: THREE.Vector3[] = [];
+            for (let j = 0; j < qubits_per_core; j++) {
+                const col = j % coreCols;
+                const row = Math.floor(j / coreCols);
+                offsets.push(new THREE.Vector3(
+                    col * idealDist - coreWidth / 2,
+                    -row * idealDist + coreWidth / 2,
+                    0
+                ));
+            }
+            for (let c = 0; c < num_cores; c++) coreLocalPositions.set(c, offsets);
+        }
+
+        // 3. Combine Positions
+        for (let i = 0; i < num_cores; i++) {
+            const corePos = corePositions[i];
+            const localPositions = coreLocalPositions.get(i);
+            if (localPositions) {
+                for (let j = 0; j < qubits_per_core; j++) {
+                    const globalId = i * qubits_per_core + j;
+                    const finalPos = new THREE.Vector3().copy(corePos).add(localPositions[j]);
+                    this.qubitPositions.set(globalId, finalPos);
+                }
+            }
+        }
+
+        // Estimate area side
+        let maxDim = 0;
+        this.qubitPositions.forEach(p => {
+            maxDim = Math.max(maxDim, Math.abs(p.x), Math.abs(p.y));
+        });
+        this.layoutAreaSide = maxDim * 2.5;
+
     }
 
     /**

@@ -11,6 +11,7 @@ interface LayoutControlsProps {
         iterations: number;
         coolingFactor: number;
         attractForce?: number;
+        coreDistance?: number;
     };
     isCollapsed: boolean;
     onToggleCollapse: () => void;
@@ -162,6 +163,9 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
     const [attractForce, setAttractForce] = useState(
         initialValues.attractForce ?? 0.1,
     );
+    const [coreDistance, setCoreDistance] = useState(
+        initialValues.coreDistance ?? 5.0,
+    );
 
     useEffect(() => {
         setRepelForce(initialValues.repelForce);
@@ -170,7 +174,16 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
         setIterations(initialValues.iterations);
         setCoolingFactor(initialValues.coolingFactor);
         setAttractForce(initialValues.attractForce ?? 0.1);
+        setCoreDistance(initialValues.coreDistance ?? 5.0);
     }, [initialValues]);
+
+    const handleCoreDistanceChange = (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const val = parseFloat(event.target.value);
+        setCoreDistance(val);
+        playground?.updateCoreDistance(val);
+    };
 
     const handleRepelForceChange = (
         event: React.ChangeEvent<HTMLInputElement>,
@@ -250,7 +263,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                 <h4 style={headerTitleStyle}>
                     Layout Controls
                 </h4>
-                <div 
+                <div
                     style={{
                         ...toggleIconStyle,
                         transform: isCollapsed ? "rotate(0deg)" : "rotate(180deg)",
@@ -311,6 +324,8 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                                 style={sliderStyle}
                             />
                         </div>
+
+
                         <div style={controlGroupStyle}>
                             <button style={buttonStyle} onClick={handleGridButtonClick}>
                                 Apply Grid Layout
@@ -321,6 +336,25 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
 
                 {activeTab === "force" && (
                     <>
+                        <div style={controlGroupStyle}>
+                            <label htmlFor="core-distance" style={labelStyle}>
+                                Core Distance:{" "}
+                                <span style={valueStyle}>
+                                    {coreDistance.toFixed(1)}
+                                </span>
+                            </label>
+                            <input
+                                type="range"
+                                id="core-distance"
+                                min="1.0"
+                                max="20.0"
+                                step="0.5"
+                                value={coreDistance}
+                                onChange={handleCoreDistanceChange}
+                                style={sliderStyle}
+                            />
+                        </div>
+
                         <div style={controlGroupStyle}>
                             <label htmlFor="repel-force" style={labelStyle}>
                                 Repel Force:{" "}
