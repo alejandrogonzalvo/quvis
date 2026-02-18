@@ -4,7 +4,7 @@ Configuration classes for Quvis.
 This module defines configuration dataclasses to standardize inputs across the application.
 """
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional
+from typing import Any
 from .enums import AlgorithmType, TopologyType
 
 @dataclass
@@ -15,7 +15,7 @@ class CircuitGenerationConfig:
     physical_qubits: int
     topology: TopologyType
     optimization_level: int = 1
-    algorithm_params: Dict[str, Any] = field(default_factory=dict)
+    algorithm_params: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         """Validate configuration."""
@@ -32,5 +32,5 @@ class VisualizationConfig:
     """Configuration for visualizing a circuit."""
     algorithm_name: str = "Circuit"
     topology_type: str = TopologyType.CUSTOM.value
-    transpile_params: Dict[str, Any] = field(default_factory=dict)
+    transpile_params: dict[str, Any] = field(default_factory=dict)
 

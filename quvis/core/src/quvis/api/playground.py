@@ -24,6 +24,7 @@ from ..compiler.utils import (
 )
 from ..enums import AlgorithmType, TopologyType
 from ..config import CircuitGenerationConfig
+from ..factories import CircuitFactory, TopologyFactory
 
 # Create module logger
 logger = logging.getLogger(__name__)
@@ -144,11 +145,9 @@ class PlaygroundAPI:
             f"   ✓ Extracted {len(compiled_operations_per_slice)} time slices from compiled circuit"
         )
 
-        routing_operations_per_slice, total_swap_count, routing_depth = (
-            extract_routing_operations_per_slice(transpiled_circuit)
-        )
+        routing_result = extract_routing_operations_per_slice(transpiled_circuit)
         logger.info(
-            f"   ✓ Found {total_swap_count} SWAP gates for qubit routing"
+            f"   ✓ Found {routing_result.total_swap_count} SWAP gates for qubit routing"
         )
 
         routing_analysis = analyze_routing_overhead(
@@ -165,9 +164,9 @@ class PlaygroundAPI:
 
         routing_info = RoutingCircuitInfo(
             num_qubits=transpiled_circuit.num_qubits,
-            routing_ops_per_slice=routing_operations_per_slice,
-            total_swap_count=total_swap_count,
-            routing_depth=routing_depth,
+            routing_ops_per_slice=routing_result.routing_ops_per_slice,
+            total_swap_count=routing_result.total_swap_count,
+            routing_depth=routing_result.routing_depth,
         )
 
         device_info = DeviceInfo(
@@ -188,7 +187,7 @@ class PlaygroundAPI:
                 "transpiled_gates": len(transpiled_circuit.data),
                 "depth": len(compiled_operations_per_slice),
                 "qubits": transpiled_circuit.num_qubits,
-                "swap_count": total_swap_count,
+                "swap_count": routing_result.total_swap_count,
             },
         }
 
@@ -196,79 +195,11 @@ class PlaygroundAPI:
         self, config: CircuitGenerationConfig
     ) -> QuantumCircuit:
         """Create a quantum circuit based on algorithm type."""
-
-        if config.algorithm == AlgorithmType.QFT:
-            return QFT(num_qubits=config.num_qubits, do_swaps=True, name=f"QFT-{config.num_qubits}")
-
-        elif config.algorithm == AlgorithmType.GHZ:
-            circuit = QuantumCircuit(config.num_qubits, name=f"GHZ-{config.num_qubits}")
-            circuit.h(0)
-            for i in range(1, config.num_qubits):
-                circuit.cx(0, i)
-            return circuit
-
-        elif config.algorithm == AlgorithmType.QAOA:
-            reps = config.algorithm_params.get("reps", 2)
-            circuit = QuantumCircuit(config.num_qubits, name=f"QAOA-{config.num_qubits}-p{reps}")
-
-            for _ in range(reps):
-                # Problem layer (ZZ interactions)
-                for i in range(config.num_qubits - 1):
-                    circuit.rzz(0.5, i, i + 1)
-
-                # Mixer layer (X rotations)
-                for i in range(config.num_qubits):
-                    circuit.rx(0.3, i)
-
-            return circuit
-
-        else:
-            raise ValueError(f"Unsupported algorithm: {config.algorithm}")
+        return CircuitFactory.create(config)
 
     def _create_coupling_map(self, topology: str, physical_qubits: int) -> QiskitCouplingMap:
         """Create a coupling map using Qiskit's built-in topology generators."""
-
-        if topology == TopologyType.LINE:
-            return QiskitCouplingMap.from_line(physical_qubits)
-
-        elif topology == TopologyType.RING:
-            return QiskitCouplingMap.from_ring(physical_qubits)
-
-        elif topology == TopologyType.GRID:
-            # Find best square grid size
-            n = int(physical_qubits**0.5)
-            if n * n < physical_qubits:
-                n += 1
-            return QiskitCouplingMap.from_grid(n, n)
-
-        elif topology == TopologyType.HEAVY_HEX:
-            distance = math.ceil((2 + math.sqrt(24 + 40 * physical_qubits)) / 10)
-
-            if distance % 2 == 0:
-                distance += 1
-
-            return QiskitCouplingMap.from_heavy_hex(distance)
-
-        elif topology == TopologyType.HEAVY_SQUARE:
-            distance = math.ceil((1 + math.sqrt(1 + 3 * physical_qubits)) / 3)
-
-            if distance % 2 == 0:
-                distance += 1
-
-            return QiskitCouplingMap.from_heavy_square(distance)
-
-        elif topology == TopologyType.HEXAGONAL:
-            rows = max(2, int((physical_qubits / 2) ** 0.5))
-            cols = max(2, physical_qubits // rows)
-            return QiskitCouplingMap.from_hexagonal_lattice(rows, cols)
-
-        elif topology == TopologyType.FULL:
-            return QiskitCouplingMap.from_full(physical_qubits)
-
-        else:
-            raise ValueError(
-                f"Unsupported topology: {topology}."
-            )
+        return TopologyFactory.create(TopologyType(topology), physical_qubits)
 
     def get_supported_algorithms(self) -> list:
         """Get list of supported algorithms."""
