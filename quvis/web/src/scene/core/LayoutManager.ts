@@ -280,8 +280,29 @@ export class LayoutManager {
     }
 
     /**
-     * Calculate layout for modular architecture
+     * Validate simulation inputs are within bounds
      */
+    private validateSimulationInput(
+        numNodes: number,
+        edges: number[][],
+        externalAttractions: { nodeIndex: number; targetPosition: THREE.Vector3; strength: number }[]
+    ): void {
+        for (const edge of edges) {
+            if (edge[0] >= numNodes || edge[1] >= numNodes) {
+                throw new Error(
+                    `Invalid edge in force simulation: [${edge[0]}, ${edge[1]}] for ${numNodes} nodes`
+                );
+            }
+        }
+        for (const att of externalAttractions) {
+            if (att.nodeIndex >= numNodes) {
+                throw new Error(
+                    `Invalid external attraction: nodeIndex ${att.nodeIndex} out of bounds for ${numNodes} nodes`
+                );
+            }
+        }
+    }
+
     /**
      * Run a synchronous force-directed simulation for a graph
      */
@@ -298,6 +319,9 @@ export class LayoutManager {
     ): THREE.Vector3[] {
         const positions: THREE.Vector3[] = [];
         const forces: THREE.Vector3[] = [];
+
+        // Validate inputs before simulation
+        this.validateSimulationInput(numNodes, edges, externalAttractions);
 
         // Initialize random positions
         for (let i = 0; i < numNodes; i++) {
@@ -334,29 +358,26 @@ export class LayoutManager {
             for (const edge of edges) {
                 const u = edge[0];
                 const v = edge[1];
-                if (u < numNodes && v < numNodes) {
-                    const delta = new THREE.Vector3().subVectors(positions[v], positions[u]);
-                    let dist = delta.length();
-                    if (dist < 0.01) dist = 0.01;
 
-                    const forceMag = kAttract * (dist - idealDist);
-                    const forceVec = delta.normalize().multiplyScalar(forceMag);
+                const delta = new THREE.Vector3().subVectors(positions[v], positions[u]);
+                let dist = delta.length();
+                if (dist < 0.01) dist = 0.01;
 
-                    forces[u].add(forceVec);
-                    forces[v].sub(forceVec);
-                }
+                const forceMag = kAttract * (dist - idealDist);
+                const forceVec = delta.normalize().multiplyScalar(forceMag);
+
+                forces[u].add(forceVec);
+                forces[v].sub(forceVec);
             }
 
             // External Attraction (Orientation)
             for (const att of externalAttractions) {
-                if (att.nodeIndex < numNodes) {
-                    const nodePos = positions[att.nodeIndex];
-                    const delta = new THREE.Vector3().subVectors(att.targetPosition, nodePos);
-                    const dist = delta.length();
-                    // Simple spring force towards target
-                    const force = delta.normalize().multiplyScalar(dist * att.strength);
-                    forces[att.nodeIndex].add(force);
-                }
+                const nodePos = positions[att.nodeIndex];
+                const delta = new THREE.Vector3().subVectors(att.targetPosition, nodePos);
+                const dist = delta.length();
+                // Simple spring force towards target
+                const force = delta.normalize().multiplyScalar(dist * att.strength);
+                forces[att.nodeIndex].add(force);
             }
 
             // Central gravity (Keep graph centered)
