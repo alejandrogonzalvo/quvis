@@ -40,6 +40,7 @@ from .compiler.utils import (
     extract_routing_operations_per_slice,
     analyze_routing_overhead
 )
+from .enums import AlgorithmType, TopologyType
 
 __version__ = "v0.27.3"
 
@@ -62,5 +63,9 @@ __all__ = [
     # Utilities
     "extract_operations_per_slice",
     "extract_routing_operations_per_slice", 
-    "analyze_routing_overhead"
+    "analyze_routing_overhead",
+    
+    # Enums
+    "AlgorithmType",
+    "TopologyType"
 ] 
