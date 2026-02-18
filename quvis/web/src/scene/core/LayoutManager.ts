@@ -293,6 +293,7 @@ export class LayoutManager {
         kAttract: number,
         idealDist: number,
         coolingFactor: number,
+        externalAttractions: { nodeIndex: number; targetPosition: THREE.Vector3; strength: number }[] = [],
         boundsScale: number = 1.0
     ): THREE.Vector3[] {
         const positions: THREE.Vector3[] = [];
@@ -329,7 +330,7 @@ export class LayoutManager {
                 }
             }
 
-            // Attraction
+            // Attraction (Internal Edges)
             for (const edge of edges) {
                 const u = edge[0];
                 const v = edge[1];
@@ -338,17 +339,23 @@ export class LayoutManager {
                     let dist = delta.length();
                     if (dist < 0.01) dist = 0.01;
 
-                    const force = delta.normalize().multiplyScalar((dist * dist) / kAttract); // kAttract is usually distance-like or stiffness
-                    // Using F = k * (d - ideal) approx or F = d^2/k
-                    // Standard Fruchterman-Reingold: Attraction = d^2/k, Repulsion = k^2/d
-                    // Our parameters might differ slightly. specific algo:
-                    // F_attract = (dist - idealDist) * kAttract ??
-                    // Let's stick to the worker logic approx: forceMag = kAttract * (dist - idealDist)
                     const forceMag = kAttract * (dist - idealDist);
                     const forceVec = delta.normalize().multiplyScalar(forceMag);
 
                     forces[u].add(forceVec);
                     forces[v].sub(forceVec);
+                }
+            }
+
+            // External Attraction (Orientation)
+            for (const att of externalAttractions) {
+                if (att.nodeIndex < numNodes) {
+                    const nodePos = positions[att.nodeIndex];
+                    const delta = new THREE.Vector3().subVectors(att.targetPosition, nodePos);
+                    const dist = delta.length();
+                    // Simple spring force towards target
+                    const force = delta.normalize().multiplyScalar(dist * att.strength);
+                    forces[att.nodeIndex].add(force);
                 }
             }
 
@@ -463,6 +470,56 @@ export class LayoutManager {
 
             for (let c = 0; c < num_cores; c++) {
                 const edges = coreInternalEdges.get(c) || [];
+
+                // Identify external attractions for this core
+                const externalAttractions: { nodeIndex: number, targetPosition: THREE.Vector3, strength: number }[] = [];
+
+                // Default center is (0,0,0) relative to core, but we want to attract towards THE OTHER CORE'S position
+                // relative to THIS core's position.
+                // Relative vector = OtherCorePos - ThisCorePos.
+                const thisCorePos = corePositions[c];
+
+                if (inter_core_links) {
+                    for (const link of inter_core_links) {
+                        const q1 = link[0];
+                        const q2 = link[1];
+
+                        // Check if this link involves current core
+                        const c1 = Math.floor(q1 / qubits_per_core);
+                        const c2 = Math.floor(q2 / qubits_per_core);
+
+                        if (c1 === c && c2 !== c) {
+                            // q1 is in this core, connecting to q2 in c2
+                            const localIndex = q1 % qubits_per_core;
+                            const otherCorePos = corePositions[c2];
+                            const direction = new THREE.Vector3().subVectors(otherCorePos, thisCorePos);
+
+                            // We want to attract localIndex towards 'direction' (relative to local origin 0,0)
+                            // We can set the target to be some distance along that vector.
+                            // Say, edge of the core.
+                            const target = direction.normalize().multiplyScalar(this.layoutParams.idealDist * Math.sqrt(qubits_per_core) * 0.5);
+
+                            externalAttractions.push({
+                                nodeIndex: localIndex,
+                                targetPosition: target,
+                                strength: 0.8 // Strong attraction to orient it
+                            });
+                        } else if (c2 === c && c1 !== c) {
+                            // q2 is in this core, connecting to q1 in c1
+                            const localIndex = q2 % qubits_per_core;
+                            const otherCorePos = corePositions[c1];
+                            const direction = new THREE.Vector3().subVectors(otherCorePos, thisCorePos);
+                            const target = direction.normalize().multiplyScalar(this.layoutParams.idealDist * Math.sqrt(qubits_per_core) * 0.5);
+
+                            externalAttractions.push({
+                                nodeIndex: localIndex,
+                                targetPosition: target,
+                                strength: 0.8
+                            });
+                        }
+                    }
+                }
+
                 const localPos = this.runForceSimulation(
                     qubits_per_core,
                     edges,
@@ -470,7 +527,8 @@ export class LayoutManager {
                     this.layoutParams.kRepel,
                     0.2, // Stronger attraction for internal stiffness
                     this.layoutParams.idealDist,
-                    this.layoutParams.coolingFactor
+                    this.layoutParams.coolingFactor,
+                    externalAttractions
                 );
                 coreLocalPositions.set(c, localPos);
             }
