@@ -1,13 +1,11 @@
 [![PyPI version](https://img.shields.io/pypi/v/quvis.svg)](https://pypi.org/project/quvis/)
 [![Python Version](https://img.shields.io/pypi/pyversions/quvis)](https://pypi.org/project/quvis/)
-[![Downloads](https://img.shields.io/pypi/dm/quvis.svg)](https://pypi.org/project/quvis/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Type checked: mypy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](https://mypy-lang.org/)
-[![Tests](https://img.shields.io/github/actions/workflow/status/alejandrogonzalvo/quvis/tests.yml?branch=main&label=tests)](https://github.com/alejandrogonzalvo/quvis/actions)
 
 # Quvis - Quantum Circuit Visualization Platform
 
-Quvis is a quantum circuit visualization platform that provides interactive 3D visualization of logical and compiled circuits.
+Quvis is a 3D quantum circuit visualization platform for logical and compiled circuits.
 
 ## 🚀 Quick Start
 
@@ -22,14 +20,7 @@ pip install poetry
 poetry install
 npm install
 
-# Option 1: Start both backend and frontend automatically
 ./scripts/start-dev.sh
-
-# Option 2: Start manually (2 terminals)
-# Terminal 1: FastAPI backend
-./scripts/start-backend.sh
-# Terminal 2: Vite frontend
-npm run dev
 ```
 
 Open http://localhost:5173 in your browser.
@@ -39,21 +30,14 @@ Open http://localhost:5173 in your browser.
 ### Option 1: Install from PyPI (Recommended)
 
 ```bash
-# Install the latest stable version
 pip install quvis
 ```
 
 ### Option 2: Install from Source (Development)
 
 ```bash
-# Clone the repository
 git clone https://github.com/your-repo/quvis.git
 cd quvis
-
-# Install in development mode
-pip install -e .
-
-# Or using Poetry
 poetry install
 ```
 
@@ -68,9 +52,7 @@ poetry install
 After installation, you can run the examples directly:
 
 ```bash
-# Run the main examples
 python examples/library_usage.py
-
 ```
 
 ## **Usage**
