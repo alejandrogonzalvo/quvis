@@ -30,7 +30,7 @@ class CircuitGenerationConfig:
 @dataclass
 class VisualizationConfig:
     """Configuration for visualizing a circuit."""
-    algorithm_name: str = "Circuit"
+    algorithm_name: str | None = "Circuit"
     topology_type: str = TopologyType.CUSTOM.value
     transpile_params: dict[str, Any] = field(default_factory=dict)
 

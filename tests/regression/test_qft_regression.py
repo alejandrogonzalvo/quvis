@@ -26,11 +26,11 @@ def create_2d_grid_coupling_map(num_qubits: int) -> CouplingMap:
 
 def extract_regression_data(visualization_data: dict[str, Any]) -> dict[str, Any]:
     """Extract the key data needed for regression testing."""
-    regression_data = {}
+    regression_data: dict[str, Any] = {}
 
     for i, circuit_data in enumerate(visualization_data["circuits"]):
-        circuit_name = circuit_data["algorithm_name"]
-        circuit_type = circuit_data["circuit_type"]
+        circuit_name = str(circuit_data["algorithm_name"])
+        circuit_type = str(circuit_data["circuit_type"])
 
         # Extract connection and interaction data
         extracted_data = {
@@ -131,7 +131,7 @@ def load_regression_baseline(filename: str = "qft_regression_baseline.json") -> 
 
 def compare_regression_data(current_data: dict[str, Any], baseline_data: dict[str, Any]) -> dict[str, Any]:
     """Compare current regression data with baseline, accounting for routing stochasticity."""
-    differences = {}
+    differences: dict[str, Any] = {}
 
     # Compare metadata (excluding items that may vary due to routing)
     current_meta = current_data.get("metadata", {})

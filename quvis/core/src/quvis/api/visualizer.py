@@ -40,8 +40,6 @@ class CircuitStats:
     original_gates: int
     depth: int
     qubits: int
-    depth: int
-    qubits: int
     transpiled_gates: int | None = None
     swap_count: int | None = None
 
@@ -60,7 +58,7 @@ class CircuitStats:
 
 
 @dataclass
-@dataclass
+
 class CircuitVisualizationData:
     """Data structure for quantum circuit visualization."""
     circuit_info: LogicalCircuitInfo | CompiledCircuitInfo
@@ -109,7 +107,7 @@ class Visualizer:
         self.auto_open_browser = auto_open_browser
         self.port = port
         self.verbose = verbose
-        self.circuits: List[CircuitVisualizationData] = []
+        self.circuits: list[CircuitVisualizationData] = []
         
         # Configure logging based on verbose setting
         if verbose:
@@ -162,7 +160,7 @@ class Visualizer:
         logger.info(f"📊 Processing circuit: '{config.algorithm_name}'")
         
         circuit_data = self._process_circuit(
-            circuit, coupling_map, config
+            circuit, config, coupling_map
         )
         self.circuits.append(circuit_data)
 
@@ -225,16 +223,13 @@ class Visualizer:
     def _process_circuit(
         self,
         circuit: QuantumCircuit,
+        config: VisualizationConfig,
         coupling_map: list[list[int]] | CouplingMap | dict[str, Any] | None = None,
-        config: VisualizationConfig = None,
     ) -> CircuitVisualizationData:
         """Process a circuit into visualization data."""
 
         if coupling_map is not None:
-            # Extract modular info first if present (before normalization which might need it)
-            # Actually, let's keep the logic simple and duplicate the modular extraction for now 
-            # or simply rely on the dict check inside normalization
-            
+            modular_info = None
             coupling_map_list, num_device_qubits = self._normalize_coupling_map(
                 coupling_map, circuit.num_qubits, config
             )
@@ -255,7 +250,7 @@ class Visualizer:
         operations_per_slice = extract_operations_per_slice(circuit)
 
         if coupling_map is None:
-            circuit_info = LogicalCircuitInfo(
+            circuit_info: LogicalCircuitInfo | CompiledCircuitInfo = LogicalCircuitInfo(
                 num_qubits=circuit.num_qubits,
                 interaction_graph_ops_per_slice=operations_per_slice,
             )
@@ -275,7 +270,7 @@ class Visualizer:
             return CircuitVisualizationData(
                 circuit_info=circuit_info,
                 device_info=device_info,
-                algorithm_name=config.algorithm_name,
+                algorithm_name=config.algorithm_name or "Unknown Circuit",
                 circuit_type="logical",
                 algorithm_params=config.transpile_params,
                 circuit_stats=circuit_stats,
@@ -300,7 +295,7 @@ class Visualizer:
             device_info = DeviceInfo(
                 num_qubits_on_device=num_device_qubits,
                 connectivity_graph_coupling_map=list(coupling_map_list),
-                modular_info=modular_info if 'modular_info' in locals() else None,
+                modular_info=modular_info,
             )
 
             circuit_stats = CircuitStats(
@@ -314,7 +309,7 @@ class Visualizer:
             return CircuitVisualizationData(
                 circuit_info=circuit_info,
                 device_info=device_info,
-                algorithm_name=config.algorithm_name,
+                algorithm_name=config.algorithm_name or "Unknown Compiled Circuit",
                 circuit_type="compiled",
                 algorithm_params=config.transpile_params,
                 circuit_stats=circuit_stats,
