@@ -2,7 +2,9 @@ import json
 from qiskit.converters import circuit_to_dag
 from dataclasses import dataclass, asdict
 
-from typing import List, Optional, Any
+from dataclasses import dataclass, asdict
+
+from typing import Any, Optional
 
 @dataclass
 class LogicalCircuitInfo:
@@ -30,14 +32,21 @@ class ModularInfo:
     num_cores: int
     qubits_per_core: int
     global_topology: str
-    inter_core_links: List[List[int]]
+    inter_core_links: list[list[int]]
+
+@dataclass
+class RoutingAnalysisResult:
+    """Result of routing analysis."""
+    routing_ops_per_slice: list
+    total_swap_count: int
+    routing_depth: int
 
 @dataclass
 class DeviceInfo:
     """Stores information about the target device."""
     num_qubits_on_device: int
     connectivity_graph_coupling_map: list
-    modular_info: Optional[ModularInfo] = None
+    modular_info: ModularInfo | None = None
 
 @dataclass
 class VisualizationData:
@@ -80,7 +89,7 @@ def extract_routing_operations_per_slice(qc):
         qc: Quantum circuit (typically the transpiled circuit)
 
     Returns:
-        tuple: (routing_ops_per_slice, total_swap_count, routing_depth)
+        RoutingAnalysisResult: Analysis result containing ops, count, and depth
     """
     dag = circuit_to_dag(qc)
     routing_ops_per_slice = []
@@ -120,7 +129,11 @@ def extract_routing_operations_per_slice(qc):
             # Add empty slice to maintain time alignment with other views
             routing_ops_per_slice.append([])
 
-    return routing_ops_per_slice, total_swap_count, routing_depth
+    return RoutingAnalysisResult(
+        routing_ops_per_slice=routing_ops_per_slice,
+        total_swap_count=total_swap_count,
+        routing_depth=routing_depth
+    )
 
 def analyze_routing_overhead(logical_circuit, compiled_circuit):
     """
@@ -135,7 +148,7 @@ def analyze_routing_overhead(logical_circuit, compiled_circuit):
     """
     logical_ops = extract_operations_per_slice(logical_circuit)
     compiled_ops = extract_operations_per_slice(compiled_circuit)
-    routing_ops, swap_count, routing_depth = extract_routing_operations_per_slice(compiled_circuit)
+    routing_result = extract_routing_operations_per_slice(compiled_circuit)
     
     # Calculate metrics
     logical_depth = len(logical_ops)
@@ -145,7 +158,7 @@ def analyze_routing_overhead(logical_circuit, compiled_circuit):
     # Count total operations
     logical_op_count = sum(len(slice_ops) for slice_ops in logical_ops)
     compiled_op_count = sum(len(slice_ops) for slice_ops in compiled_ops)
-    routing_op_count = sum(len(slice_ops) for slice_ops in routing_ops)
+    routing_op_count = sum(len(slice_ops) for slice_ops in routing_result.routing_ops_per_slice)
     
     return {
         "logical_depth": logical_depth,
@@ -154,7 +167,7 @@ def analyze_routing_overhead(logical_circuit, compiled_circuit):
         "logical_op_count": logical_op_count,
         "compiled_op_count": compiled_op_count,
         "routing_op_count": routing_op_count,
-        "swap_count": swap_count,
-        "routing_depth": routing_depth,
+        "swap_count": routing_result.total_swap_count,
+        "routing_depth": routing_result.routing_depth,
         "routing_overhead_percentage": (routing_op_count / compiled_op_count * 100) if compiled_op_count > 0 else 0
     }

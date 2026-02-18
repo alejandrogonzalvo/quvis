@@ -11,7 +11,7 @@ import os
 import json
 import logging
 import subprocess
-from typing import Dict, Any, Optional, Union, List
+from typing import Any
 from pathlib import Path
 from dataclasses import asdict, dataclass
 
@@ -40,10 +40,12 @@ class CircuitStats:
     original_gates: int
     depth: int
     qubits: int
-    transpiled_gates: Optional[int] = None
-    swap_count: Optional[int] = None
+    depth: int
+    qubits: int
+    transpiled_gates: int | None = None
+    swap_count: int | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         result = {
             "original_gates": self.original_gates,
@@ -58,17 +60,18 @@ class CircuitStats:
 
 
 @dataclass
+@dataclass
 class CircuitVisualizationData:
     """Data structure for quantum circuit visualization."""
-    circuit_info: Union[LogicalCircuitInfo, CompiledCircuitInfo]
+    circuit_info: LogicalCircuitInfo | CompiledCircuitInfo
     device_info: DeviceInfo
     algorithm_name: str
     circuit_type: str
-    algorithm_params: Dict[str, Any]
+    algorithm_params: dict[str, Any]
     circuit_stats: CircuitStats
-    routing_info: Optional[RoutingCircuitInfo] = None
+    routing_info: RoutingCircuitInfo | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         result = {
             "circuit_info": asdict(self.circuit_info),
@@ -127,13 +130,12 @@ class Visualizer:
                 "Please ensure the web frontend was included in the installation."
             )
 
+
     def add_circuit(
         self,
         circuit: QuantumCircuit,
-        coupling_map: Optional[
-            Union[List[List[int]], CouplingMap, Dict[str, Any]]
-        ] = None,
-        config: Optional[VisualizationConfig] = None,
+        coupling_map: list[list[int]] | CouplingMap | dict[str, Any] | None = None,
+        config: VisualizationConfig | None = None,
         **kwargs,
     ) -> None:
         """
@@ -164,7 +166,7 @@ class Visualizer:
         )
         self.circuits.append(circuit_data)
 
-    def visualize(self) -> Dict[str, Any]:
+    def visualize(self) -> dict[str, Any]:
         """
         Visualize all added circuits with Quvis.
 
@@ -187,42 +189,63 @@ class Visualizer:
 
         return frontend_data
 
+    def _normalize_coupling_map(
+        self,
+        coupling_map: list[list[int]] | CouplingMap | dict[str, Any],
+        circuit_qubits: int,
+        config: VisualizationConfig
+    ) -> tuple[list, int]:
+        """Normalize coupling map to list of edges and device qubit count."""
+        if isinstance(coupling_map, dict):
+            coupling_map_list = coupling_map.get("coupling_map", [])
+            num_device_qubits = coupling_map.get("num_qubits", circuit_qubits)
+            if "topology_type" in coupling_map:
+                config.topology_type = coupling_map["topology_type"]
+            
+            # Parse modular info if present
+            if "num_cores" in coupling_map:
+                pass
+        elif isinstance(coupling_map, CouplingMap):
+            coupling_map_list = list(coupling_map.get_edges())
+            num_device_qubits = coupling_map.size()
+        elif isinstance(coupling_map, list):
+            coupling_map_list = coupling_map
+            num_device_qubits = (
+                max(max(edge) for edge in coupling_map) + 1
+                if coupling_map
+                else circuit_qubits
+            )
+        else:
+            raise ValueError(
+                "coupling_map must be a list of edges, CouplingMap object, or dictionary"
+            )
+            
+        return coupling_map_list, num_device_qubits
+
     def _process_circuit(
         self,
         circuit: QuantumCircuit,
-        coupling_map: Optional[Union[List[List[int]], CouplingMap, Dict[str, Any]]] = None,
+        coupling_map: list[list[int]] | CouplingMap | dict[str, Any] | None = None,
         config: VisualizationConfig = None,
     ) -> CircuitVisualizationData:
         """Process a circuit into visualization data."""
 
         if coupling_map is not None:
-            if isinstance(coupling_map, dict):
-                coupling_map_list = coupling_map.get("coupling_map", [])
-                num_device_qubits = coupling_map.get("num_qubits", circuit.num_qubits)
-                if "topology_type" in coupling_map:
-                    config.topology_type = coupling_map["topology_type"]
-                
-                # Parse modular info if present
-                if "num_cores" in coupling_map:
-                    modular_info = ModularInfo(
-                        num_cores=coupling_map.get("num_cores", 1),
-                        qubits_per_core=coupling_map.get("qubits_per_core", 0),
-                        global_topology=coupling_map.get("global_topology", TopologyType.CUSTOM.value),
-                        inter_core_links=coupling_map.get("inter_core_links", [])
-                    )
-            elif isinstance(coupling_map, CouplingMap):
-                coupling_map_list = coupling_map.get_edges()
-                num_device_qubits = coupling_map.size()
-            elif isinstance(coupling_map, list):
-                coupling_map_list = coupling_map
-                num_device_qubits = (
-                    max(max(edge) for edge in coupling_map) + 1
-                    if coupling_map
-                    else circuit.num_qubits
-                )
-            else:
-                raise ValueError(
-                    "coupling_map must be a list of edges, CouplingMap object, or dictionary"
+            # Extract modular info first if present (before normalization which might need it)
+            # Actually, let's keep the logic simple and duplicate the modular extraction for now 
+            # or simply rely on the dict check inside normalization
+            
+            coupling_map_list, num_device_qubits = self._normalize_coupling_map(
+                coupling_map, circuit.num_qubits, config
+            )
+            
+            # Handle modular info separately if it's a dict
+            if isinstance(coupling_map, dict) and "num_cores" in coupling_map:
+                 modular_info = ModularInfo(
+                    num_cores=coupling_map.get("num_cores", 1),
+                    qubits_per_core=coupling_map.get("qubits_per_core", 0),
+                    global_topology=coupling_map.get("global_topology", TopologyType.CUSTOM.value),
+                    inter_core_links=coupling_map.get("inter_core_links", [])
                 )
         else:
             # No coupling map provided - logical circuit
@@ -260,9 +283,7 @@ class Visualizer:
         else:
             compiled_operations_per_slice = extract_operations_per_slice(circuit)
 
-            routing_operations_per_slice, total_swap_count, routing_depth = (
-                extract_routing_operations_per_slice(circuit)
-            )
+            routing_result = extract_routing_operations_per_slice(circuit)
 
             circuit_info = CompiledCircuitInfo(
                 num_qubits=circuit.num_qubits,
@@ -271,9 +292,9 @@ class Visualizer:
 
             routing_info = RoutingCircuitInfo(
                 num_qubits=circuit.num_qubits,
-                routing_ops_per_slice=routing_operations_per_slice,
-                total_swap_count=total_swap_count,
-                routing_depth=routing_depth,
+                routing_ops_per_slice=routing_result.routing_ops_per_slice,
+                total_swap_count=routing_result.total_swap_count,
+                routing_depth=routing_result.routing_depth,
             )
 
             device_info = DeviceInfo(
@@ -287,7 +308,7 @@ class Visualizer:
                 depth=len(compiled_operations_per_slice),
                 qubits=circuit.num_qubits,
                 transpiled_gates=len(circuit.data),
-                swap_count=total_swap_count,
+                swap_count=routing_result.total_swap_count,
             )
 
             return CircuitVisualizationData(
@@ -304,7 +325,7 @@ class Visualizer:
         """Clear all processed circuits from the visualizer."""
         self.circuits.clear()
 
-    def _launch_visualization(self, data: Dict[str, Any]):
+    def _launch_visualization(self, data: dict[str, Any]):
         """Launch the Quvis visualization with the given data."""
 
         data_file = self.frontend_path / "public" / "temp_circuit_data.json"
@@ -398,11 +419,11 @@ class Visualizer:
 
 def visualize_circuit(
     circuit: QuantumCircuit,
-    coupling_map: Optional[Union[List[List[int]], CouplingMap, Dict[str, Any]]] = None,
+    coupling_map: list[list[int]] | CouplingMap | dict[str, Any] | None = None,
     algorithm_name: str = "Custom Circuit",
     verbose: bool = False,
     **kwargs,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Convenience function to visualize a quantum circuit with Quvis.
     Generates both logical and compiled versions for unified visualization.

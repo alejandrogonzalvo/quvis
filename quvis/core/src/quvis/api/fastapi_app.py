@@ -5,7 +5,7 @@ This module provides a REST API for quantum circuit generation and visualization
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -40,7 +40,7 @@ class CircuitGenerationRequest(BaseModel):
         description="Number of logical qubits",
         examples=[5]
     )
-    physical_qubits: Optional[int] = Field(
+    physical_qubits: int | None = Field(
         None,
         ge=2,
         le=1000,
@@ -59,7 +59,7 @@ class CircuitGenerationRequest(BaseModel):
         description="Qiskit transpiler optimization level",
         examples=[1]
     )
-    reps: Optional[int] = Field(
+    reps: int | None = Field(
         None,
         ge=1,
         description="Number of repetitions for QAOA algorithm",
@@ -79,11 +79,12 @@ class CircuitGenerationRequest(BaseModel):
 
 
 class CircuitGenerationResponse(BaseModel):
-    """Response model for circuit generation endpoint."""
+    """Response model for circuit generation."""
 
     circuits: list[dict[str, Any]]
     total_circuits: int
-    generation_successful: bool = True
+    generation_successful: bool
+    error_message: str | None = None
 
 
 class ErrorResponse(BaseModel):
