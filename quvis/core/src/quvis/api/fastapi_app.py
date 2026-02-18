@@ -15,6 +15,7 @@ import uvicorn
 
 
 from .playground import PlaygroundAPI
+from ..enums import AlgorithmType, TopologyType
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,8 +29,8 @@ class CircuitGenerationRequest(BaseModel):
 
     algorithm: str = Field(
         ...,
-        description="Algorithm type: 'qft', 'qaoa', or 'ghz'",
-        examples=["qft"]
+        description=f"Algorithm type: {', '.join([a.value for a in AlgorithmType])}",
+        examples=[AlgorithmType.QFT.value]
     )
     num_qubits: int = Field(
         ...,
@@ -47,8 +48,8 @@ class CircuitGenerationRequest(BaseModel):
     )
     topology: str = Field(
         ...,
-        description="Device topology: 'line', 'ring', 'grid', 'heavy_hex', 'heavy_square', 'hexagonal', or 'full'",
-        examples=["grid"]
+        description=f"Device topology: {', '.join([t.value for t in TopologyType])}",
+        examples=[TopologyType.GRID.value]
     )
     optimization_level: int = Field(
         1,
@@ -67,10 +68,10 @@ class CircuitGenerationRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "algorithm": "qft",
+                "algorithm": AlgorithmType.QFT.value,
                 "num_qubits": 5,
                 "physical_qubits": 9,
-                "topology": "grid",
+                "topology": TopologyType.GRID.value,
                 "optimization_level": 1
             }
         }
