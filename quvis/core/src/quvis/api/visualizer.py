@@ -27,6 +27,8 @@ from ..compiler.utils import (
     DeviceInfo,
     ModularInfo,
 )
+from ..enums import TopologyType
+from ..config import VisualizationConfig
 
 # Create module logger
 logger = logging.getLogger(__name__)
@@ -131,8 +133,7 @@ class Visualizer:
         coupling_map: Optional[
             Union[List[List[int]], CouplingMap, Dict[str, Any]]
         ] = None,
-        algorithm_name: Optional[str] = None,
-        topology_type: str = "custom",
+        config: Optional[VisualizationConfig] = None,
         **kwargs,
     ) -> None:
         """
@@ -141,18 +142,25 @@ class Visualizer:
         Args:
             circuit: The quantum circuit to add
             coupling_map: Device coupling map (optional - if None, treated as logical)
-            algorithm_name: Name for the circuit (displayed in UI)
-            topology_type: Type of topology (for display purposes)
-            **kwargs: Additional arguments for circuit processing
+            config: Visualization configuration
+            **kwargs: Legacy support for algorithm_name, topology_type, etc.
         """
-        if algorithm_name is None:
+        # Create config if not provided, using kwargs to populate it
+        if config is None:
+            config = VisualizationConfig(
+                algorithm_name=kwargs.get("algorithm_name"),
+                topology_type=kwargs.get("topology_type", TopologyType.CUSTOM.value),
+                transpile_params={k: v for k, v in kwargs.items() if k not in ["algorithm_name", "topology_type"]}
+            )
+            
+        if config.algorithm_name is None:
             circuit_type = "Logical" if coupling_map is None else "Compiled"
-            algorithm_name = f"{circuit_type} Circuit {len(self.circuits) + 1}"
+            config.algorithm_name = f"{circuit_type} Circuit {len(self.circuits) + 1}"
 
-        logger.info(f"📊 Processing circuit: '{algorithm_name}'")
+        logger.info(f"📊 Processing circuit: '{config.algorithm_name}'")
         
         circuit_data = self._process_circuit(
-            circuit, coupling_map, algorithm_name, topology_type, **kwargs
+            circuit, coupling_map, config
         )
         self.circuits.append(circuit_data)
 
@@ -183,9 +191,7 @@ class Visualizer:
         self,
         circuit: QuantumCircuit,
         coupling_map: Optional[Union[List[List[int]], CouplingMap, Dict[str, Any]]] = None,
-        algorithm_name: str = "Circuit",
-        topology_type: str = "custom",
-        **transpile_kwargs,
+        config: VisualizationConfig = None,
     ) -> CircuitVisualizationData:
         """Process a circuit into visualization data."""
 
@@ -194,14 +200,14 @@ class Visualizer:
                 coupling_map_list = coupling_map.get("coupling_map", [])
                 num_device_qubits = coupling_map.get("num_qubits", circuit.num_qubits)
                 if "topology_type" in coupling_map:
-                    topology_type = coupling_map["topology_type"]
+                    config.topology_type = coupling_map["topology_type"]
                 
                 # Parse modular info if present
                 if "num_cores" in coupling_map:
                     modular_info = ModularInfo(
                         num_cores=coupling_map.get("num_cores", 1),
                         qubits_per_core=coupling_map.get("qubits_per_core", 0),
-                        global_topology=coupling_map.get("global_topology", "custom"),
+                        global_topology=coupling_map.get("global_topology", TopologyType.CUSTOM.value),
                         inter_core_links=coupling_map.get("inter_core_links", [])
                     )
             elif isinstance(coupling_map, CouplingMap):
@@ -246,9 +252,9 @@ class Visualizer:
             return CircuitVisualizationData(
                 circuit_info=circuit_info,
                 device_info=device_info,
-                algorithm_name=algorithm_name,
+                algorithm_name=config.algorithm_name,
                 circuit_type="logical",
-                algorithm_params=transpile_kwargs,
+                algorithm_params=config.transpile_params,
                 circuit_stats=circuit_stats,
             )
         else:
@@ -287,9 +293,9 @@ class Visualizer:
             return CircuitVisualizationData(
                 circuit_info=circuit_info,
                 device_info=device_info,
-                algorithm_name=algorithm_name,
+                algorithm_name=config.algorithm_name,
                 circuit_type="compiled",
-                algorithm_params=transpile_kwargs,
+                algorithm_params=config.transpile_params,
                 circuit_stats=circuit_stats,
                 routing_info=routing_info,
             )
@@ -329,8 +335,7 @@ class Visualizer:
 
             # Check if a server is already running on the port
             import socket
-            import urllib.request
-            import urllib.error
+
     
             def is_port_in_use(port):
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -412,8 +417,14 @@ def visualize_circuit(
     Returns:
         Dictionary containing multi-circuit visualization data (logical + compiled)
     """
+    config = VisualizationConfig(
+        algorithm_name=algorithm_name,
+        # topology_type is not explictly passed here often, usually in coupling_map or default
+        transpile_params=kwargs
+    )
+    
     visualizer = Visualizer(verbose=verbose)
     visualizer.add_circuit(
-        circuit, coupling_map, algorithm_name=algorithm_name, **kwargs
+        circuit, coupling_map, config=config
     )
     return visualizer.visualize()

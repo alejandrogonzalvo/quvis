@@ -16,6 +16,7 @@ import uvicorn
 
 from .playground import PlaygroundAPI
 from ..enums import AlgorithmType, TopologyType
+from ..config import CircuitGenerationConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -192,14 +193,18 @@ async def generate_circuit(request: CircuitGenerationRequest):
         if request.reps is not None:
             kwargs["reps"] = request.reps
 
-        # Generate circuit data
-        result = playground_api.generate_visualization_data(
-            algorithm=request.algorithm,
+        # Create configuration object
+        config = CircuitGenerationConfig(
+            algorithm=AlgorithmType(request.algorithm),
             num_qubits=request.num_qubits,
-            physical_qubits=physical_qubits,
-            topology=request.topology,
-            **kwargs
+            physical_qubits=request.physical_qubits or request.num_qubits,
+            topology=TopologyType(request.topology),
+            optimization_level=request.optimization_level,
+            algorithm_params=kwargs
         )
+
+        # Generate circuit data
+        result = playground_api.generate_visualization_data(config)
 
         logger.info("✅ Circuit generated successfully")
 
