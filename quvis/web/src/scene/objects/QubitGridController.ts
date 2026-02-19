@@ -152,6 +152,17 @@ export class QubitGridController {
         this.updateVisualization();
     }
 
+    public get simulationParameters() {
+        return {
+            layout: this.layoutManager.parameters,
+            appearance: this.renderManager.parameters // We might need to expose this too
+        };
+    }
+
+    public get layoutParameters() {
+        return this.layoutManager.parameters;
+    }
+
     private runModularLayoutForCurrentCircuit(onComplete?: () => void): void {
         const modularInfo = this.dataManager.modularInfo;
         if (!modularInfo) return;
@@ -244,24 +255,7 @@ export class QubitGridController {
         }
     }
 
-    public updateAppearanceParameters(params: {
-        qubitSize?: number;
-        connectionThickness?: number;
-        inactiveAlpha?: number;
-    }): void {
-        if (params.qubitSize !== undefined) {
-            this.renderManager.setQubitScale(params.qubitSize);
-        }
-        if (params.connectionThickness !== undefined) {
-            this.renderManager.setConnectionThickness(
-                params.connectionThickness
-            );
-        }
-        if (params.inactiveAlpha !== undefined) {
-            this.renderManager.setInactiveElementAlpha(params.inactiveAlpha);
-        }
-        this.updateVisualization();
-    }
+
 
     /**
      * Update connection colors based on current background mode
@@ -427,8 +421,6 @@ export class QubitGridController {
             }
         }
 
-        this.updateVisualization();
-
         // Apply per-circuit settings if available
         const circuitSettings = this.dataManager.currentCircuitSettings;
         if (circuitSettings) {
@@ -457,6 +449,7 @@ export class QubitGridController {
                 qubitSize: circuitSettings.qubit_size,
                 connectionThickness: circuitSettings.connection_thickness,
                 inactiveAlpha: circuitSettings.inactive_alpha,
+                baseSize: circuitSettings.heatmap_base_size,
             });
 
             this.setBlochSpheresVisible(circuitSettings.render_bloch_spheres);
@@ -476,15 +469,48 @@ export class QubitGridController {
                 this.updateHeatmapSlices(circuitSettings.heatmap_max_slices);
             }
 
+            // Trigger re-layout since parameters might have changed
+            const modularInfo = this.dataManager.modularInfo;
+            if (modularInfo) {
+                this.runModularLayoutForCurrentCircuit();
+            } else {
+                this.runForceLayoutForCurrentCircuit();
+            }
+
             // Notify UI of new settings
             if (this.onSettingsChanged) {
                 this.onSettingsChanged(circuitSettings);
             }
         }
 
+        this.updateVisualization();
+
         console.log(
             `Switched to circuit: ${circuitIndex} (${this.dataManager.visualizationMode})`
         );
+    }
+
+    // ...
+
+    public updateAppearanceParameters(params: {
+        qubitSize?: number;
+        connectionThickness?: number;
+        inactiveAlpha?: number;
+        baseSize?: number;
+    }): void {
+        if (params.qubitSize !== undefined) {
+            this.renderManager.setQubitScale(params.qubitSize);
+        }
+        if (params.connectionThickness !== undefined) {
+            this.renderManager.setConnectionThickness(params.connectionThickness);
+        }
+        if (params.inactiveAlpha !== undefined) {
+            this.renderManager.setInactiveElementAlpha(params.inactiveAlpha);
+        }
+        if (params.baseSize !== undefined) {
+            this.heatmapManager.updateBaseSize(params.baseSize);
+        }
+        this.updateVisualization();
     }
 
     private recreateGridForNewQubitCount(newQubitCount: number): void {

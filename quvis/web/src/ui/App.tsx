@@ -555,6 +555,66 @@ const App: React.FC = () => {
         };
     }, [isPlaygroundInitialized, actualSliceCount]);
 
+    // Separate effect for 'n' key to copy settings, depending on all settings state
+    useEffect(() => {
+        const handleCopySettings = (event: KeyboardEvent) => {
+            if (event.key === 'n') {
+                console.log('📋 Generating settings code...');
+
+                if (!playgroundRef.current) {
+                    console.warn('Playground not initialized, cannot copy settings.');
+                    return;
+                }
+
+                const settings = playgroundRef.current.getCurrentVisualizerSettings();
+
+                const settingsCode = `VisualizerSettings(
+    # Layout
+    repel_force=${settings.repel_force},
+    ideal_distance=${settings.ideal_distance},
+    iterations=${settings.iterations},
+    cooling_factor=${settings.cooling_factor},
+    attract_force=${settings.attract_force ?? 0.1},
+    core_distance=${settings.core_distance},
+    
+    # Appearance
+    qubit_size=${settings.qubit_size},
+    connection_thickness=${settings.connection_thickness},
+    inactive_alpha=${settings.inactive_alpha},
+    render_bloch_spheres=${settings.render_bloch_spheres ? 'True' : 'False'},
+    render_connection_lines=${settings.render_connection_lines ? 'True' : 'False'},
+    
+    # Heatmap
+    heatmap_max_slices=${settings.heatmap_max_slices},
+    heatmap_base_size=${settings.heatmap_base_size},
+    heatmap_fade_threshold=${settings.heatmap_fade_threshold},
+    heatmap_green_threshold=${settings.heatmap_green_threshold},
+    heatmap_yellow_threshold=${settings.heatmap_yellow_threshold},
+    heatmap_intensity_power=${settings.heatmap_intensity_power},
+    heatmap_min_intensity=${settings.heatmap_min_intensity},
+    heatmap_border_width=${settings.heatmap_border_width},
+    
+    # Fidelity
+    one_qubit_fidelity_base=${settings.one_qubit_fidelity_base},
+    two_qubit_fidelity_base=${settings.two_qubit_fidelity_base}
+)`;
+                navigator.clipboard.writeText(settingsCode).then(() => {
+                    console.log('✅ Settings copied to clipboard!');
+                    setTooltipContent('Settings copied to clipboard!');
+                    setTooltipVisible(true);
+                    setTooltipX(window.innerWidth / 2);
+                    setTooltipY(window.innerHeight - 50);
+                    setTimeout(() => setTooltipVisible(false), 2000);
+                }).catch(err => {
+                    console.error('Failed to copy settings:', err);
+                });
+            }
+        };
+
+        window.addEventListener('keydown', handleCopySettings);
+        return () => window.removeEventListener('keydown', handleCopySettings);
+    }, []); // No dependencies needed as we read from ref
+
     useEffect(() => {
         if (!isPlaying || !isPlaygroundInitialized) {
             return;

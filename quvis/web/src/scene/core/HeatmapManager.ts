@@ -298,6 +298,15 @@ export class HeatmapManager {
         }
     }
 
+    /**
+     * Update heatmap base size
+     */
+    updateBaseSize(size: number): void {
+        if (this.heatmap) {
+            this.heatmap.updateBaseSize(size);
+        }
+    }
+
 
     /**
      * Get current color parameters

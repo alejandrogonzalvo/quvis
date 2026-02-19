@@ -4,6 +4,7 @@ export interface LayoutParameters {
     iterations: number;
     coolingFactor: number;
     coreDistance: number;
+    attractForce: number;
 }
 
 export class LayoutParameterManager {
@@ -15,6 +16,7 @@ export class LayoutParameterManager {
         iterations: number = 500,
         coolingFactor: number = 1.0,
         coreDistance: number = 5.0,
+        attractForce: number = 0.1,
     ) {
         this.parameters = {
             repelForce,
@@ -22,6 +24,7 @@ export class LayoutParameterManager {
             iterations,
             coolingFactor,
             coreDistance,
+            attractForce,
         };
     }
 
@@ -47,6 +50,9 @@ export class LayoutParameterManager {
         if (params.coreDistance !== undefined) {
             this.parameters.coreDistance = params.coreDistance;
         }
+        if (params.attractForce !== undefined) {
+            this.parameters.attractForce = params.attractForce;
+        }
         return this.getParameters();
     }
 
@@ -66,6 +72,10 @@ export class LayoutParameterManager {
         return this.parameters.coolingFactor;
     }
 
+    public getAttractForce(): number {
+        return this.parameters.attractForce;
+    }
+
     public setRepelForce(value: number): void {
         this.parameters.repelForce = value;
     }
@@ -80,6 +90,10 @@ export class LayoutParameterManager {
 
     public setCoolingFactor(value: number): void {
         this.parameters.coolingFactor = value;
+    }
+
+    public setAttractForce(value: number): void {
+        this.parameters.attractForce = value;
     }
 
     public getCoreDistance(): number {

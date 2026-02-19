@@ -398,6 +398,75 @@ export class Playground {
         };
     }
 
+    /**
+     * Returns the current visualizer settings as an object, 
+     * useful for copying to clipboard or saving state.
+     */
+    public getCurrentVisualizerSettings() {
+        let layout, appearance;
+
+        // Prefer live simulation parameters from the grid controller
+        if (this.grid && this.grid.simulationParameters) {
+            const simParams = this.grid.simulationParameters;
+
+            layout = {
+                repel_force: simParams.layout.kRepel,
+                ideal_distance: simParams.layout.idealDist,
+                iterations: simParams.layout.iterations,
+                cooling_factor: simParams.layout.coolingFactor,
+                attract_force: simParams.layout.kAttract,
+                core_distance: simParams.layout.coreDistance,
+            };
+
+            appearance = {
+                qubit_size: simParams.appearance.qubitScale,
+                connection_thickness: simParams.appearance.connectionThickness,
+                inactive_alpha: simParams.appearance.inactiveElementAlpha,
+                render_bloch_spheres: this.appearanceManager.areBlochSpheresVisible(), // Visibility is managed by manager/UI state
+                render_connection_lines: this.appearanceManager.areConnectionLinesVisible(),
+            };
+        } else {
+            // Fallback to local managers if grid is not ready
+            layout = {
+                repel_force: this.layoutManager.getRepelForce(),
+                ideal_distance: this.layoutManager.getIdealDistance(),
+                iterations: this.layoutManager.getIterations(),
+                cooling_factor: this.layoutManager.getCoolingFactor(),
+                attract_force: this.layoutManager.getAttractForce(),
+                core_distance: this.layoutManager.getCoreDistance(),
+            };
+
+            appearance = {
+                qubit_size: this.appearanceManager.getQubitSize(),
+                connection_thickness: this.appearanceManager.getConnectionThickness(),
+                inactive_alpha: this.appearanceManager.getInactiveAlpha(),
+                render_bloch_spheres: this.appearanceManager.areBlochSpheresVisible(),
+                render_connection_lines: this.appearanceManager.areConnectionLinesVisible(),
+            };
+        }
+
+        // Heatmap
+        const heatmapParams = this.getHeatmapColorParameters();
+        const heatmap = {
+            heatmap_max_slices: this.visualizationStateManager.getMaxHeatmapSlices(),
+            heatmap_base_size: this.appearanceManager.getBaseSize(),
+            heatmap_fade_threshold: heatmapParams.fadeThreshold,
+            heatmap_green_threshold: heatmapParams.greenThreshold,
+            heatmap_yellow_threshold: heatmapParams.yellowThreshold,
+            heatmap_intensity_power: heatmapParams.intensityPower,
+            heatmap_min_intensity: heatmapParams.minIntensity,
+            heatmap_border_width: heatmapParams.borderWidth,
+        };
+
+        // Fidelity
+        const fidelity = {
+            one_qubit_fidelity_base: this.visualizationStateManager.getOneQubitFidelityBase(),
+            two_qubit_fidelity_base: this.visualizationStateManager.getTwoQubitFidelityBase(),
+        };
+
+        return { ...layout, ...appearance, ...heatmap, ...fidelity };
+    }
+
     public setCurrentSlice(sliceIndex: number) {
         this.visualizationStateManager.setCurrentSlice(sliceIndex);
         if (this.grid) {
