@@ -5,11 +5,10 @@ This module provides the backend for the interactive playground mode,
 generating quantum circuits on-demand based on user selections.
 """
 
-import sys, math, json, os, argparse, logging
+import sys, json, os, argparse, logging
 from typing import Any 
 from pathlib import Path
 from qiskit import QuantumCircuit
-from qiskit.circuit.library import QFT
 from qiskit.transpiler import CouplingMap as QiskitCouplingMap
 from qiskit import transpile
 from dataclasses import asdict
@@ -22,6 +21,9 @@ from ..compiler.utils import (
     RoutingCircuitInfo,
     DeviceInfo,
 )
+from ..enums import AlgorithmType, TopologyType
+from ..config import CircuitGenerationConfig
+from ..factories import CircuitFactory, TopologyFactory
 
 # Create module logger
 logger = logging.getLogger(__name__)
@@ -39,30 +41,20 @@ class PlaygroundAPI:
 
     def generate_visualization_data(
         self,
-        algorithm: str,
-        num_qubits: int,
-        physical_qubits: int,
-        topology: str,
-        optimization_level: int = 1,
-        **kwargs,
+        config: CircuitGenerationConfig
     ) -> dict[str, Any]:
         """
         Generate visualization data for a quantum circuit.
 
         Args:
-            algorithm: Algorithm type ('qft', 'qaoa', 'ghz')
-            num_qubits: Number of logical qubits (4-1000)
-            topology: Topology type ('line', 'ring', 'grid', 'heavy_hex', etc.)
-            optimization_level: Qiskit optimization level (0-3)
-            physical_qubits: Number of physical qubits for the device topology (defaults to num_qubits)
-            **kwargs: Additional algorithm parameters
+            config: Configuration object containing all generation parameters.
 
         Returns:
             Dictionary containing visualization data in library_multi format
         """
 
-        circuit = self._create_circuit(algorithm, num_qubits, **kwargs)
-        coupling_map = self._create_coupling_map(topology, physical_qubits)
+        circuit = self._create_circuit(config)
+        coupling_map = self._create_coupling_map(config.topology, config.physical_qubits)
 
         basis_gates = ["id", "rz", "sx", "x", "cx", "swap"]
 
@@ -70,7 +62,7 @@ class PlaygroundAPI:
 
         # Process logical circuit
         logger.info("Processing logical circuit...")
-        logical_circuit_data = self._process_logical_circuit(circuit, algorithm, kwargs)
+        logical_circuit_data = self._process_logical_circuit(circuit, config)
 
         # Process compiled circuit
         logger.info("Processing compiled circuit...")
@@ -78,9 +70,7 @@ class PlaygroundAPI:
             circuit,
             coupling_map,
             basis_gates,
-            optimization_level,
-            algorithm,
-            kwargs,
+            config,
         )
 
         result = {
@@ -96,8 +86,7 @@ class PlaygroundAPI:
     def _process_logical_circuit(
         self,
         circuit: QuantumCircuit,
-        algorithm: str,
-        kwargs: dict[str, Any],
+        config: CircuitGenerationConfig,
     ) -> dict[str, Any]:
         """Process the logical version of the circuit."""
         decomposed_circuit = circuit.decompose()
@@ -119,9 +108,9 @@ class PlaygroundAPI:
         return {
             "circuit_info": asdict(logical_info),
             "device_info": asdict(device_info),
-            "algorithm_name": f"{algorithm.upper()} (Logical)",
+            "algorithm_name": f"{config.algorithm.value.upper()} (Logical)",
             "circuit_type": "logical",
-            "algorithm_params": kwargs,
+            "algorithm_params": config.algorithm_params,
             "circuit_stats": {
                 "original_gates": len(circuit.data),
                 "depth": len(logical_operations_per_slice),
@@ -134,19 +123,17 @@ class PlaygroundAPI:
         circuit: QuantumCircuit,
         coupling_map: QiskitCouplingMap,
         basis_gates: list[str],
-        optimization_level: int,
-        algorithm: str,
-        kwargs: dict[str, Any],
+        config: CircuitGenerationConfig,
     ) -> dict[str, Any]:
         """Process the compiled version of the circuit."""
         logger.info(
-            f"🔧 Transpiling for optimization level {optimization_level}..."
+            f"🔧 Transpiling for optimization level {config.optimization_level}..."
         )
 
         transpiled_circuit = transpile(
             circuit,
             basis_gates=basis_gates,
-            optimization_level=optimization_level,
+            optimization_level=config.optimization_level,
             coupling_map=coupling_map)
         logger.info(
             f"   ✓ Transpilation complete: {len(transpiled_circuit.data)} gates total"
@@ -157,11 +144,9 @@ class PlaygroundAPI:
             f"   ✓ Extracted {len(compiled_operations_per_slice)} time slices from compiled circuit"
         )
 
-        routing_operations_per_slice, total_swap_count, routing_depth = (
-            extract_routing_operations_per_slice(transpiled_circuit)
-        )
+        routing_result = extract_routing_operations_per_slice(transpiled_circuit)
         logger.info(
-            f"   ✓ Found {total_swap_count} SWAP gates for qubit routing"
+            f"   ✓ Found {routing_result.swaps} SWAP gates for qubit routing"
         )
 
         routing_analysis = analyze_routing_overhead(
@@ -178,9 +163,9 @@ class PlaygroundAPI:
 
         routing_info = RoutingCircuitInfo(
             num_qubits=transpiled_circuit.num_qubits,
-            routing_ops_per_slice=routing_operations_per_slice,
-            total_swap_count=total_swap_count,
-            routing_depth=routing_depth,
+            routing_ops_per_slice=routing_result.routing_ops_per_slice,
+            swaps=routing_result.swaps,
+            routing_depth=routing_result.routing_depth,
         )
 
         device_info = DeviceInfo(
@@ -192,100 +177,32 @@ class PlaygroundAPI:
             "circuit_info": asdict(compiled_info),
             "routing_info": asdict(routing_info),
             "device_info": asdict(device_info),
-            "algorithm_name": f"{algorithm.upper()} (Compiled)",
+            "algorithm_name": f"{config.algorithm.value.upper()} (Compiled)",
             "circuit_type": "compiled",
-            "algorithm_params": kwargs,
+            "algorithm_params": config.algorithm_params,
             "routing_analysis": routing_analysis,
             "circuit_stats": {
                 "original_gates": len(circuit.data),
                 "transpiled_gates": len(transpiled_circuit.data),
                 "depth": len(compiled_operations_per_slice),
                 "qubits": transpiled_circuit.num_qubits,
-                "swap_count": total_swap_count,
+                "swap_count": routing_result.swaps,
             },
         }
 
     def _create_circuit(
-        self, algorithm: str, num_qubits: int, **kwargs
+        self, config: CircuitGenerationConfig
     ) -> QuantumCircuit:
         """Create a quantum circuit based on algorithm type."""
-
-        if algorithm == "qft":
-            return QFT(num_qubits=num_qubits, do_swaps=True, name=f"QFT-{num_qubits}")
-
-        elif algorithm == "ghz":
-            circuit = QuantumCircuit(num_qubits, name=f"GHZ-{num_qubits}")
-            circuit.h(0)
-            for i in range(1, num_qubits):
-                circuit.cx(0, i)
-            return circuit
-
-        elif algorithm == "qaoa":
-            reps = kwargs.get("reps", 2)
-            circuit = QuantumCircuit(num_qubits, name=f"QAOA-{num_qubits}-p{reps}")
-
-            for _ in range(reps):
-                # Problem layer (ZZ interactions)
-                for i in range(num_qubits - 1):
-                    circuit.rzz(0.5, i, i + 1)
-
-                # Mixer layer (X rotations)
-                for i in range(num_qubits):
-                    circuit.rx(0.3, i)
-
-            return circuit
-
-        else:
-            raise ValueError(f"Unsupported algorithm: {algorithm}")
+        return CircuitFactory.create(config)
 
     def _create_coupling_map(self, topology: str, physical_qubits: int) -> QiskitCouplingMap:
         """Create a coupling map using Qiskit's built-in topology generators."""
-
-        if topology == "line":
-            return QiskitCouplingMap.from_line(physical_qubits)
-
-        elif topology == "ring":
-            return QiskitCouplingMap.from_ring(physical_qubits)
-
-        elif topology == "grid":
-            # Find best square grid size
-            n = int(physical_qubits**0.5)
-            if n * n < physical_qubits:
-                n += 1
-            return QiskitCouplingMap.from_grid(n, n)
-
-        elif topology == "heavy_hex":
-            distance = math.ceil((2 + math.sqrt(24 + 40 * physical_qubits)) / 10)
-
-            if distance % 2 == 0:
-                distance += 1
-
-            return QiskitCouplingMap.from_heavy_hex(distance)
-
-        elif topology == "heavy_square":
-            distance = math.ceil((1 + math.sqrt(1 + 3 * physical_qubits)) / 3)
-
-            if distance % 2 == 0:
-                distance += 1
-
-            return QiskitCouplingMap.from_heavy_square(distance)
-
-        elif topology == "hexagonal":
-            rows = max(2, int((physical_qubits / 2) ** 0.5))
-            cols = max(2, physical_qubits // rows)
-            return QiskitCouplingMap.from_hexagonal_lattice(rows, cols)
-
-        elif topology == "full":
-            return QiskitCouplingMap.from_full(physical_qubits)
-
-        else:
-            raise ValueError(
-                f"Unsupported topology: {topology}."
-            )
+        return TopologyFactory.create(TopologyType(topology), physical_qubits)
 
     def get_supported_algorithms(self) -> list:
         """Get list of supported algorithms."""
-        return ["qft", "qaoa", "ghz"]
+        return [algo.value for algo in AlgorithmType]
 
 
 def generate_playground_circuit(
@@ -294,8 +211,15 @@ def generate_playground_circuit(
     """
     High-level function to generate a playground circuit.
     """
+    config = CircuitGenerationConfig(
+        algorithm=AlgorithmType(algorithm),
+        num_qubits=num_qubits,
+        physical_qubits=physical_qubits,
+        topology=TopologyType(topology),
+        algorithm_params=kwargs
+    )
     api = PlaygroundAPI()
-    return api.generate_visualization_data(algorithm, num_qubits, physical_qubits, topology, **kwargs)
+    return api.generate_visualization_data(config)
 
 
 def main():
@@ -328,19 +252,26 @@ def main():
     else:
         logging.basicConfig(level=logging.WARNING, format='%(message)s', stream=sys.stderr)
 
+    api = PlaygroundAPI()
+
     # Generate circuit with the API
     try:
         logger.info(
             f"INFO: Generating circuit - algorithm: {args.algorithm}, qubits: {args.num_qubits}, topology: {args.topology}"
         )
 
-        result = generate_playground_circuit(
-            algorithm=args.algorithm,
+        kwargs = {"optimization_level": args.optimization_level}
+        
+        config = CircuitGenerationConfig(
+            algorithm=AlgorithmType(args.algorithm),
             num_qubits=args.num_qubits,
-            physical_qubits=args.physical_qubits,
-            topology=args.topology,
+            physical_qubits=args.physical_qubits or args.num_qubits,
+            topology=TopologyType(args.topology),
             optimization_level=args.optimization_level,
+            algorithm_params=kwargs # Assuming other kwargs might be added later via parser
         )
+
+        result = api.generate_visualization_data(config)
 
         # Add generation success flag
         result["generation_successful"] = True

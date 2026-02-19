@@ -5,7 +5,7 @@ This module provides a REST API for quantum circuit generation and visualization
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -15,6 +15,8 @@ import uvicorn
 
 
 from .playground import PlaygroundAPI
+from ..enums import AlgorithmType, TopologyType
+from ..config import CircuitGenerationConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,8 +30,8 @@ class CircuitGenerationRequest(BaseModel):
 
     algorithm: str = Field(
         ...,
-        description="Algorithm type: 'qft', 'qaoa', or 'ghz'",
-        examples=["qft"]
+        description=f"Algorithm type: {', '.join([a.value for a in AlgorithmType])}",
+        examples=[AlgorithmType.QFT.value]
     )
     num_qubits: int = Field(
         ...,
@@ -38,7 +40,7 @@ class CircuitGenerationRequest(BaseModel):
         description="Number of logical qubits",
         examples=[5]
     )
-    physical_qubits: Optional[int] = Field(
+    physical_qubits: int | None = Field(
         None,
         ge=2,
         le=1000,
@@ -47,8 +49,8 @@ class CircuitGenerationRequest(BaseModel):
     )
     topology: str = Field(
         ...,
-        description="Device topology: 'line', 'ring', 'grid', 'heavy_hex', 'heavy_square', 'hexagonal', or 'full'",
-        examples=["grid"]
+        description=f"Device topology: {', '.join([t.value for t in TopologyType])}",
+        examples=[TopologyType.GRID.value]
     )
     optimization_level: int = Field(
         1,
@@ -57,7 +59,7 @@ class CircuitGenerationRequest(BaseModel):
         description="Qiskit transpiler optimization level",
         examples=[1]
     )
-    reps: Optional[int] = Field(
+    reps: int | None = Field(
         None,
         ge=1,
         description="Number of repetitions for QAOA algorithm",
@@ -67,21 +69,22 @@ class CircuitGenerationRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "algorithm": "qft",
+                "algorithm": AlgorithmType.QFT.value,
                 "num_qubits": 5,
                 "physical_qubits": 9,
-                "topology": "grid",
+                "topology": TopologyType.GRID.value,
                 "optimization_level": 1
             }
         }
 
 
 class CircuitGenerationResponse(BaseModel):
-    """Response model for circuit generation endpoint."""
+    """Response model for circuit generation."""
 
     circuits: list[dict[str, Any]]
     total_circuits: int
-    generation_successful: bool = True
+    generation_successful: bool
+    error_message: str | None = None
 
 
 class ErrorResponse(BaseModel):
@@ -191,14 +194,18 @@ async def generate_circuit(request: CircuitGenerationRequest):
         if request.reps is not None:
             kwargs["reps"] = request.reps
 
-        # Generate circuit data
-        result = playground_api.generate_visualization_data(
-            algorithm=request.algorithm,
+        # Create configuration object
+        config = CircuitGenerationConfig(
+            algorithm=AlgorithmType(request.algorithm),
             num_qubits=request.num_qubits,
-            physical_qubits=physical_qubits,
-            topology=request.topology,
-            **kwargs
+            physical_qubits=request.physical_qubits or request.num_qubits,
+            topology=TopologyType(request.topology),
+            optimization_level=request.optimization_level,
+            algorithm_params=kwargs
         )
+
+        # Generate circuit data
+        result = playground_api.generate_visualization_data(config)
 
         logger.info("✅ Circuit generated successfully")
 

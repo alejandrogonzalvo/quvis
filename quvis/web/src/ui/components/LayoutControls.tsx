@@ -347,7 +347,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                                 type="range"
                                 id="core-distance"
                                 min="1.0"
-                                max="20.0"
+                                max="500"
                                 step="0.5"
                                 value={coreDistance}
                                 onChange={handleCoreDistanceChange}
@@ -367,7 +367,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                                 id="repel-force"
                                 min="0.1"
                                 max="2.0"
-                                step="0.1"
+                                step="0.01"
                                 value={repelForce}
                                 onChange={handleRepelForceChange}
                                 style={sliderStyle}
@@ -414,15 +414,15 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
                             <label htmlFor="cooling-factor" style={labelStyle}>
                                 Cooling Factor:{" "}
                                 <span style={valueStyle}>
-                                    {coolingFactor.toFixed(2)}
+                                    {coolingFactor.toFixed(3)}
                                 </span>
                             </label>
                             <input
                                 type="range"
                                 id="cooling-factor"
-                                min="0.85"
+                                min="0.95"
                                 max="1.0"
-                                step="0.01"
+                                step="0.001"
                                 value={coolingFactor}
                                 onChange={handleCoolingFactorChange}
                                 style={sliderStyle}

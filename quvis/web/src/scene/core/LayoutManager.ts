@@ -11,6 +11,37 @@ interface LayoutParameters {
 }
 
 export class LayoutManager {
+    // Physics Constants
+    private static readonly MIN_FORCE_DIST = 0.01;
+    private static readonly GRAVITY_THRESHOLD = 0.1;
+    private static readonly GRAVITY_STRENGTH = 0.05;
+
+    // Core Layout Constants
+    private static readonly CORE_ITERATIONS = 200;
+    private static readonly CORE_REPEL_FACTOR = 0.5;
+    private static readonly CORE_ATTRACT_FACTOR = 0.5;
+    private static readonly CORE_COOLING_FACTOR = 0.9;
+
+    // Intra-Core Layout Constants
+    private static readonly INTRA_CORE_ITERATIONS = 300;
+    private static readonly INTRA_CORE_ATTRACT_FACTOR = 0.2;
+    private static readonly EXTERNAL_ATTRACTION_STRENGTH = 0.8;
+    private static readonly BOUNDARY_ATTRACTION_DIST_FACTOR = 0.5;
+
+    // Area Calculation
+    private static readonly LAYOUT_AREA_SCALE = 2.5;
+    private static readonly MIN_LAYOUT_AREA = 5;
+    private static readonly LAYOUT_DEPTH_FACTOR = 0.5;
+
+    // Default Parameters
+    public static readonly DEFAULT_K_REPEL = 0.3;
+    public static readonly DEFAULT_IDEAL_DIST = 5.0;
+    public static readonly DEFAULT_ITERATIONS = 300;
+    public static readonly DEFAULT_COOLING_FACTOR = 0.95;
+    public static readonly DEFAULT_K_ATTRACT = 0.1;
+    public static readonly DEFAULT_BARNES_HUT_THETA = 0.8;
+    public static readonly DEFAULT_CORE_DISTANCE = 5.0;
+
     private qubitPositions: Map<number, THREE.Vector3> = new Map();
     private layoutWorker: Worker;
     private layoutParams: LayoutParameters;
@@ -18,13 +49,13 @@ export class LayoutManager {
     public lastLayoutCalculationTime: number = 0;
 
     constructor(
-        initialKRepel: number = 0.3,
-        initialIdealDist: number = 5.0,
-        initialIterations: number = 300,
-        initialCoolingFactor: number = 0.95,
-        initialKAttract: number = 0.1,
-        initialBarnesHutTheta: number = 0.8,
-        initialCoreDistance: number = 5.0,
+        initialKRepel: number = LayoutManager.DEFAULT_K_REPEL,
+        initialIdealDist: number = LayoutManager.DEFAULT_IDEAL_DIST,
+        initialIterations: number = LayoutManager.DEFAULT_ITERATIONS,
+        initialCoolingFactor: number = LayoutManager.DEFAULT_COOLING_FACTOR,
+        initialKAttract: number = LayoutManager.DEFAULT_K_ATTRACT,
+        initialBarnesHutTheta: number = LayoutManager.DEFAULT_BARNES_HUT_THETA,
+        initialCoreDistance: number = LayoutManager.DEFAULT_CORE_DISTANCE,
     ) {
         this.layoutParams = {
             kRepel: initialKRepel,
@@ -127,10 +158,10 @@ export class LayoutManager {
 
         this.qubitPositions.clear();
         this.layoutAreaSide = Math.max(
-            5,
+            LayoutManager.MIN_LAYOUT_AREA,
             Math.sqrt(numDeviceQubits) *
-            2.5 *
-            (this.layoutParams.idealDist / 5),
+            LayoutManager.LAYOUT_AREA_SCALE *
+            (this.layoutParams.idealDist / LayoutManager.MIN_LAYOUT_AREA),
         );
 
         const startTime = performance.now();
@@ -158,7 +189,7 @@ export class LayoutManager {
             couplingMap,
             areaWidth: this.layoutAreaSide,
             areaHeight: this.layoutAreaSide,
-            areaDepth: this.layoutAreaSide * 0.5,
+            areaDepth: this.layoutAreaSide * LayoutManager.LAYOUT_DEPTH_FACTOR,
             iterations: this.layoutParams.iterations,
             coolingFactor: this.layoutParams.coolingFactor,
             kRepel: this.layoutParams.kRepel,
@@ -237,51 +268,51 @@ export class LayoutManager {
         }
     }
 
-    /**
-     * Get position of a specific qubit
-     */
     getQubitPosition(qubitId: number): THREE.Vector3 | undefined {
         return this.qubitPositions.get(qubitId);
     }
 
-    /**
-     * Set position of a specific qubit
-     */
     setQubitPosition(qubitId: number, position: THREE.Vector3): void {
         this.qubitPositions.set(qubitId, position.clone());
     }
 
-    /**
-     * Clear all positions
-     */
     clearPositions(): void {
         this.qubitPositions.clear();
     }
 
-    /**
-     * Get all qubit IDs that have positions
-     */
     getQubitIds(): number[] {
         return Array.from(this.qubitPositions.keys());
     }
 
-    /**
-     * Check if a qubit has a position
-     */
     hasQubit(qubitId: number): boolean {
         return this.qubitPositions.has(qubitId);
     }
 
-    /**
-     * Get the number of qubits with positions
-     */
     getQubitCount(): number {
         return this.qubitPositions.size;
     }
 
-    /**
-     * Calculate layout for modular architecture
-     */
+    private validateSimulationInput(
+        numNodes: number,
+        edges: number[][],
+        externalAttractions: { nodeIndex: number; targetPosition: THREE.Vector3; strength: number }[]
+    ): void {
+        for (const edge of edges) {
+            if (edge[0] >= numNodes || edge[1] >= numNodes) {
+                throw new Error(
+                    `Invalid edge in force simulation: [${edge[0]}, ${edge[1]}] for ${numNodes} nodes`
+                );
+            }
+        }
+        for (const att of externalAttractions) {
+            if (att.nodeIndex >= numNodes) {
+                throw new Error(
+                    `Invalid external attraction: nodeIndex ${att.nodeIndex} out of bounds for ${numNodes} nodes`
+                );
+            }
+        }
+    }
+
     /**
      * Run a synchronous force-directed simulation for a graph
      */
@@ -293,10 +324,14 @@ export class LayoutManager {
         kAttract: number,
         idealDist: number,
         coolingFactor: number,
+        externalAttractions: { nodeIndex: number; targetPosition: THREE.Vector3; strength: number }[] = [],
         boundsScale: number = 1.0
     ): THREE.Vector3[] {
         const positions: THREE.Vector3[] = [];
         const forces: THREE.Vector3[] = [];
+
+        // Validate inputs before simulation
+        this.validateSimulationInput(numNodes, edges, externalAttractions);
 
         // Initialize random positions
         for (let i = 0; i < numNodes; i++) {
@@ -321,7 +356,7 @@ export class LayoutManager {
                 for (let j = i + 1; j < numNodes; j++) {
                     const delta = new THREE.Vector3().subVectors(positions[j], positions[i]);
                     let dist = delta.length();
-                    if (dist < 0.01) dist = 0.01;
+                    if (dist < LayoutManager.MIN_FORCE_DIST) dist = LayoutManager.MIN_FORCE_DIST;
 
                     const force = delta.normalize().multiplyScalar((kRepel * kRepel) / dist);
                     forces[i].sub(force);
@@ -329,34 +364,37 @@ export class LayoutManager {
                 }
             }
 
-            // Attraction
+            // Attraction (Internal Edges)
             for (const edge of edges) {
                 const u = edge[0];
                 const v = edge[1];
-                if (u < numNodes && v < numNodes) {
-                    const delta = new THREE.Vector3().subVectors(positions[v], positions[u]);
-                    let dist = delta.length();
-                    if (dist < 0.01) dist = 0.01;
 
-                    const force = delta.normalize().multiplyScalar((dist * dist) / kAttract); // kAttract is usually distance-like or stiffness
-                    // Using F = k * (d - ideal) approx or F = d^2/k
-                    // Standard Fruchterman-Reingold: Attraction = d^2/k, Repulsion = k^2/d
-                    // Our parameters might differ slightly. specific algo:
-                    // F_attract = (dist - idealDist) * kAttract ??
-                    // Let's stick to the worker logic approx: forceMag = kAttract * (dist - idealDist)
-                    const forceMag = kAttract * (dist - idealDist);
-                    const forceVec = delta.normalize().multiplyScalar(forceMag);
+                const delta = new THREE.Vector3().subVectors(positions[v], positions[u]);
+                let dist = delta.length();
+                if (dist < LayoutManager.MIN_FORCE_DIST) dist = LayoutManager.MIN_FORCE_DIST;
 
-                    forces[u].add(forceVec);
-                    forces[v].sub(forceVec);
-                }
+                const forceMag = kAttract * (dist - idealDist);
+                const forceVec = delta.normalize().multiplyScalar(forceMag);
+
+                forces[u].add(forceVec);
+                forces[v].sub(forceVec);
+            }
+
+            // External Attraction (Orientation)
+            for (const att of externalAttractions) {
+                const nodePos = positions[att.nodeIndex];
+                const delta = new THREE.Vector3().subVectors(att.targetPosition, nodePos);
+                const dist = delta.length();
+                // Simple spring force towards target
+                const force = delta.normalize().multiplyScalar(dist * att.strength);
+                forces[att.nodeIndex].add(force);
             }
 
             // Central gravity (Keep graph centered)
             for (let i = 0; i < numNodes; i++) {
                 const distToCenter = positions[i].length();
-                if (distToCenter > 0.1) {
-                    forces[i].sub(positions[i].clone().normalize().multiplyScalar(distToCenter * 0.05));
+                if (distToCenter > LayoutManager.GRAVITY_THRESHOLD) {
+                    forces[i].sub(positions[i].clone().normalize().multiplyScalar(distToCenter * LayoutManager.GRAVITY_STRENGTH));
                 }
             }
 
@@ -387,7 +425,7 @@ export class LayoutManager {
             global_topology: string;
             inter_core_links?: number[][];
         },
-        coreDistance: number = 5.0,
+        coreDistance: number = LayoutManager.DEFAULT_CORE_DISTANCE,
         couplingMap: number[][] | null = null
     ): void {
         const { num_cores, qubits_per_core, global_topology, inter_core_links } = modularInfo;
@@ -405,44 +443,34 @@ export class LayoutManager {
         const coreEdges: number[][] = [];
         const coreConnections = new Set<string>();
 
-        if (inter_core_links) {
-            for (const link of inter_core_links) {
-                const core1 = Math.floor(link[0] / qubits_per_core);
-                const core2 = Math.floor(link[1] / qubits_per_core);
-                if (core1 !== core2) {
-                    const key = `${Math.min(core1, core2)}-${Math.max(core1, core2)}`;
-                    if (!coreConnections.has(key)) {
-                        coreEdges.push([core1, core2]);
-                        coreConnections.add(key);
-                    }
-                }
+        for (const link of inter_core_links) {
+            const core1 = Math.floor(link[0] / qubits_per_core);
+            const core2 = Math.floor(link[1] / qubits_per_core);
+
+            if (core1 === core2) continue;
+
+            const key = `${Math.min(core1, core2)}-${Math.max(core1, core2)}`;
+            if (!coreConnections.has(key)) {
+                coreEdges.push([core1, core2]);
+                coreConnections.add(key);
             }
-        } else {
-            // Fallback to ring if no explicit links, or generate based on topology string
-            if (global_topology === 'ring' || !global_topology) {
-                for (let i = 0; i < num_cores; i++) {
-                    coreEdges.push([i, (i + 1) % num_cores]);
-                }
-            }
-            // Add other topology defaults if needed
         }
 
         // Run simulation for cores
         const corePositions = this.runForceSimulation(
             num_cores,
             coreEdges,
-            200, // Iterations
-            coreDistance * 0.5, // kRepel (adjust for scale)
-            0.5, // kAttract
+            LayoutManager.CORE_ITERATIONS, // Iterations
+            coreDistance * LayoutManager.CORE_REPEL_FACTOR, // kRepel (adjust for scale)
+            LayoutManager.CORE_ATTRACT_FACTOR, // kAttract
             coreDistance, // Ideal distance
-            0.9
+            LayoutManager.CORE_COOLING_FACTOR
         );
 
 
         // 2. Calculate Intra-Core Layouts
         // We will compute one reference layout if they are all identical, or one per core if coupling differs.
         // Assuming homogeneous cores mostly, but better to be safe and compute per core if coupling map is provided.
-        // If no coupling map, default to grid.
 
         const coreLocalPositions: Map<number, THREE.Vector3[]> = new Map();
 
@@ -463,14 +491,65 @@ export class LayoutManager {
 
             for (let c = 0; c < num_cores; c++) {
                 const edges = coreInternalEdges.get(c) || [];
+
+                // Identify external attractions for this core
+                const externalAttractions: { nodeIndex: number, targetPosition: THREE.Vector3, strength: number }[] = [];
+
+                // Default center is (0,0,0) relative to core, but we want to attract towards THE OTHER CORE'S position
+                // relative to THIS core's position.
+                // Relative vector = OtherCorePos - ThisCorePos.
+                const thisCorePos = corePositions[c];
+
+                if (inter_core_links) {
+                    for (const link of inter_core_links) {
+                        const q1 = link[0];
+                        const q2 = link[1];
+
+                        // Check if this link involves current core
+                        const c1 = Math.floor(q1 / qubits_per_core);
+                        const c2 = Math.floor(q2 / qubits_per_core);
+
+                        if (c1 === c && c2 !== c) {
+                            // q1 is in this core, connecting to q2 in c2
+                            const localIndex = q1 % qubits_per_core;
+                            const otherCorePos = corePositions[c2];
+                            const direction = new THREE.Vector3().subVectors(otherCorePos, thisCorePos);
+
+                            // We want to attract localIndex towards 'direction' (relative to local origin 0,0)
+                            // We can set the target to be some distance along that vector.
+                            // Say, edge of the core.
+                            const target = direction.normalize().multiplyScalar(this.layoutParams.idealDist * Math.sqrt(qubits_per_core) * LayoutManager.BOUNDARY_ATTRACTION_DIST_FACTOR);
+
+                            externalAttractions.push({
+                                nodeIndex: localIndex,
+                                targetPosition: target,
+                                strength: LayoutManager.EXTERNAL_ATTRACTION_STRENGTH // Strong attraction to orient it
+                            });
+                        } else if (c2 === c && c1 !== c) {
+                            // q2 is in this core, connecting to q1 in c1
+                            const localIndex = q2 % qubits_per_core;
+                            const otherCorePos = corePositions[c1];
+                            const direction = new THREE.Vector3().subVectors(otherCorePos, thisCorePos);
+                            const target = direction.normalize().multiplyScalar(this.layoutParams.idealDist * Math.sqrt(qubits_per_core) * LayoutManager.BOUNDARY_ATTRACTION_DIST_FACTOR);
+
+                            externalAttractions.push({
+                                nodeIndex: localIndex,
+                                targetPosition: target,
+                                strength: LayoutManager.EXTERNAL_ATTRACTION_STRENGTH
+                            });
+                        }
+                    }
+                }
+
                 const localPos = this.runForceSimulation(
                     qubits_per_core,
                     edges,
-                    300,
+                    LayoutManager.INTRA_CORE_ITERATIONS,
                     this.layoutParams.kRepel,
-                    0.2, // Stronger attraction for internal stiffness
+                    LayoutManager.INTRA_CORE_ATTRACT_FACTOR, // Stronger attraction for internal stiffness
                     this.layoutParams.idealDist,
-                    this.layoutParams.coolingFactor
+                    this.layoutParams.coolingFactor,
+                    externalAttractions
                 );
                 coreLocalPositions.set(c, localPos);
             }
@@ -497,12 +576,13 @@ export class LayoutManager {
         for (let i = 0; i < num_cores; i++) {
             const corePos = corePositions[i];
             const localPositions = coreLocalPositions.get(i);
-            if (localPositions) {
-                for (let j = 0; j < qubits_per_core; j++) {
-                    const globalId = i * qubits_per_core + j;
-                    const finalPos = new THREE.Vector3().copy(corePos).add(localPositions[j]);
-                    this.qubitPositions.set(globalId, finalPos);
-                }
+            if (!localPositions) {
+                throw new Error(`No local positions found for core ${i}`);
+            }
+            for (let j = 0; j < qubits_per_core; j++) {
+                const globalId = i * qubits_per_core + j;
+                const finalPos = new THREE.Vector3().copy(corePos).add(localPositions[j]);
+                this.qubitPositions.set(globalId, finalPos);
             }
         }
 
@@ -511,7 +591,7 @@ export class LayoutManager {
         this.qubitPositions.forEach(p => {
             maxDim = Math.max(maxDim, Math.abs(p.x), Math.abs(p.y));
         });
-        this.layoutAreaSide = maxDim * 2.5;
+        this.layoutAreaSide = maxDim * LayoutManager.LAYOUT_AREA_SCALE;
 
     }
 
