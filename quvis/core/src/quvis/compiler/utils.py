@@ -23,7 +23,7 @@ class RoutingCircuitInfo:
     """Stores information about routing operations (SWAP gates) in the compiled circuit."""
     num_qubits: int
     routing_ops_per_slice: list
-    total_swap_count: int
+    swaps: int
     routing_depth: int
 
 @dataclass
@@ -38,7 +38,7 @@ class ModularInfo:
 class RoutingAnalysisResult:
     """Result of routing analysis."""
     routing_ops_per_slice: list
-    total_swap_count: int
+    swaps: int
     routing_depth: int
 
 @dataclass
@@ -94,7 +94,7 @@ def extract_routing_operations_per_slice(qc):
     dag = circuit_to_dag(qc)
     routing_ops_per_slice = []
     qubit_indices = {qubit: i for i, qubit in enumerate(qc.qubits)}
-    total_swap_count = 0
+    swaps = 0
     routing_depth = 0
 
     # Operations that are typically inserted for routing
@@ -119,7 +119,7 @@ def extract_routing_operations_per_slice(qc):
                     has_routing_ops = True
 
                     if op_name == "swap":
-                        total_swap_count += 1
+                        swaps += 1
 
         # Only add slices that contain routing operations
         if has_routing_ops:
@@ -131,7 +131,7 @@ def extract_routing_operations_per_slice(qc):
 
     return RoutingAnalysisResult(
         routing_ops_per_slice=routing_ops_per_slice,
-        total_swap_count=total_swap_count,
+        swaps=swaps,
         routing_depth=routing_depth
     )
 
@@ -167,7 +167,7 @@ def analyze_routing_overhead(logical_circuit, compiled_circuit):
         "logical_op_count": logical_op_count,
         "compiled_op_count": compiled_op_count,
         "routing_op_count": routing_op_count,
-        "swap_count": routing_result.total_swap_count,
+        "swap_count": routing_result.swaps,
         "routing_depth": routing_result.routing_depth,
         "routing_overhead_percentage": (routing_op_count / compiled_op_count * 100) if compiled_op_count > 0 else 0
     }

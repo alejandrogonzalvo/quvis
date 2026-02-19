@@ -1,1 +1,362 @@
-{"circuits":[{"circuit_info":{"num_qubits":3,"interaction_graph_ops_per_slice":[[{"name":"h","qubits":[2]}],[{"name":"cp","qubits":[2,1]}],[{"name":"cp","qubits":[2,0]},{"name":"h","qubits":[1]}],[{"name":"cp","qubits":[1,0]}],[{"name":"h","qubits":[0]}],[{"name":"swap","qubits":[0,2]}]]},"device_info":{"num_qubits_on_device":3,"connectivity_graph_coupling_map":[],"modular_info":null},"algorithm_name":"QFT (Logical)","circuit_type":"logical","algorithm_params":{"optimization_level":1},"circuit_stats":{"original_gates":1,"depth":6,"qubits":3}},{"circuit_info":{"num_qubits":3,"compiled_interaction_graph_ops_per_slice":[[{"name":"rz","qubits":[1]}],[{"name":"sx","qubits":[1]}],[{"name":"rz","qubits":[1]}],[{"name":"cx","qubits":[1,0]}],[{"name":"rz","qubits":[0]}],[{"name":"cx","qubits":[1,0]}],[{"name":"rz","qubits":[1]},{"name":"rz","qubits":[0]}],[{"name":"cx","qubits":[1,2]},{"name":"sx","qubits":[0]}],[{"name":"rz","qubits":[2]},{"name":"rz","qubits":[0]}],[{"name":"cx","qubits":[1,2]}],[{"name":"rz","qubits":[2]}],[{"name":"swap","qubits":[2,1]}],[{"name":"cx","qubits":[0,1]}],[{"name":"rz","qubits":[1]}],[{"name":"cx","qubits":[0,1]}],[{"name":"rz","qubits":[1]}],[{"name":"sx","qubits":[1]}],[{"name":"rz","qubits":[1]}],[{"name":"swap","qubits":[1,2]}]]},"routing_info":{"num_qubits":3,"routing_ops_per_slice":[[],[],[],[],[],[],[],[],[],[],[],[],[{"name":"swap","qubits":[2,1],"routing_type":"swap"}],[],[],[],[],[],[],[{"name":"swap","qubits":[1,2],"routing_type":"swap"}],[]],"total_swap_count":2,"routing_depth":20},"device_info":{"num_qubits_on_device":3,"connectivity_graph_coupling_map":[[0,1],[1,0],[1,2],[2,1]],"modular_info":null},"algorithm_name":"QFT (Compiled)","circuit_type":"compiled","algorithm_params":{"optimization_level":1},"routing_analysis":{"logical_depth":6,"compiled_depth":19,"routing_overhead_depth":13,"logical_op_count":7,"compiled_op_count":22,"routing_op_count":2,"swap_count":2,"routing_depth":20,"routing_overhead_percentage":9.090909090909092},"circuit_stats":{"original_gates":1,"transpiled_gates":22,"depth":19,"qubits":3,"swap_count":2}}],"total_circuits":2,"generation_successful":true}
+{
+    "circuits": [
+        {
+            "circuit_info": {
+                "num_qubits": 3,
+                "interaction_graph_ops_per_slice": [
+                    [
+                        {
+                            "name": "h",
+                            "qubits": [
+                                2
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "cp",
+                            "qubits": [
+                                2,
+                                1
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "cp",
+                            "qubits": [
+                                2,
+                                0
+                            ]
+                        },
+                        {
+                            "name": "h",
+                            "qubits": [
+                                1
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "cp",
+                            "qubits": [
+                                1,
+                                0
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "h",
+                            "qubits": [
+                                0
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "swap",
+                            "qubits": [
+                                0,
+                                2
+                            ]
+                        }
+                    ]
+                ]
+            },
+            "device_info": {
+                "num_qubits_on_device": 3,
+                "connectivity_graph_coupling_map": [],
+                "modular_info": null
+            },
+            "algorithm_name": "QFT (Logical)",
+            "circuit_type": "logical",
+            "algorithm_params": {
+                "optimization_level": 1
+            },
+            "circuit_stats": {
+                "original_gates": 1,
+                "depth": 6,
+                "qubits": 3
+            }
+        },
+        {
+            "circuit_info": {
+                "num_qubits": 3,
+                "compiled_interaction_graph_ops_per_slice": [
+                    [
+                        {
+                            "name": "rz",
+                            "qubits": [
+                                1
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "sx",
+                            "qubits": [
+                                1
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "rz",
+                            "qubits": [
+                                1
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "cx",
+                            "qubits": [
+                                1,
+                                0
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "rz",
+                            "qubits": [
+                                0
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "cx",
+                            "qubits": [
+                                1,
+                                0
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "rz",
+                            "qubits": [
+                                1
+                            ]
+                        },
+                        {
+                            "name": "rz",
+                            "qubits": [
+                                0
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "cx",
+                            "qubits": [
+                                1,
+                                2
+                            ]
+                        },
+                        {
+                            "name": "sx",
+                            "qubits": [
+                                0
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "rz",
+                            "qubits": [
+                                2
+                            ]
+                        },
+                        {
+                            "name": "rz",
+                            "qubits": [
+                                0
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "cx",
+                            "qubits": [
+                                1,
+                                2
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "rz",
+                            "qubits": [
+                                2
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "swap",
+                            "qubits": [
+                                2,
+                                1
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "cx",
+                            "qubits": [
+                                0,
+                                1
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "rz",
+                            "qubits": [
+                                1
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "cx",
+                            "qubits": [
+                                0,
+                                1
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "rz",
+                            "qubits": [
+                                1
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "sx",
+                            "qubits": [
+                                1
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "rz",
+                            "qubits": [
+                                1
+                            ]
+                        }
+                    ],
+                    [
+                        {
+                            "name": "swap",
+                            "qubits": [
+                                1,
+                                2
+                            ]
+                        }
+                    ]
+                ]
+            },
+            "routing_info": {
+                "num_qubits": 3,
+                "routing_ops_per_slice": [
+                    [],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [
+                        {
+                            "name": "swap",
+                            "qubits": [
+                                2,
+                                1
+                            ],
+                            "routing_type": "swap"
+                        }
+                    ],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [
+                        {
+                            "name": "swap",
+                            "qubits": [
+                                1,
+                                2
+                            ],
+                            "routing_type": "swap"
+                        }
+                    ],
+                    []
+                ],
+                "swaps": 2,
+                "routing_depth": 20
+            },
+            "device_info": {
+                "num_qubits_on_device": 3,
+                "connectivity_graph_coupling_map": [
+                    [
+                        0,
+                        1
+                    ],
+                    [
+                        1,
+                        0
+                    ],
+                    [
+                        1,
+                        2
+                    ],
+                    [
+                        2,
+                        1
+                    ]
+                ],
+                "modular_info": null
+            },
+            "algorithm_name": "QFT (Compiled)",
+            "circuit_type": "compiled",
+            "algorithm_params": {
+                "optimization_level": 1
+            },
+            "routing_analysis": {
+                "logical_depth": 6,
+                "compiled_depth": 19,
+                "routing_overhead_depth": 13,
+                "logical_op_count": 7,
+                "compiled_op_count": 22,
+                "routing_op_count": 2,
+                "swap_count": 2,
+                "routing_depth": 20,
+                "routing_overhead_percentage": 9.090909090909092
+            },
+            "circuit_stats": {
+                "original_gates": 1,
+                "transpiled_gates": 22,
+                "depth": 19,
+                "qubits": 3,
+                "swap_count": 2
+            }
+        }
+    ],
+    "total_circuits": 2,
+    "generation_successful": true
+}

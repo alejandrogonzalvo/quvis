@@ -288,7 +288,7 @@ class Visualizer:
             routing_info = RoutingCircuitInfo(
                 num_qubits=circuit.num_qubits,
                 routing_ops_per_slice=routing_result.routing_ops_per_slice,
-                total_swap_count=routing_result.total_swap_count,
+                swaps=routing_result.swaps,
                 routing_depth=routing_result.routing_depth,
             )
 
@@ -303,7 +303,7 @@ class Visualizer:
                 depth=len(compiled_operations_per_slice),
                 qubits=circuit.num_qubits,
                 transpiled_gates=len(circuit.data),
-                swap_count=routing_result.total_swap_count,
+                swap_count=routing_result.swaps,
             )
 
             return CircuitVisualizationData(

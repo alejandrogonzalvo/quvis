@@ -146,7 +146,7 @@ class PlaygroundAPI:
 
         routing_result = extract_routing_operations_per_slice(transpiled_circuit)
         logger.info(
-            f"   ✓ Found {routing_result.total_swap_count} SWAP gates for qubit routing"
+            f"   ✓ Found {routing_result.swaps} SWAP gates for qubit routing"
         )
 
         routing_analysis = analyze_routing_overhead(
@@ -164,7 +164,7 @@ class PlaygroundAPI:
         routing_info = RoutingCircuitInfo(
             num_qubits=transpiled_circuit.num_qubits,
             routing_ops_per_slice=routing_result.routing_ops_per_slice,
-            total_swap_count=routing_result.total_swap_count,
+            swaps=routing_result.swaps,
             routing_depth=routing_result.routing_depth,
         )
 
@@ -186,7 +186,7 @@ class PlaygroundAPI:
                 "transpiled_gates": len(transpiled_circuit.data),
                 "depth": len(compiled_operations_per_slice),
                 "qubits": transpiled_circuit.num_qubits,
-                "swap_count": routing_result.total_swap_count,
+                "swap_count": routing_result.swaps,
             },
         }
 

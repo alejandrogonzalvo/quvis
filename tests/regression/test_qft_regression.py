@@ -49,7 +49,7 @@ def extract_regression_data(visualization_data: dict[str, Any]) -> dict[str, Any
             if "routing_info" in circuit_data:
                 extracted_data["routing_info"] = {
                     "routing_ops_per_slice": circuit_data["routing_info"]["routing_ops_per_slice"],
-                    "total_swap_count": circuit_data["routing_info"]["total_swap_count"],
+                    "swaps": circuit_data["routing_info"]["swaps"],
                     "routing_depth": circuit_data["routing_info"]["routing_depth"],
                 }
 
