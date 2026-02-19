@@ -32,10 +32,12 @@ export class QubitGridController {
         count: number,
         initialIndex: number
     ) => void;
+    private onSettingsChanged?: (settings: any) => void;
 
     // State tracking
     public isFullyLoaded = false;
     private currentNumDeviceQubits: number = 0;
+    private lastUsedLayoutType: 'grid' | 'force' = 'grid';
 
     // Per-circuit layout state management
     private circuitLayoutStates: Map<number, CircuitLayoutState> = new Map();
@@ -56,13 +58,15 @@ export class QubitGridController {
         initialInactiveElementAlpha: number = 0.1,
         onSlicesLoadedCallback?: (count: number, initialIndex: number) => void,
         isLightBackground?: () => boolean,
-        smartAlignment?: SmartCameraAlignment
+        smartAlignment?: SmartCameraAlignment,
+        onSettingsChanged?: (settings: any) => void
     ) {
         this.scene = scene;
         this.mouse = mouse;
         this.camera = camera;
         this.onSlicesLoadedCallback = onSlicesLoadedCallback;
         this.smartAlignment = smartAlignment;
+        this.onSettingsChanged = onSettingsChanged;
 
         // Initialize subsystems
         this.dataManager = new CircuitDataManager();
@@ -148,6 +152,72 @@ export class QubitGridController {
         this.updateVisualization();
     }
 
+    private runModularLayoutForCurrentCircuit(onComplete?: () => void): void {
+        const modularInfo = this.dataManager.modularInfo;
+        if (!modularInfo) return;
+
+        this.layoutManager.calculateModularLayout(
+            modularInfo,
+            this.layoutManager.parameters.coreDistance,
+            this.dataManager.couplingMap
+        );
+        // Directly update positions since modular layout is synchronous
+        this.renderManager.updateQubitPositions(this.layoutManager.positions);
+        this.heatmapManager.generateClusters(
+            this.layoutManager.positions,
+            this.dataManager.deviceQubitCount
+        );
+        this.heatmapManager.clearPositionsCache();
+        this.updateVisualization();
+
+        // Auto-align camera to optimal viewing angle for the layout
+        this.autoAlignCameraToLayout();
+
+        // Save modular layout state
+        if (this.dataManager.isMultiCircuit) {
+            this.saveCurrentLayoutState(
+                this.dataManager.currentCircuitIndex,
+                'grid' // Treat as grid type for now since we don't have separate modular type
+            );
+        }
+        onComplete?.();
+    }
+
+    private runForceLayoutForCurrentCircuit(onComplete?: () => void): void {
+        const deviceQubitCount = this.dataManager.deviceQubitCount;
+        if (deviceQubitCount <= 0) {
+            onComplete?.();
+            return;
+        }
+
+        this.layoutManager.calculateForceDirectedLayout(
+            deviceQubitCount,
+            this.dataManager.couplingMap,
+            (positions) => {
+                this.renderManager.updateQubitPositions(positions);
+                this.heatmapManager.generateClusters(
+                    positions,
+                    deviceQubitCount
+                );
+                this.heatmapManager.clearPositionsCache();
+                this.updateVisualization();
+
+                // Auto-align camera to optimal viewing angle for the layout
+                this.autoAlignCameraToLayout();
+
+                // Save force layout state for current circuit
+                if (this.dataManager.isMultiCircuit) {
+                    this.saveCurrentLayoutState(
+                        this.dataManager.currentCircuitIndex,
+                        'force'
+                    );
+                }
+
+                onComplete?.();
+            }
+        );
+    }
+
     public updateLayoutParameters(
         params: {
             repelForce?: number;
@@ -158,66 +228,17 @@ export class QubitGridController {
         },
         onLayoutComplete?: () => void
     ): void {
-        // Always update parameters and trigger layout recalculation
+        // Always update parameters
         this.layoutManager.updateParameters(params);
 
-        const deviceQubitCount = this.dataManager.deviceQubitCount;
         const modularInfo = this.dataManager.modularInfo;
+        const deviceQubitCount = this.dataManager.deviceQubitCount;
 
         if (modularInfo) {
             console.log('Calculating modular layout...');
-            this.layoutManager.calculateModularLayout(
-                modularInfo,
-                this.layoutManager.parameters.coreDistance,
-                this.dataManager.couplingMap
-            );
-            // Directly update positions since modular layout is synchronous
-            this.renderManager.updateQubitPositions(this.layoutManager.positions);
-            this.heatmapManager.generateClusters(
-                this.layoutManager.positions,
-                deviceQubitCount
-            );
-            this.heatmapManager.clearPositionsCache();
-            this.updateVisualization();
-
-            // Auto-align camera to optimal viewing angle for the layout
-            this.autoAlignCameraToLayout();
-
-            // Save modular layout state
-            if (this.dataManager.isMultiCircuit) {
-                this.saveCurrentLayoutState(
-                    this.dataManager.currentCircuitIndex,
-                    'grid' // Treat as grid type for now or add 'modular' type
-                );
-            }
-            onLayoutComplete?.();
+            this.runModularLayoutForCurrentCircuit(onLayoutComplete);
         } else if (deviceQubitCount > 0) {
-            this.layoutManager.calculateForceDirectedLayout(
-                deviceQubitCount,
-                this.dataManager.couplingMap,
-                (positions) => {
-                    this.renderManager.updateQubitPositions(positions);
-                    this.heatmapManager.generateClusters(
-                        positions,
-                        deviceQubitCount
-                    );
-                    this.heatmapManager.clearPositionsCache();
-                    this.updateVisualization();
-
-                    // Auto-align camera to optimal viewing angle for the layout
-                    this.autoAlignCameraToLayout();
-
-                    // Save force layout state for current circuit
-                    if (this.dataManager.isMultiCircuit) {
-                        this.saveCurrentLayoutState(
-                            this.dataManager.currentCircuitIndex,
-                            'force'
-                        );
-                    }
-
-                    onLayoutComplete?.();
-                }
-            );
+            this.runForceLayoutForCurrentCircuit(onLayoutComplete);
         } else {
             onLayoutComplete?.();
         }
@@ -310,6 +331,13 @@ export class QubitGridController {
 
         const previousQubitCount = this.currentNumDeviceQubits;
 
+        // Save state of current circuit before switching
+        const currentCircuitIndex = this.dataManager.currentCircuitIndex;
+        // Only save if we have a valid circuit index (it might be -1 or 0 initially)
+        if (currentCircuitIndex >= 0 && currentCircuitIndex < this.dataManager.totalCircuits) {
+            this.saveCurrentLayoutState(currentCircuitIndex, this.lastUsedLayoutType);
+        }
+
         this.dataManager.switchToCircuit(circuitIndex);
         this.stateManager.setVisualizationMode(
             this.dataManager.visualizationMode
@@ -361,11 +389,19 @@ export class QubitGridController {
                 this.heatmapManager.clearPositionsCache();
             }
         } else {
-            // Initialize with default grid layout for new circuit
-            this.applyGridLayout();
-            this.circuitLayoutStates.set(circuitIndex, {
-                layoutType: 'grid',
-            });
+            // No saved state. Decide based on lastUsedLayoutType
+
+            const modularInfo = this.dataManager.modularInfo;
+            if (this.lastUsedLayoutType === 'force' && !modularInfo) {
+                console.log('Applying propagated Force layout preference to new circuit');
+                this.runForceLayoutForCurrentCircuit();
+            } else {
+                // Default to grid layout
+                this.applyGridLayout();
+                this.circuitLayoutStates.set(circuitIndex, {
+                    layoutType: 'grid',
+                });
+            }
         }
 
         // Update connections based on circuit type
@@ -392,6 +428,60 @@ export class QubitGridController {
         }
 
         this.updateVisualization();
+
+        // Apply per-circuit settings if available
+        const circuitSettings = this.dataManager.currentCircuitSettings;
+        if (circuitSettings) {
+            console.log('Applying per-circuit settings:', circuitSettings);
+
+            // Apply Layout Settings
+            this.updateLayoutParameters({
+                repelForce: circuitSettings.repel_force,
+                idealDistance: circuitSettings.ideal_distance,
+                iterations: circuitSettings.iterations,
+                coolingFactor: circuitSettings.cooling_factor,
+                coreDistance: circuitSettings.core_distance,
+                // attractForce: circuitSettings.attract_force // Not currently in VisualizerSettings but in LayoutManager
+            });
+
+            // Since we applied specific layout settings, we assume the user wants to use a force/modular layout
+            // Update the state so it persists and doesn't get overwritten by default grid
+            this.circuitLayoutStates.set(circuitIndex, {
+                layoutType: 'force',
+                // positions will be updated by the layout calculation
+            });
+            this.lastUsedLayoutType = 'force';
+
+            // Apply Appearance Settings
+            this.updateAppearanceParameters({
+                qubitSize: circuitSettings.qubit_size,
+                connectionThickness: circuitSettings.connection_thickness,
+                inactiveAlpha: circuitSettings.inactive_alpha,
+            });
+
+            this.setBlochSpheresVisible(circuitSettings.render_bloch_spheres);
+            this.setConnectionLinesVisible(circuitSettings.render_connection_lines);
+
+            // Apply Heatmap Settings
+            this.updateHeatmapColorParameters({
+                fadeThreshold: circuitSettings.heatmap_fade_threshold,
+                greenThreshold: circuitSettings.heatmap_green_threshold,
+                yellowThreshold: circuitSettings.heatmap_yellow_threshold,
+                intensityPower: circuitSettings.heatmap_intensity_power,
+                minIntensity: circuitSettings.heatmap_min_intensity,
+                borderWidth: circuitSettings.heatmap_border_width,
+            });
+
+            if (circuitSettings.heatmap_max_slices !== -1) {
+                this.updateHeatmapSlices(circuitSettings.heatmap_max_slices);
+            }
+
+            // Notify UI of new settings
+            if (this.onSettingsChanged) {
+                this.onSettingsChanged(circuitSettings);
+            }
+        }
+
         console.log(
             `Switched to circuit: ${circuitIndex} (${this.dataManager.visualizationMode})`
         );
@@ -457,6 +547,7 @@ export class QubitGridController {
             }
 
             this.circuitLayoutStates.set(circuitIndex, currentState);
+            this.lastUsedLayoutType = layoutType;
         }
     }
 
@@ -499,6 +590,7 @@ export class QubitGridController {
         borderWidth?: number;
     }): void {
         this.heatmapManager.updateColorParameters(params);
+        this.updateVisualization();
     }
 
     public updateHeatmapLightBackground(isLight: boolean): void {

@@ -28,7 +28,7 @@ from ..compiler.utils import (
     ModularInfo,
 )
 from ..enums import TopologyType
-from ..config import VisualizationConfig
+from ..config import VisualizationConfig, VisualizerSettings
 
 # Create module logger
 logger = logging.getLogger(__name__)
@@ -68,6 +68,7 @@ class CircuitVisualizationData:
     algorithm_params: dict[str, Any]
     circuit_stats: CircuitStats
     routing_info: RoutingCircuitInfo | None = None
+    settings: VisualizerSettings | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -81,6 +82,10 @@ class CircuitVisualizationData:
         }
         if self.routing_info is not None:
             result["routing_info"] = asdict(self.routing_info)
+        
+        if self.settings:
+            result["settings"] = self.settings.to_dict()
+
         return result
 
 
@@ -95,6 +100,8 @@ class Visualizer:
         auto_open_browser: bool = True,
         port: int = 5173,
         verbose: bool = False,
+        settings: VisualizerSettings | None = None,
+        start_server: bool = True,
     ):
         """
         Initialize the Quvis visualizer.
@@ -103,10 +110,14 @@ class Visualizer:
             auto_open_browser: Whether to automatically open the browser
             port: Port for the development server (default: 5173)
             verbose: Whether to enable verbose logging
+            settings: Global configuration settings for the visualizer
+            start_server: Whether to start the development server (set to False for data generation only)
         """
         self.auto_open_browser = auto_open_browser
         self.port = port
         self.verbose = verbose
+        self.settings = settings
+        self.start_server = start_server
         self.circuits: list[CircuitVisualizationData] = []
         
         # Configure logging based on verbose setting
@@ -134,6 +145,7 @@ class Visualizer:
         circuit: QuantumCircuit,
         coupling_map: list[list[int]] | CouplingMap | dict[str, Any] | None = None,
         config: VisualizationConfig | None = None,
+        settings: VisualizerSettings | None = None,
         **kwargs,
     ) -> None:
         """
@@ -160,7 +172,7 @@ class Visualizer:
         logger.info(f"📊 Processing circuit: '{config.algorithm_name}'")
         
         circuit_data = self._process_circuit(
-            circuit, config, coupling_map
+            circuit, config, coupling_map, settings
         )
         self.circuits.append(circuit_data)
 
@@ -182,6 +194,10 @@ class Visualizer:
             "circuits": [circuit.to_dict() for circuit in self.circuits],
             "total_circuits": len(self.circuits),
         }
+        
+        # Add global settings if present
+        if self.settings:
+            frontend_data["settings"] = self.settings.to_dict()
 
         self._launch_visualization(frontend_data)
 
@@ -225,6 +241,7 @@ class Visualizer:
         circuit: QuantumCircuit,
         config: VisualizationConfig,
         coupling_map: list[list[int]] | CouplingMap | dict[str, Any] | None = None,
+        settings: VisualizerSettings | None = None,
     ) -> CircuitVisualizationData:
         """Process a circuit into visualization data."""
 
@@ -274,6 +291,7 @@ class Visualizer:
                 circuit_type="logical",
                 algorithm_params=config.transpile_params,
                 circuit_stats=circuit_stats,
+                settings=settings,
             )
         else:
             compiled_operations_per_slice = extract_operations_per_slice(circuit)
@@ -314,6 +332,7 @@ class Visualizer:
                 algorithm_params=config.transpile_params,
                 circuit_stats=circuit_stats,
                 routing_info=routing_info,
+                settings=settings,
             )
 
     def clear_circuits(self) -> None:
@@ -340,6 +359,10 @@ class Visualizer:
 
         except Exception as e:
             logger.error(f"❌ Error creating data file: {e}")
+            return
+            
+        if not self.start_server:
+            logger.info(f"✅ Data generated at {data_file}. Skipping server start.")
             return
 
         # Store original CWD
@@ -433,13 +456,24 @@ def visualize_circuit(
     Returns:
         Dictionary containing multi-circuit visualization data (logical + compiled)
     """
+    settings = kwargs.pop("settings", None)
+    auto_open_browser = kwargs.pop("auto_open_browser", True)
+    port = kwargs.pop("port", 5173)
+    start_server = kwargs.pop("start_server", True)
+    
     config = VisualizationConfig(
         algorithm_name=algorithm_name,
         # topology_type is not explictly passed here often, usually in coupling_map or default
         transpile_params=kwargs
     )
     
-    visualizer = Visualizer(verbose=verbose)
+    visualizer = Visualizer(
+        verbose=verbose, 
+        settings=settings, 
+        auto_open_browser=auto_open_browser,
+        port=port,
+        start_server=start_server
+    )
     visualizer.add_circuit(
         circuit, coupling_map, config=config
     )

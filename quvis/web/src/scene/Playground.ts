@@ -44,7 +44,8 @@ export class Playground {
         onModeSwitchedCallback?: (
             newSliceCount: number,
             newCurrentSliceIndex: number
-        ) => void
+        ) => void,
+        onSettingsChangedCallback?: (settings: any) => void
     ) {
         this.containerElement = container || null;
         this.instanceId = `PlaygroundInstance_${Math.random().toString(36).substr(2, 9)}`;
@@ -110,7 +111,8 @@ export class Playground {
             this.appearanceManager.getInactiveAlpha(),
             onSlicesLoadedCallback,
             () => this.threeSetup.isLightBackground(),
-            this.threeComponents.smartAlignment
+            this.threeComponents.smartAlignment,
+            onSettingsChangedCallback
         );
 
         // Set up grid references in modules
@@ -232,6 +234,7 @@ export class Playground {
             iterations?: number;
             coolingFactor?: number;
             attractForce?: number;
+            coreDistance?: number;
         },
         onLayoutComplete?: () => void
     ) {

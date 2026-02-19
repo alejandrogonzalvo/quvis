@@ -77,6 +77,36 @@ def main():
     n_qubits = 500
     n_cores = 5 
     qubits_per_core = n_qubits // n_cores 
+    
+    # Configure visualization settings based on screenshot
+    from quvis.config import VisualizerSettings
+    settings = VisualizerSettings(
+        # Appearance
+        render_bloch_spheres=True,
+        render_connection_lines=True,
+        qubit_size=1.0,
+        connection_thickness=0.1,
+        inactive_alpha=1.0,
+        
+        # Layout
+        core_distance=18.5,
+        repel_force=0.22,
+        ideal_distance=1.0,
+        iterations=10000,
+        cooling_factor=0.995,
+        attract_force=0.217,
+        
+        # Heatmap
+        heatmap_max_slices=40,
+        heatmap_base_size=3110.0,
+        heatmap_fade_threshold=0.0,
+        heatmap_green_threshold=0.3,
+        heatmap_yellow_threshold=0.7,
+        heatmap_intensity_power=0.3,
+        heatmap_min_intensity=0.01,
+        heatmap_border_width=0.0
+    )
+    
     viz = Visualizer(verbose=True)
     
     print(f"Creating {n_qubits}-qubit QFT Modular Demo...")
@@ -135,11 +165,11 @@ def main():
         "inter_core_links": inter_core_links,
         "topology_type": "modular_grid"
     }
-
     viz.add_circuit(
         qc_modular_transpiled,
         coupling_map=modular_def,
-        algorithm_name=f"QFT {n_qubits} ({n_cores} cores x {qubits_per_core} qubits)"
+        algorithm_name=f"QFT {n_qubits} ({n_cores} cores x {qubits_per_core} qubits)",
+        settings=settings
     )
 
     # --- Visualize ---

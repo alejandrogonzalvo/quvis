@@ -167,6 +167,17 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
         initialValues.coreDistance ?? 5.0,
     );
 
+    // Sync state with initialValues when they change
+    useEffect(() => {
+        setRepelForce(initialValues.repelForce);
+        setIdealDistance(initialValues.idealDistance);
+        setGridIdealDistance(initialValues.gridIdealDistance);
+        setIterations(initialValues.iterations);
+        setCoolingFactor(initialValues.coolingFactor);
+        setAttractForce(initialValues.attractForce ?? 0.1);
+        setCoreDistance(initialValues.coreDistance ?? 5.0);
+    }, [initialValues]);
+
     useEffect(() => {
         setRepelForce(initialValues.repelForce);
         setIdealDistance(initialValues.idealDistance);

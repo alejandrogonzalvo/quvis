@@ -112,6 +112,12 @@ const App: React.FC = () => {
     const [initialHeatmapSettings, setInitialHeatmapSettings] = useState({
         maxSlices: -1,
         baseSize: 1500.0,
+        fadeThreshold: 0.05,
+        greenThreshold: 0.4,
+        yellowThreshold: 0.7,
+        intensityPower: 0.5,
+        minIntensity: 0.01,
+        borderWidth: 0.0,
     });
 
     // State for FidelityControls initial values
@@ -592,13 +598,55 @@ const App: React.FC = () => {
             return;
         }
 
+        const handleSettingsChanged = (settings: any) => {
+            console.log('🔄 UI received settings update from Playground:', settings);
+
+            // Update initial states which controls read from
+            if (settings) {
+                // Update Appearance
+                setInitialAppearance(prev => ({
+                    ...prev,
+                    qubitSize: settings.qubit_size ?? prev.qubitSize,
+                    connectionThickness: settings.connection_thickness ?? prev.connectionThickness,
+                    inactiveAlpha: settings.inactive_alpha ?? prev.inactiveAlpha,
+                    renderBlochSpheres: settings.render_bloch_spheres ?? prev.renderBlochSpheres,
+                    renderConnectionLines: settings.render_connection_lines ?? prev.renderConnectionLines,
+                }));
+
+                // Update Layout
+                setInitialLayout(prev => ({
+                    ...prev,
+                    repelForce: settings.repel_force ?? prev.repelForce,
+                    idealDistance: settings.ideal_distance ?? prev.idealDistance,
+                    iterations: settings.iterations ?? prev.iterations,
+                    coolingFactor: settings.cooling_factor ?? prev.coolingFactor,
+                    attractForce: settings.attract_force ?? prev.attractForce,
+                    coreDistance: settings.core_distance ?? prev.coreDistance,
+                }));
+
+                // Update Heatmap
+                setInitialHeatmapSettings(prev => ({
+                    ...prev,
+                    maxSlices: settings.heatmap_max_slices ?? prev.maxSlices,
+                    // baseSize: settings.heatmap_base_size ?? prev.baseSize, // Not dynamic in UI yet?
+                    fadeThreshold: settings.heatmap_fade_threshold ?? prev.fadeThreshold,
+                    greenThreshold: settings.heatmap_green_threshold ?? prev.greenThreshold,
+                    yellowThreshold: settings.heatmap_yellow_threshold ?? prev.yellowThreshold,
+                    intensityPower: settings.heatmap_intensity_power ?? prev.intensityPower,
+                    minIntensity: settings.heatmap_min_intensity ?? prev.minIntensity,
+                    borderWidth: settings.heatmap_border_width ?? prev.borderWidth,
+                }));
+            }
+        };
+
         const playgroundInstance = new Playground(
             mountRef.current,
             playgroundData,
             'compiled',
             handleSlicesLoaded,
             handleTooltipUpdate,
-            handleModeSwitched
+            handleModeSwitched,
+            handleSettingsChanged
         );
         playgroundRef.current = playgroundInstance;
         setIsPlaygroundInitialized(true);
@@ -618,29 +666,112 @@ const App: React.FC = () => {
             }, 500); // Small delay to show completion
         }
 
-        setInitialAppearance({
-            qubitSize: playgroundInstance.currentQubitSize,
-            connectionThickness: playgroundInstance.currentConnectionThickness,
-            inactiveAlpha: playgroundInstance.currentInactiveAlpha,
-            renderBlochSpheres: playgroundInstance.areBlochSpheresVisible,
-            renderConnectionLines: playgroundInstance.areConnectionLinesVisible,
-        });
-        setInitialLayout({
-            repelForce: playgroundInstance.currentRepelForce,
-            idealDistance: playgroundInstance.currentIdealDistance,
-            gridIdealDistance: 1.0, // Default value
-            iterations: playgroundInstance.currentIterations,
-            coolingFactor: playgroundInstance.currentCoolingFactor,
-            coreDistance: playgroundInstance.currentCoreDistance,
-        });
-        setInitialHeatmapSettings({
-            maxSlices: playgroundInstance.maxHeatmapSlices,
-            baseSize: playgroundInstance.currentBaseSize,
-        });
-        setInitialFidelitySettings({
-            oneQubitBase: playgroundInstance.currentOneQubitFidelityBase,
-            twoQubitBase: playgroundInstance.currentTwoQubitFidelityBase,
-        });
+        // Apply settings from backend if available, otherwise fallback to Playground defaults
+        const settings = playgroundData.settings;
+
+        if (settings) {
+            console.log("⚙️ Applying settings from backend:", settings);
+
+            // Apply appearance settings
+            setInitialAppearance({
+                qubitSize: settings.qubit_size ?? 1.0,
+                connectionThickness: settings.connection_thickness ?? 0.05,
+                inactiveAlpha: settings.inactive_alpha ?? 0.1,
+                renderBlochSpheres: settings.render_bloch_spheres ?? false,
+                renderConnectionLines: settings.render_connection_lines ?? true,
+            });
+
+            // Apply layout settings
+            setInitialLayout({
+                repelForce: settings.repel_force ?? 0.6,
+                idealDistance: settings.ideal_distance ?? 1.0,
+                gridIdealDistance: 1.0,
+                iterations: settings.iterations ?? 500,
+                coolingFactor: settings.cooling_factor ?? 1.0,
+                attractForce: settings.attract_force ?? 0.1,
+                coreDistance: settings.core_distance ?? 5.0,
+            });
+
+            // Apply heatmap settings
+            setInitialHeatmapSettings((prev) => ({
+                ...prev,
+                maxSlices: settings.heatmap_max_slices ?? -1,
+                baseSize: settings.heatmap_base_size ?? 1500.0,
+            }));
+
+            // Apply fidelity settings
+            setInitialFidelitySettings({
+                oneQubitBase: settings.one_qubit_fidelity_base ?? 0.99,
+                twoQubitBase: settings.two_qubit_fidelity_base ?? 0.98,
+            });
+
+            // Update the Playground instance with these settings
+            // Note: Playground constructor usually takes defaults, but we should update it 
+            // incase the constructor set different defaults.
+            playgroundInstance.updateAppearanceParameters({
+                qubitSize: settings.qubit_size,
+                connectionThickness: settings.connection_thickness,
+                inactiveAlpha: settings.inactive_alpha,
+                baseSize: settings.heatmap_base_size,
+            });
+
+            playgroundInstance.setBlochSpheresVisible(settings.render_bloch_spheres ?? false);
+            playgroundInstance.setConnectionLinesVisible(settings.render_connection_lines ?? true);
+
+            playgroundInstance.updateLayoutParameters({
+                repelForce: settings.repel_force,
+                idealDistance: settings.ideal_distance,
+                iterations: settings.iterations,
+                coolingFactor: settings.cooling_factor,
+                attractForce: settings.attract_force,
+                coreDistance: settings.core_distance,
+            });
+
+            playgroundInstance.updateHeatmapSlices(settings.heatmap_max_slices ?? -1);
+
+            playgroundInstance.updateHeatmapColorParameters({
+                fadeThreshold: settings.heatmap_fade_threshold,
+                greenThreshold: settings.heatmap_green_threshold,
+                yellowThreshold: settings.heatmap_yellow_threshold,
+                intensityPower: settings.heatmap_intensity_power,
+                minIntensity: settings.heatmap_min_intensity,
+                borderWidth: settings.heatmap_border_width,
+            });
+
+            playgroundInstance.updateFidelityParameters({
+                oneQubitBase: settings.one_qubit_fidelity_base,
+                twoQubitBase: settings.two_qubit_fidelity_base,
+            });
+
+        } else {
+            // Fallback to reading defaults FROM the playground instance (legacy behavior)
+            setInitialAppearance({
+                qubitSize: playgroundInstance.currentQubitSize,
+                connectionThickness: playgroundInstance.currentConnectionThickness,
+                inactiveAlpha: playgroundInstance.currentInactiveAlpha,
+                renderBlochSpheres: playgroundInstance.areBlochSpheresVisible,
+                renderConnectionLines: playgroundInstance.areConnectionLinesVisible,
+            });
+            setInitialLayout({
+                repelForce: playgroundInstance.currentRepelForce,
+                idealDistance: playgroundInstance.currentIdealDistance,
+                gridIdealDistance: 1.0, // Default value
+                iterations: playgroundInstance.currentIterations,
+                coolingFactor: playgroundInstance.currentCoolingFactor,
+                attractForce: 0.1, // Default
+                coreDistance: playgroundInstance.currentCoreDistance,
+            });
+            setInitialHeatmapSettings((prev) => ({
+                ...prev,
+                maxSlices: playgroundInstance.maxHeatmapSlices,
+                baseSize: playgroundInstance.currentBaseSize,
+            }));
+            setInitialFidelitySettings({
+                oneQubitBase: playgroundInstance.currentOneQubitFidelityBase,
+                twoQubitBase: playgroundInstance.currentTwoQubitFidelityBase,
+            });
+        }
+
         // Initialize light mode from playground background state
         setLightMode(playgroundInstance.isLightBackground());
 

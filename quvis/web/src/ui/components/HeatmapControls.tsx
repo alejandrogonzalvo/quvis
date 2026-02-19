@@ -7,6 +7,12 @@ interface HeatmapControlsProps {
     initialValues: {
         maxSlices: number;
         baseSize: number;
+        fadeThreshold?: number;
+        greenThreshold?: number;
+        yellowThreshold?: number;
+        intensityPower?: number;
+        minIntensity?: number;
+        borderWidth?: number;
     };
     isCollapsed: boolean;
     onToggleCollapse: () => void;
@@ -21,7 +27,7 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
     const [isHovered, setIsHovered] = useState(false);
     const [maxSlices, setMaxSlices] = useState(initialValues.maxSlices);
     const [baseSize, setBaseSize] = useState(initialValues.baseSize);
-    
+
     // Color parameters state
     const [fadeThreshold, setFadeThreshold] = useState(0.1);
     const [greenThreshold, setGreenThreshold] = useState(0.3);
@@ -79,16 +85,26 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
     useEffect(() => {
         setMaxSlices(initialValues.maxSlices);
         setBaseSize(initialValues.baseSize);
-        // Initialize color parameters from playground
-        if (playground) {
-            const colorParams = playground.getHeatmapColorParameters();
-            setFadeThreshold(colorParams.fadeThreshold);
-            setGreenThreshold(colorParams.greenThreshold);
-            setYellowThreshold(colorParams.yellowThreshold);
-            setIntensityPower(colorParams.intensityPower);
-            setMinIntensity(colorParams.minIntensity);
-            setBorderWidth(colorParams.borderWidth);
-        }
+
+        // Sync color parameters from props if available (preferred) or fallback to playground defaults
+        if (initialValues.fadeThreshold !== undefined) setFadeThreshold(initialValues.fadeThreshold);
+        else if (playground) setFadeThreshold(playground.getHeatmapColorParameters().fadeThreshold);
+
+        if (initialValues.greenThreshold !== undefined) setGreenThreshold(initialValues.greenThreshold);
+        else if (playground) setGreenThreshold(playground.getHeatmapColorParameters().greenThreshold);
+
+        if (initialValues.yellowThreshold !== undefined) setYellowThreshold(initialValues.yellowThreshold);
+        else if (playground) setYellowThreshold(playground.getHeatmapColorParameters().yellowThreshold);
+
+        if (initialValues.intensityPower !== undefined) setIntensityPower(initialValues.intensityPower);
+        else if (playground) setIntensityPower(playground.getHeatmapColorParameters().intensityPower);
+
+        if (initialValues.minIntensity !== undefined) setMinIntensity(initialValues.minIntensity);
+        else if (playground) setMinIntensity(playground.getHeatmapColorParameters().minIntensity);
+
+        if (initialValues.borderWidth !== undefined) setBorderWidth(initialValues.borderWidth);
+        else if (playground) setBorderWidth(playground.getHeatmapColorParameters().borderWidth);
+
     }, [initialValues, playground]);
 
     const handleMaxSlicesChange = (
@@ -157,7 +173,7 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
         setBorderWidth(value);
         if (playground) {
             playground.updateHeatmapColorParameters({ borderWidth: value });
-            
+
         }
     };
 
@@ -286,7 +302,7 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
                 <h4 style={headerTitleStyle}>
                     Heatmap Controls
                 </h4>
-                <div 
+                <div
                     style={{
                         ...toggleIconStyle,
                         transform: isCollapsed ? "rotate(0deg)" : "rotate(180deg)",
@@ -303,7 +319,7 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
                         <label htmlFor="max-slices" style={labelStyle}>
                             Max Heatmap Slices
                         </label>
-                        <div 
+                        <div
                             style={{
                                 position: "relative",
                                 display: "flex",
@@ -323,9 +339,9 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
                             }}
                             onMouseEnter={(e) => {
                                 const rect = e.currentTarget.getBoundingClientRect();
-                                setSlicesTooltipPosition({ 
-                                    top: rect.top - 10, 
-                                    left: Math.max(20, rect.left - 150) 
+                                setSlicesTooltipPosition({
+                                    top: rect.top - 10,
+                                    left: Math.max(20, rect.left - 150)
                                 });
                                 setSlicesTooltipFading(false);
                                 setShowSlicesTooltip(true);
@@ -363,7 +379,7 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
                         <label htmlFor="heatmap-base-size" style={labelStyle}>
                             Heatmap Base Size
                         </label>
-                        <div 
+                        <div
                             style={{
                                 position: "relative",
                                 display: "flex",
@@ -383,9 +399,9 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
                             }}
                             onMouseEnter={(e) => {
                                 const rect = e.currentTarget.getBoundingClientRect();
-                                setBaseSizeTooltipPosition({ 
-                                    top: rect.top - 10, 
-                                    left: Math.max(20, rect.left - 150) 
+                                setBaseSizeTooltipPosition({
+                                    top: rect.top - 10,
+                                    left: Math.max(20, rect.left - 150)
                                 });
                                 setBaseSizeTooltipFading(false);
                                 setShowBaseSizeTooltip(true);
@@ -424,7 +440,7 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
                         <label style={labelStyle}>
                             Color Controls
                         </label>
-                        <div 
+                        <div
                             style={{
                                 position: "relative",
                                 display: "flex",
@@ -444,9 +460,9 @@ const HeatmapControls: React.FC<HeatmapControlsProps> = ({
                             }}
                             onMouseEnter={(e) => {
                                 const rect = e.currentTarget.getBoundingClientRect();
-                                setTooltipPosition({ 
-                                    top: rect.top - 10, 
-                                    left: Math.max(20, rect.left - 150) 
+                                setTooltipPosition({
+                                    top: rect.top - 10,
+                                    left: Math.max(20, rect.left - 150)
                                 });
                                 setColorTooltipFading(false);
                                 setShowColorTooltip(true);

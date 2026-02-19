@@ -38,9 +38,9 @@ interface Circuit {
         qubits: number;
         swap_count?: number;
     };
-    routing_info?: any;
     routing_analysis?: any;
     algorithm_params?: any;
+    settings?: any;
 }
 
 export class CircuitDataManager {
@@ -141,6 +141,14 @@ export class CircuitDataManager {
 
     get cumulativeWeightedPairInteractionData(): Map<string, number[]> {
         return this.cumulativePairInteractions;
+    }
+
+    get currentCircuitSettings(): any {
+        if (this.circuits) {
+            const currentCircuit = this.circuits[this._currentCircuitIndex];
+            return currentCircuit?.settings;
+        }
+        return undefined;
     }
 
     async loadDataFile(filePath: string): Promise<void> {

@@ -35,7 +35,7 @@ from .compiler.utils import (
     analyze_routing_overhead
 )
 from .enums import AlgorithmType, TopologyType
-from .config import CircuitGenerationConfig, VisualizationConfig
+from .config import CircuitGenerationConfig, VisualizationConfig, VisualizerSettings
 
 __version__ = "v0.28.0"
 
@@ -65,5 +65,6 @@ __all__ = [
 
     # Config
     "CircuitGenerationConfig",
-    "VisualizationConfig"
+    "VisualizationConfig",
+    "VisualizerSettings"
 ] 
